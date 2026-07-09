@@ -9,5 +9,4 @@ public class TenureBeApplication {
 	public static void main(String[] args) {
 		SpringApplication.run(TenureBeApplication.class, args);
 	}
-
 }
