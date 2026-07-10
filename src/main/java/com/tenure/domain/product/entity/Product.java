@@ -68,4 +68,29 @@ public class Product extends BaseTimeEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "product_status", nullable = false, length = 20)
     private ProductStatus productStatus = ProductStatus.ON_SALE;
+
+    public static Product create(
+            Item item,
+            User seller,
+            Integer price,
+            Integer shippingFee,
+            FeePolicy feePolicy,
+            String mainImageUrl,
+            String measurements,
+            String conditionFlags,
+            String sellerDescription
+    ) {
+        Product product = new Product();
+        product.item = item;
+        product.seller = seller;
+        product.price = price;
+        product.shippingFee = shippingFee;
+        product.feePolicy = feePolicy;
+        product.mainImageUrl = mainImageUrl;
+        product.measurements = measurements;
+        product.conditionFlags = conditionFlags;
+        product.sellerDescription = sellerDescription;
+        product.productStatus = ProductStatus.ON_SALE;
+        return product;
+    }
 }

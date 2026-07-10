@@ -50,4 +50,11 @@ public class ProductAttachedOotd {
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
     }
+
+    public static ProductAttachedOotd create(Product product, Ootd ootd) {
+        ProductAttachedOotd attachedOotd = new ProductAttachedOotd();
+        attachedOotd.product = product;
+        attachedOotd.ootd = ootd;
+        return attachedOotd;
+    }
 }

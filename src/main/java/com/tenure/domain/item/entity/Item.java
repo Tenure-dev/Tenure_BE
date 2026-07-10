@@ -77,4 +77,8 @@ public class Item extends BaseTimeEntity {
 
     @Column(name = "purchase_offer_enabled", nullable = false)
     private Boolean purchaseOfferEnabled = true;
+
+    public void markOnSale() {
+        this.itemStatus = ItemStatus.ON_SALE;
+    }
 }
