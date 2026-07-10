@@ -20,6 +20,8 @@ import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Getter
 @Entity
@@ -52,9 +54,11 @@ public class Product extends BaseTimeEntity {
     @Column(name = "main_image_url", length = 500)
     private String mainImageUrl;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
     private String measurements;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "condition_flags", columnDefinition = "jsonb")
     private String conditionFlags;
 

@@ -20,6 +20,8 @@ import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Getter
 @Entity
@@ -77,9 +79,11 @@ public class User extends BaseTimeEntity {
     @Column(name = "default_purchase_offer_enabled", nullable = false)
     private Boolean defaultPurchaseOfferEnabled = false;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "notification_settings", columnDefinition = "jsonb")
     private String notificationSettings;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "settlement_account", columnDefinition = "jsonb")
     private String settlementAccount;
 
