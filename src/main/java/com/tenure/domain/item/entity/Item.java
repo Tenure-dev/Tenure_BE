@@ -1,0 +1,80 @@
+package com.tenure.domain.item.entity;
+
+import com.tenure.domain.item.enums.ItemStatus;
+
+import com.tenure.domain.item.enums.WearingTarget;
+
+import com.tenure.domain.common.entity.BaseTimeEntity;
+import com.tenure.domain.user.entity.User;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import java.time.LocalDate;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
+@Getter
+@Entity
+@Table(name = "items")
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+public class Item extends BaseTimeEntity {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "owner_user_id", nullable = false)
+    private User owner;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "category_id", nullable = false)
+    private Category category;
+
+    @Column(name = "brand_name", nullable = false, length = 100)
+    private String brandName;
+
+    @Column(name = "item_name", nullable = false, length = 100)
+    private String itemName;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "wearing_target", nullable = false, length = 20)
+    private WearingTarget wearingTarget;
+
+    @Column(name = "size_system", length = 30)
+    private String sizeSystem;
+
+    @Column(name = "size_value", length = 30)
+    private String sizeValue;
+
+    @Column(name = "representative_image_url", length = 500)
+    private String representativeImageUrl;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "item_status", nullable = false, length = 30)
+    private ItemStatus itemStatus = ItemStatus.OWNED;
+
+    @Column(name = "ootd_verified_wear_count", nullable = false)
+    private Integer ootdVerifiedWearCount = 0;
+
+    @Column(name = "last_worn_at")
+    private LocalDate lastWornAt;
+
+    @Column(name = "first_owned_at")
+    private LocalDate firstOwnedAt;
+
+    @Column(name = "wish_count", nullable = false)
+    private Integer wishCount = 0;
+
+    @Column(name = "purchase_offer_enabled", nullable = false)
+    private Boolean purchaseOfferEnabled = true;
+}

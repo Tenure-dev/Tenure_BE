@@ -1,0 +1,92 @@
+package com.tenure.domain.purchase.entity;
+
+import com.tenure.domain.purchase.enums.PurchaseOfferStatus;
+
+import com.tenure.domain.address.entity.DeliveryAddress;
+import com.tenure.domain.common.entity.BaseTimeEntity;
+import com.tenure.domain.common.enums.PaymentAuthorizationStatus;
+import com.tenure.domain.item.entity.Item;
+import com.tenure.domain.user.entity.User;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import java.time.LocalDateTime;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
+@Getter
+@Entity
+@Table(
+        name = "purchase_offers",
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uk_purchase_offers_proposer_item",
+                        columnNames = {"proposer_user_id", "item_id"}
+                )
+        }
+)
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+public class PurchaseOffer extends BaseTimeEntity {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "item_id", nullable = false)
+    private Item item;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "proposer_user_id", nullable = false)
+    private User proposer;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "owner_user_id", nullable = false)
+    private User owner;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "delivery_address_id", nullable = false)
+    private DeliveryAddress deliveryAddress;
+
+    @Column(name = "offer_price", nullable = false)
+    private Integer offerPrice;
+
+    @Column(name = "proposer_shipping_fee", nullable = false)
+    private Integer proposerShippingFee = 0;
+
+    @Column(name = "proposer_service_fee", nullable = false)
+    private Integer proposerServiceFee = 0;
+
+    @Column(name = "total_payment_amount", nullable = false)
+    private Integer totalPaymentAmount;
+
+    @Column(name = "owner_settlement_amount", nullable = false)
+    private Integer ownerSettlementAmount;
+
+    @Column(name = "payment_authorization_id", nullable = false, length = 100)
+    private String paymentAuthorizationId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_authorization_status", nullable = false, length = 30)
+    private PaymentAuthorizationStatus paymentAuthorizationStatus = PaymentAuthorizationStatus.AUTHORIZED;
+
+    @Column(name = "payment_method_id", nullable = false, length = 100)
+    private String paymentMethodId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private PurchaseOfferStatus status = PurchaseOfferStatus.SENT;
+
+    @Column(name = "expires_at", nullable = false)
+    private LocalDateTime expiresAt;
+}
