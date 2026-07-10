@@ -1,8 +1,11 @@
 package com.tenure.domain.product.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tenure.domain.common.enums.FeePolicy;
+import com.tenure.domain.follow.enums.FollowStatus;
+import com.tenure.domain.follow.repository.FollowRelationshipRepository;
 import com.tenure.domain.item.entity.Item;
 import com.tenure.domain.item.enums.ItemStatus;
 import com.tenure.domain.item.repository.ItemRepository;
@@ -11,16 +14,23 @@ import com.tenure.domain.ootd.enums.OotdPublicationStatus;
 import com.tenure.domain.ootd.repository.OotdRepository;
 import com.tenure.domain.product.dto.ProductCreateRequest;
 import com.tenure.domain.product.dto.ProductCreateResponse;
+import com.tenure.domain.product.dto.ProductDetailResponse;
 import com.tenure.domain.product.entity.Product;
 import com.tenure.domain.product.entity.ProductAttachedOotd;
+import com.tenure.domain.product.enums.ProductAction;
+import com.tenure.domain.product.enums.ProductStatus;
+import com.tenure.domain.product.enums.ProductViewerMode;
 import com.tenure.domain.product.exception.ProductErrorCode;
 import com.tenure.domain.product.repository.ProductAttachedOotdRepository;
 import com.tenure.domain.product.repository.ProductRepository;
 import com.tenure.domain.tag.enums.TagStatus;
 import com.tenure.domain.tag.repository.OotdTagRepository;
 import com.tenure.domain.user.entity.User;
+import com.tenure.domain.user.enums.AccountVisibility;
 import com.tenure.domain.user.enums.UserGrade;
 import com.tenure.global.exception.CustomException;
+import java.io.IOException;
+import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -39,6 +49,7 @@ public class ProductService {
     private final ProductAttachedOotdRepository productAttachedOotdRepository;
     private final OotdRepository ootdRepository;
     private final OotdTagRepository ootdTagRepository;
+    private final FollowRelationshipRepository followRelationshipRepository;
     private final ObjectMapper objectMapper;
 
     @Transactional
@@ -76,6 +87,32 @@ public class ProductService {
         item.markOnSale();
 
         return ProductCreateResponse.of(product, item, request.attachedOotdIds());
+    }
+
+    @Transactional(readOnly = true)
+    public ProductDetailResponse getProductDetail(Long productId, Long currentUserId) {
+        Product product = productRepository.findDetailById(productId)
+                .orElseThrow(() -> new CustomException(ProductErrorCode.PRODUCT_NOT_FOUND));
+
+        User seller = product.getSeller();
+        ProductViewerMode viewerMode = resolveViewerMode(seller, currentUserId);
+        validateHiddenProduct(product, viewerMode);
+        validateProductVisibility(seller, currentUserId, viewerMode);
+
+        List<ProductAttachedOotd> representativeOotds =
+                productAttachedOotdRepository.findActiveByProductIdOrderByOotdCreatedAtDesc(
+                        product.getId(),
+                        OotdPublicationStatus.ACTIVE
+                );
+
+        return ProductDetailResponse.of(
+                product,
+                viewerMode,
+                resolveAvailableActions(viewerMode, product.getProductStatus()),
+                readMapOrEmpty(product.getMeasurements()),
+                readListOrEmpty(product.getConditionFlags()),
+                representativeOotds
+        );
     }
 
     private void validateOwner(Item item, Long currentUserId) {
@@ -127,6 +164,72 @@ public class ProductService {
             return objectMapper.writeValueAsString(value);
         } catch (JsonProcessingException e) {
             throw new CustomException(ProductErrorCode.PRODUCT_JSON_INVALID);
+        }
+    }
+
+    private ProductViewerMode resolveViewerMode(User seller, Long currentUserId) {
+        if (seller.getId().equals(currentUserId)) {
+            return ProductViewerMode.SELLER;
+        }
+        return ProductViewerMode.BUYER;
+    }
+
+    private void validateProductVisibility(User seller, Long currentUserId, ProductViewerMode viewerMode) {
+        if (viewerMode == ProductViewerMode.SELLER || seller.getAccountVisibility() == AccountVisibility.PUBLIC) {
+            return;
+        }
+
+        boolean acceptedFollower = followRelationshipRepository.existsByFollowerIdAndFollowingIdAndStatus(
+                currentUserId,
+                seller.getId(),
+                FollowStatus.ACCEPTED
+        );
+        if (!acceptedFollower) {
+            throw new CustomException(ProductErrorCode.PRIVATE_PRODUCT_ACCESS_DENIED);
+        }
+    }
+
+    private void validateHiddenProduct(Product product, ProductViewerMode viewerMode) {
+        if (product.getProductStatus() == ProductStatus.HIDDEN && viewerMode != ProductViewerMode.SELLER) {
+            throw new CustomException(ProductErrorCode.PRODUCT_NOT_FOUND);
+        }
+    }
+
+    private List<ProductAction> resolveAvailableActions(ProductViewerMode viewerMode, ProductStatus productStatus) {
+        if (viewerMode == ProductViewerMode.SELLER) {
+            if (productStatus == ProductStatus.ON_SALE) {
+                return List.of(ProductAction.EDIT, ProductAction.DELETE, ProductAction.MARK_SOLD);
+            }
+            return List.of();
+        }
+
+        if (productStatus == ProductStatus.ON_SALE) {
+            return List.of(ProductAction.CHAT, ProductAction.PURCHASE, ProductAction.SHARE, ProductAction.REPORT);
+        }
+        return List.of(ProductAction.SHARE, ProductAction.REPORT);
+    }
+
+    private Map<String, Object> readMapOrEmpty(String json) {
+        if (json == null || json.isBlank()) {
+            return Collections.emptyMap();
+        }
+        try {
+            return objectMapper.readValue(json, new TypeReference<>() {
+            });
+        } catch (IOException e) {
+            throw new CustomException(ProductErrorCode.PRODUCT_DETAIL_DATA_INVALID);
+        }
+    }
+
+    private List<String> readListOrEmpty(String json) {
+        if (json == null || json.isBlank()) {
+            return List.of();
+        }
+        try {
+            return objectMapper.readValue(json, new TypeReference<>() {
+            });
+        } catch (IOException e) {
+            throw new CustomException(ProductErrorCode.PRODUCT_DETAIL_DATA_INVALID);
         }
     }
 }

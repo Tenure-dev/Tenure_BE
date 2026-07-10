@@ -10,6 +10,9 @@ import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tenure.domain.common.enums.FeePolicy;
+import com.tenure.domain.follow.enums.FollowStatus;
+import com.tenure.domain.follow.repository.FollowRelationshipRepository;
+import com.tenure.domain.item.entity.Category;
 import com.tenure.domain.item.entity.Item;
 import com.tenure.domain.item.enums.ItemStatus;
 import com.tenure.domain.item.repository.ItemRepository;
@@ -18,17 +21,23 @@ import com.tenure.domain.ootd.enums.OotdPublicationStatus;
 import com.tenure.domain.ootd.repository.OotdRepository;
 import com.tenure.domain.product.dto.ProductCreateRequest;
 import com.tenure.domain.product.dto.ProductCreateResponse;
+import com.tenure.domain.product.dto.ProductDetailResponse;
 import com.tenure.domain.product.entity.Product;
 import com.tenure.domain.product.entity.ProductAttachedOotd;
+import com.tenure.domain.product.enums.ProductAction;
+import com.tenure.domain.product.enums.ProductStatus;
+import com.tenure.domain.product.enums.ProductViewerMode;
 import com.tenure.domain.product.exception.ProductErrorCode;
 import com.tenure.domain.product.repository.ProductAttachedOotdRepository;
 import com.tenure.domain.product.repository.ProductRepository;
 import com.tenure.domain.tag.enums.TagStatus;
 import com.tenure.domain.tag.repository.OotdTagRepository;
 import com.tenure.domain.user.entity.User;
+import com.tenure.domain.user.enums.AccountVisibility;
 import com.tenure.domain.user.enums.UserGrade;
 import com.tenure.global.exception.CustomException;
 import java.lang.reflect.Constructor;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -61,6 +70,9 @@ class ProductServiceTest {
     @Mock
     private OotdTagRepository ootdTagRepository;
 
+    @Mock
+    private FollowRelationshipRepository followRelationshipRepository;
+
     private ProductService productService;
 
     @BeforeEach
@@ -71,6 +83,7 @@ class ProductServiceTest {
                 productAttachedOotdRepository,
                 ootdRepository,
                 ootdTagRepository,
+                followRelationshipRepository,
                 new ObjectMapper()
         );
     }
@@ -172,6 +185,79 @@ class ProductServiceTest {
                 .isEqualTo(ProductErrorCode.ATTACHED_OOTD_INVALID);
     }
 
+    @Test
+    void getProductDetail_returnsSellerModeAndSellerActionsForOwner() {
+        User seller = user(CURRENT_USER_ID, UserGrade.BASIC);
+        ReflectionTestUtils.setField(seller, "accountVisibility", AccountVisibility.PRIVATE);
+        Item item = item(ITEM_ID, seller, ItemStatus.ON_SALE);
+        ReflectionTestUtils.setField(item, "category", category(1L, "블루종", category(2L, "아우터", null)));
+        Product product = product(200L, item, seller, ProductStatus.ON_SALE);
+
+        when(productRepository.findDetailById(200L)).thenReturn(Optional.of(product));
+        when(productAttachedOotdRepository.findActiveByProductIdOrderByOotdCreatedAtDesc(
+                200L,
+                OotdPublicationStatus.ACTIVE
+        )).thenReturn(List.of(attachedOotd(product, ootd(100L))));
+
+        ProductDetailResponse response = productService.getProductDetail(200L, CURRENT_USER_ID);
+
+        assertThat(response.viewerMode()).isEqualTo(ProductViewerMode.SELLER);
+        assertThat(response.availableActions()).containsExactly(
+                ProductAction.EDIT,
+                ProductAction.DELETE,
+                ProductAction.MARK_SOLD
+        );
+        assertThat(response.item().categoryLarge()).isEqualTo("아우터");
+        assertThat(response.item().categorySmall()).isEqualTo("블루종");
+        assertThat(response.representativeOotds()).hasSize(1);
+    }
+
+    @Test
+    void getProductDetail_returnsBuyerModeAndBuyerActionsForPublicSeller() {
+        User seller = user(CURRENT_USER_ID, UserGrade.BASIC);
+        ReflectionTestUtils.setField(seller, "accountVisibility", AccountVisibility.PUBLIC);
+        Item item = item(ITEM_ID, seller, ItemStatus.ON_SALE);
+        ReflectionTestUtils.setField(item, "category", category(1L, "아우터", null));
+        Product product = product(200L, item, seller, ProductStatus.ON_SALE);
+
+        when(productRepository.findDetailById(200L)).thenReturn(Optional.of(product));
+        when(productAttachedOotdRepository.findActiveByProductIdOrderByOotdCreatedAtDesc(
+                200L,
+                OotdPublicationStatus.ACTIVE
+        )).thenReturn(List.of());
+
+        ProductDetailResponse response = productService.getProductDetail(200L, 999L);
+
+        assertThat(response.viewerMode()).isEqualTo(ProductViewerMode.BUYER);
+        assertThat(response.availableActions()).containsExactly(
+                ProductAction.CHAT,
+                ProductAction.PURCHASE,
+                ProductAction.SHARE,
+                ProductAction.REPORT
+        );
+    }
+
+    @Test
+    void getProductDetail_rejectsPrivateSellerForNotAcceptedFollower() {
+        User seller = user(CURRENT_USER_ID, UserGrade.BASIC);
+        ReflectionTestUtils.setField(seller, "accountVisibility", AccountVisibility.PRIVATE);
+        Item item = item(ITEM_ID, seller, ItemStatus.ON_SALE);
+        ReflectionTestUtils.setField(item, "category", category(1L, "아우터", null));
+        Product product = product(200L, item, seller, ProductStatus.ON_SALE);
+
+        when(productRepository.findDetailById(200L)).thenReturn(Optional.of(product));
+        when(followRelationshipRepository.existsByFollowerIdAndFollowingIdAndStatus(
+                999L,
+                CURRENT_USER_ID,
+                FollowStatus.ACCEPTED
+        )).thenReturn(false);
+
+        assertThatThrownBy(() -> productService.getProductDetail(200L, 999L))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(ProductErrorCode.PRIVATE_PRODUCT_ACCESS_DENIED);
+    }
+
     private ProductCreateRequest request(FeePolicy feePolicy, int shippingFee, List<Long> attachedOotdIds) {
         return new ProductCreateRequest(
                 50000,
@@ -189,6 +275,8 @@ class ProductServiceTest {
         User user = instantiate(User.class);
         ReflectionTestUtils.setField(user, "id", id);
         ReflectionTestUtils.setField(user, "grade", grade);
+        ReflectionTestUtils.setField(user, "username", "YuJin");
+        ReflectionTestUtils.setField(user, "accountVisibility", AccountVisibility.PUBLIC);
         return user;
     }
 
@@ -197,13 +285,48 @@ class ProductServiceTest {
         ReflectionTestUtils.setField(item, "id", id);
         ReflectionTestUtils.setField(item, "owner", owner);
         ReflectionTestUtils.setField(item, "itemStatus", itemStatus);
+        ReflectionTestUtils.setField(item, "brandName", "Nike");
+        ReflectionTestUtils.setField(item, "itemName", "Black Jacket");
+        ReflectionTestUtils.setField(item, "ootdVerifiedWearCount", 3);
+        ReflectionTestUtils.setField(item, "wishCount", 12);
         return item;
     }
 
     private Ootd ootd(Long id) {
         Ootd ootd = instantiate(Ootd.class);
         ReflectionTestUtils.setField(ootd, "id", id);
+        ReflectionTestUtils.setField(ootd, "imageUrl", "https://image.url/ootd.jpg");
+        ReflectionTestUtils.setField(ootd, "createdAt", LocalDateTime.of(2026, 7, 10, 12, 0));
         return ootd;
+    }
+
+    private Category category(Long id, String name, Category parent) {
+        Category category = instantiate(Category.class);
+        ReflectionTestUtils.setField(category, "id", id);
+        ReflectionTestUtils.setField(category, "name", name);
+        ReflectionTestUtils.setField(category, "parent", parent);
+        return category;
+    }
+
+    private Product product(Long id, Item item, User seller, ProductStatus status) {
+        Product product = Product.create(
+                item,
+                seller,
+                50000,
+                0,
+                FeePolicy.SELLER_PAYS,
+                "https://image.url/product.jpg",
+                "{\"shoulder\":45,\"chest\":55,\"totalLength\":70}",
+                "[\"NO_DEFECT\"]",
+                "3회 착용했습니다."
+        );
+        ReflectionTestUtils.setField(product, "id", id);
+        ReflectionTestUtils.setField(product, "productStatus", status);
+        return product;
+    }
+
+    private ProductAttachedOotd attachedOotd(Product product, Ootd ootd) {
+        return ProductAttachedOotd.create(product, ootd);
     }
 
     private <T> T instantiate(Class<T> type) {

@@ -2,6 +2,7 @@ package com.tenure.domain.product.controller;
 
 import com.tenure.domain.product.dto.ProductCreateRequest;
 import com.tenure.domain.product.dto.ProductCreateResponse;
+import com.tenure.domain.product.dto.ProductDetailResponse;
 import com.tenure.domain.product.service.ProductService;
 import com.tenure.global.response.BaseResponse;
 import com.tenure.global.security.CurrentUserProvider;
@@ -15,6 +16,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -23,7 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @Tag(name = "Product", description = "판매 상품 API")
 @RestController
-@RequestMapping("/items/{itemId}/product")
+@RequestMapping
 @RequiredArgsConstructor
 public class ProductController {
 
@@ -95,7 +97,7 @@ public class ProductController {
                     )
             )
     )
-    @PostMapping
+    @PostMapping("/items/{itemId}/product")
     public BaseResponse<ProductCreateResponse> createProduct(
             @PathVariable Long itemId,
             @Valid @RequestBody ProductCreateRequest request
@@ -103,5 +105,83 @@ public class ProductController {
         Long currentUserId = currentUserProvider.getCurrentUserId();
         ProductCreateResponse response = productService.createProduct(itemId, currentUserId, request);
         return BaseResponse.success(response, "판매 상품이 생성되었습니다.");
+    }
+
+    @Operation(
+            summary = "판매 상품 상세 조회",
+            description = "판매 상품 상세를 조회합니다. 판매자 비공개 계정의 미승인 사용자는 403 PRIVATE_403으로 차단합니다.",
+            parameters = {
+                    @Parameter(
+                            name = "X-USER-ID",
+                            in = ParameterIn.HEADER,
+                            required = true,
+                            description = "JWT 적용 전 Swagger 테스트용 현재 사용자 ID. JWT 적용 후에는 SecurityContext 값을 사용합니다.",
+                            example = "2"
+                    )
+            }
+    )
+    @ApiResponse(
+            responseCode = "200",
+            description = "판매 상품 상세 조회 성공",
+            content = @Content(
+                    schema = @Schema(implementation = ProductDetailResponse.class),
+                    examples = @ExampleObject(
+                            value = """
+                                    {
+                                      "success": true,
+                                      "code": "COMMON_200",
+                                      "message": "조회에 성공했습니다.",
+                                      "data": {
+                                        "productId": 1,
+                                        "viewerMode": "BUYER",
+                                        "availableActions": ["CHAT", "PURCHASE", "SHARE", "REPORT"],
+                                        "productStatus": "ON_SALE",
+                                        "item": {
+                                          "itemId": 10,
+                                          "brandName": "Nike",
+                                          "itemName": "Black Jacket",
+                                          "sizeSystem": "KR",
+                                          "sizeValue": "100",
+                                          "categoryLarge": "아우터",
+                                          "categorySmall": "블루종",
+                                          "ootdVerifiedWearCount": 3,
+                                          "wishCount": 12
+                                        },
+                                        "seller": {
+                                          "userId": 1,
+                                          "username": "YuJin",
+                                          "profileImageUrl": "https://image.url/profile.jpg",
+                                          "grade": "BASIC"
+                                        },
+                                        "price": 50000,
+                                        "shippingFee": 0,
+                                        "feePolicy": "SELLER_PAYS",
+                                        "mainImageUrl": "https://image.url/product.jpg",
+                                        "measurements": {
+                                          "shoulder": 45,
+                                          "chest": 55,
+                                          "totalLength": 70
+                                        },
+                                        "conditionFlags": ["NO_DEFECT"],
+                                        "sellerDescription": "3회 착용했습니다.",
+                                        "representativeOotds": [
+                                          {
+                                            "ootdId": 1,
+                                            "imageUrl": "https://image.url/ootd.jpg",
+                                            "createdAt": "2026-07-10T12:00:00"
+                                          }
+                                        ]
+                                      }
+                                    }
+                                    """
+                    )
+            )
+    )
+    @ApiResponse(responseCode = "403", description = "비공개 계정 미승인 접근")
+    @GetMapping("/products/{productId}")
+    public BaseResponse<ProductDetailResponse> getProductDetail(@PathVariable Long productId) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        ProductDetailResponse response = productService.getProductDetail(productId, currentUserId);
+        return BaseResponse.success(response, "조회에 성공했습니다.");
     }
 }
