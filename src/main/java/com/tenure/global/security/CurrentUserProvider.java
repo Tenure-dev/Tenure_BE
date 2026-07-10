@@ -4,6 +4,7 @@ import com.tenure.global.exception.CommonErrorCode;
 import com.tenure.global.exception.CustomException;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
@@ -18,11 +19,32 @@ public class CurrentUserProvider {
     private final HttpServletRequest request;
 
     public Long getCurrentUserId() {
-        Long securityContextUserId = getFromSecurityContext();
-        if (securityContextUserId != null) {
-            return securityContextUserId;
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (isAuthenticatedUser(authentication)) {
+            return getFromAuthenticatedPrincipal(authentication);
         }
 
+        return getFromDevelopmentHeader();
+    }
+
+    private boolean isAuthenticatedUser(Authentication authentication) {
+        return authentication != null
+                && authentication.isAuthenticated()
+                && !(authentication instanceof AnonymousAuthenticationToken);
+    }
+
+    private Long getFromAuthenticatedPrincipal(Authentication authentication) {
+        Object principal = authentication.getPrincipal();
+        if (principal instanceof Long userId) {
+            return userId;
+        }
+        if (principal instanceof String value && value.chars().allMatch(Character::isDigit)) {
+            return Long.valueOf(value);
+        }
+        throw new CustomException(CommonErrorCode.UNAUTHORIZED);
+    }
+
+    private Long getFromDevelopmentHeader() {
         String headerValue = request.getHeader(CURRENT_USER_ID_HEADER);
         if (!StringUtils.hasText(headerValue)) {
             throw new CustomException(CommonErrorCode.UNAUTHORIZED);
@@ -33,21 +55,5 @@ public class CurrentUserProvider {
         } catch (NumberFormatException e) {
             throw new CustomException(CommonErrorCode.UNAUTHORIZED);
         }
-    }
-
-    private Long getFromSecurityContext() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated()) {
-            return null;
-        }
-
-        Object principal = authentication.getPrincipal();
-        if (principal instanceof Long userId) {
-            return userId;
-        }
-        if (principal instanceof String value && value.chars().allMatch(Character::isDigit)) {
-            return Long.valueOf(value);
-        }
-        return null;
     }
 }

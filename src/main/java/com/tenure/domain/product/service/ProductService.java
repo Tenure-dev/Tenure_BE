@@ -217,7 +217,7 @@ public class ProductService {
             return objectMapper.readValue(json, new TypeReference<>() {
             });
         } catch (IOException e) {
-            throw new CustomException(ProductErrorCode.PRODUCT_JSON_INVALID);
+            throw new CustomException(ProductErrorCode.PRODUCT_DETAIL_DATA_INVALID);
         }
     }
 
@@ -229,7 +229,7 @@ public class ProductService {
             return objectMapper.readValue(json, new TypeReference<>() {
             });
         } catch (IOException e) {
-            throw new CustomException(ProductErrorCode.PRODUCT_JSON_INVALID);
+            throw new CustomException(ProductErrorCode.PRODUCT_DETAIL_DATA_INVALID);
         }
     }
 }
