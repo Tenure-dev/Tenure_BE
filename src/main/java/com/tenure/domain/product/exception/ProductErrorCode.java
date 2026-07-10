@@ -8,6 +8,8 @@ import org.springframework.http.HttpStatus;
 @Getter
 @RequiredArgsConstructor
 public enum ProductErrorCode implements ErrorCode {
+    PRODUCT_NOT_FOUND("PRODUCT_404", "판매 상품 정보를 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
+    PRIVATE_PRODUCT_ACCESS_DENIED("PRIVATE_403", "비공개 계정입니다. 팔로우 요청 후 확인할 수 있어요.", HttpStatus.FORBIDDEN),
     ITEM_NOT_FOUND("ITEM_404", "아이템 정보를 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
     PRODUCT_OWNER_ONLY("PRODUCT_403", "본인 아이템만 판매 전환할 수 있습니다.", HttpStatus.FORBIDDEN),
     PRODUCT_ITEM_STATUS_INVALID("PRODUCT_001", "보유 중인 아이템만 판매 전환할 수 있습니다.", HttpStatus.BAD_REQUEST),
