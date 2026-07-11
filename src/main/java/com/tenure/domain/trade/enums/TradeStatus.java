@@ -4,7 +4,8 @@ public enum TradeStatus {
     PAID,
     SHIPPED,
     DELIVERED,
-    COMPLETED,
+    PURCHASE_CONFIRMED,
     SETTLED,
+    COMPLETED,
     TRANSFERRED
 }
