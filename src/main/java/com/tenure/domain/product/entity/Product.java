@@ -17,6 +17,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import java.math.BigDecimal;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -51,6 +52,9 @@ public class Product extends BaseTimeEntity {
     @Column(name = "fee_policy", nullable = false, length = 30)
     private FeePolicy feePolicy = FeePolicy.SELLER_PAYS;
 
+    @Column(name = "fee_rate", nullable = false, precision = 5, scale = 4)
+    private BigDecimal feeRate;
+
     @Column(name = "main_image_url", length = 500)
     private String mainImageUrl;
 
@@ -75,6 +79,7 @@ public class Product extends BaseTimeEntity {
             Integer price,
             Integer shippingFee,
             FeePolicy feePolicy,
+            BigDecimal feeRate,
             String mainImageUrl,
             String measurements,
             String conditionFlags,
@@ -86,6 +91,7 @@ public class Product extends BaseTimeEntity {
         product.price = price;
         product.shippingFee = shippingFee;
         product.feePolicy = feePolicy;
+        product.feeRate = feeRate;
         product.mainImageUrl = mainImageUrl;
         product.measurements = measurements;
         product.conditionFlags = conditionFlags;

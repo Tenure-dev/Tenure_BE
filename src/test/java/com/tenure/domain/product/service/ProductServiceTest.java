@@ -37,6 +37,7 @@ import com.tenure.domain.user.enums.AccountVisibility;
 import com.tenure.domain.user.enums.UserGrade;
 import com.tenure.global.exception.CustomException;
 import java.lang.reflect.Constructor;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -315,6 +316,7 @@ class ProductServiceTest {
                 50000,
                 0,
                 FeePolicy.SELLER_PAYS,
+                new BigDecimal("0.0600"),
                 "https://image.url/product.jpg",
                 "{\"shoulder\":45,\"chest\":55,\"totalLength\":70}",
                 "[\"NO_DEFECT\"]",

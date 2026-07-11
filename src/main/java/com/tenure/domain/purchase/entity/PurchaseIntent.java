@@ -19,6 +19,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -57,6 +58,9 @@ public class PurchaseIntent extends BaseTimeEntity {
     @Column(name = "fee_policy_snapshot", nullable = false, length = 30)
     private FeePolicy feePolicySnapshot;
 
+    @Column(name = "fee_rate_snapshot", nullable = false, precision = 5, scale = 4)
+    private BigDecimal feeRateSnapshot;
+
     @Column(name = "buyer_shipping_fee", nullable = false)
     private Integer buyerShippingFee = 0;
 
@@ -82,10 +86,85 @@ public class PurchaseIntent extends BaseTimeEntity {
     @Column(name = "payment_method_id", nullable = false, length = 100)
     private String paymentMethodId;
 
+    @Column(name = "delivery_receiver_name", nullable = false, length = 50)
+    private String deliveryReceiverName;
+
+    @Column(name = "delivery_phone", nullable = false, length = 20)
+    private String deliveryPhone;
+
+    @Column(name = "delivery_address_line1", nullable = false, length = 255)
+    private String deliveryAddressLine1;
+
+    @Column(name = "delivery_address_line2", nullable = false, length = 255)
+    private String deliveryAddressLine2;
+
+    @Column(name = "delivery_postal_code", length = 10)
+    private String deliveryPostalCode;
+
+    @Column(name = "delivery_request_note", length = 300)
+    private String deliveryRequestNote;
+
     @Column(name = "expires_at", nullable = false)
     private LocalDateTime expiresAt;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private PurchaseIntentStatus status = PurchaseIntentStatus.SENT;
+
+    public static PurchaseIntent create(
+            Product product,
+            User buyer,
+            User seller,
+            DeliveryAddress deliveryAddress,
+            Integer productPrice,
+            FeePolicy feePolicySnapshot,
+            BigDecimal feeRateSnapshot,
+            Integer buyerShippingFee,
+            Integer buyerServiceFee,
+            Integer sellerServiceFee,
+            Integer totalPaymentAmount,
+            Integer sellerSettlementAmount,
+            String paymentAuthorizationId,
+            String paymentMethodId,
+            LocalDateTime expiresAt
+    ) {
+        PurchaseIntent intent = new PurchaseIntent();
+        intent.product = product;
+        intent.buyer = buyer;
+        intent.seller = seller;
+        intent.deliveryAddress = deliveryAddress;
+        intent.productPrice = productPrice;
+        intent.feePolicySnapshot = feePolicySnapshot;
+        intent.feeRateSnapshot = feeRateSnapshot;
+        intent.buyerShippingFee = buyerShippingFee;
+        intent.buyerServiceFee = buyerServiceFee;
+        intent.sellerServiceFee = sellerServiceFee;
+        intent.totalPaymentAmount = totalPaymentAmount;
+        intent.sellerSettlementAmount = sellerSettlementAmount;
+        intent.paymentAuthorizationStatus = PaymentAuthorizationStatus.AUTHORIZED;
+        intent.paymentAuthorizationId = paymentAuthorizationId;
+        intent.paymentMethodId = paymentMethodId;
+        intent.deliveryReceiverName = deliveryAddress.getReceiverName();
+        intent.deliveryPhone = deliveryAddress.getPhone();
+        intent.deliveryAddressLine1 = deliveryAddress.getAddressLine1();
+        intent.deliveryAddressLine2 = deliveryAddress.getAddressLine2();
+        intent.deliveryPostalCode = deliveryAddress.getPostalCode();
+        intent.deliveryRequestNote = deliveryAddress.getRequestNote();
+        intent.expiresAt = expiresAt;
+        intent.status = PurchaseIntentStatus.SENT;
+        return intent;
+    }
+
+    public boolean isSent() {
+        return status == PurchaseIntentStatus.SENT;
+    }
+
+    public boolean isExpiredAt(LocalDateTime now) {
+        return !expiresAt.isAfter(now);
+    }
+
+    public void expireAndReleaseAuthorization() {
+        this.status = PurchaseIntentStatus.EXPIRED;
+        this.paymentAuthorizationStatus = PaymentAuthorizationStatus.RELEASED;
+    }
 }
