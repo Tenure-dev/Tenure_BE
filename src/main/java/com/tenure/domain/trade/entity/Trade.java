@@ -92,4 +92,8 @@ public class Trade extends BaseTimeEntity {
 
     @Column(name = "payment_authorization_id", nullable = false, length = 100)
     private String paymentAuthorizationId;
+
+    public Integer getItemPrice() {
+        return paymentAmount - buyerShippingFee - buyerServiceFee;
+    }
 }

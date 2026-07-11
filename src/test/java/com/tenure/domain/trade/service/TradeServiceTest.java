@@ -1,6 +1,7 @@
 package com.tenure.domain.trade.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -8,16 +9,22 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.tenure.domain.item.entity.Item;
+import com.tenure.domain.trade.dto.TradeDetailResponse;
 import com.tenure.domain.trade.dto.TradeListItemResponse;
 import com.tenure.domain.trade.entity.Trade;
+import com.tenure.domain.trade.enums.TradeAction;
 import com.tenure.domain.trade.enums.TradeRole;
 import com.tenure.domain.trade.enums.TradeSourceType;
 import com.tenure.domain.trade.enums.TradeStatus;
+import com.tenure.domain.trade.enums.TradeViewerMode;
+import com.tenure.domain.trade.exception.TradeErrorCode;
 import com.tenure.domain.trade.repository.TradeRepository;
 import com.tenure.domain.user.entity.User;
+import com.tenure.global.exception.CustomException;
 import com.tenure.global.response.PageResponse;
 import java.lang.reflect.Constructor;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -106,9 +113,91 @@ class TradeServiceTest {
         ReflectionTestUtils.setField(trade, "buyer", user(buyerId));
         ReflectionTestUtils.setField(trade, "seller", user(sellerId));
         ReflectionTestUtils.setField(trade, "paymentAmount", 50000);
+        ReflectionTestUtils.setField(trade, "buyerShippingFee", 0);
+        ReflectionTestUtils.setField(trade, "buyerServiceFee", 1500);
+        ReflectionTestUtils.setField(trade, "sellerServiceFee", 1500);
         ReflectionTestUtils.setField(trade, "settlementAmount", 48000);
         ReflectionTestUtils.setField(trade, "status", status);
         return trade;
+    }
+
+    @Test
+    void getTradeDetail_asBuyer_returnsBuyerView() {
+        Trade trade = trade(100L, CURRENT_USER_ID, 2L, TradeStatus.PAID);
+        when(tradeRepository.findById(100L)).thenReturn(Optional.of(trade));
+
+        TradeDetailResponse response = tradeService.getTradeDetail(100L, CURRENT_USER_ID);
+
+        assertThat(response.viewerMode()).isEqualTo(TradeViewerMode.BUYER);
+        assertThat(response.paymentAmount()).isEqualTo(50000);
+        assertThat(response.settlementAmount()).isNull();
+        assertThat(response.buyerServiceFee()).isEqualTo(1500);
+        assertThat(response.sellerServiceFee()).isNull();
+    }
+
+    @Test
+    void getTradeDetail_asSeller_returnsSellerView() {
+        Trade trade = trade(101L, 2L, CURRENT_USER_ID, TradeStatus.PAID);
+        when(tradeRepository.findById(101L)).thenReturn(Optional.of(trade));
+
+        TradeDetailResponse response = tradeService.getTradeDetail(101L, CURRENT_USER_ID);
+
+        assertThat(response.viewerMode()).isEqualTo(TradeViewerMode.SELLER);
+        assertThat(response.settlementAmount()).isEqualTo(48000);
+        assertThat(response.paymentAmount()).isNull();
+        assertThat(response.sellerServiceFee()).isEqualTo(1500);
+        assertThat(response.buyerServiceFee()).isNull();
+    }
+
+    @Test
+    void getTradeDetail_asThirdParty_throwsTradeNotFound() {
+        Trade trade = trade(102L, 2L, 3L, TradeStatus.PAID);
+        when(tradeRepository.findById(102L)).thenReturn(Optional.of(trade));
+
+        assertThatThrownBy(() -> tradeService.getTradeDetail(102L, CURRENT_USER_ID))
+                .isInstanceOf(CustomException.class)
+                .extracting(e -> ((CustomException) e).getErrorCode())
+                .isEqualTo(TradeErrorCode.TRADE_NOT_FOUND);
+    }
+
+    @Test
+    void getTradeDetail_tradeNotFound_throwsTradeNotFound() {
+        when(tradeRepository.findById(999L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> tradeService.getTradeDetail(999L, CURRENT_USER_ID))
+                .isInstanceOf(CustomException.class)
+                .extracting(e -> ((CustomException) e).getErrorCode())
+                .isEqualTo(TradeErrorCode.TRADE_NOT_FOUND);
+    }
+
+    @Test
+    void getTradeDetail_paidStatusAsSeller_returnsRegisterShipmentAction() {
+        Trade trade = trade(103L, 2L, CURRENT_USER_ID, TradeStatus.PAID);
+        when(tradeRepository.findById(103L)).thenReturn(Optional.of(trade));
+
+        TradeDetailResponse response = tradeService.getTradeDetail(103L, CURRENT_USER_ID);
+
+        assertThat(response.availableActions()).containsExactly(TradeAction.REGISTER_SHIPMENT);
+    }
+
+    @Test
+    void getTradeDetail_paidStatusAsBuyer_returnsEmptyActions() {
+        Trade trade = trade(104L, CURRENT_USER_ID, 2L, TradeStatus.PAID);
+        when(tradeRepository.findById(104L)).thenReturn(Optional.of(trade));
+
+        TradeDetailResponse response = tradeService.getTradeDetail(104L, CURRENT_USER_ID);
+
+        assertThat(response.availableActions()).isEmpty();
+    }
+
+    @Test
+    void getTradeDetail_deliveredStatusAsBuyer_returnsConfirmPurchaseAction() {
+        Trade trade = trade(105L, CURRENT_USER_ID, 2L, TradeStatus.DELIVERED);
+        when(tradeRepository.findById(105L)).thenReturn(Optional.of(trade));
+
+        TradeDetailResponse response = tradeService.getTradeDetail(105L, CURRENT_USER_ID);
+
+        assertThat(response.availableActions()).containsExactly(TradeAction.CONFIRM_PURCHASE);
     }
 
     private Item item(Long id) {
