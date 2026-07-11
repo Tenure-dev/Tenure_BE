@@ -30,6 +30,7 @@ import com.tenure.domain.user.enums.AccountVisibility;
 import com.tenure.domain.user.enums.UserGrade;
 import com.tenure.global.exception.CustomException;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -68,6 +69,7 @@ public class ProductService {
                 request.price(),
                 request.shippingFee(),
                 request.feePolicy(),
+                resolveProductFeeRate(item.getOwner()),
                 request.mainImageUrl(),
                 writeJsonOrNull(request.measurements()),
                 writeJsonOrNull(request.conditionFlags()),
@@ -137,6 +139,13 @@ public class ProductService {
         if (request.shippingFee() != 0) {
             throw new CustomException(ProductErrorCode.BASIC_USER_SHIPPING_FEE_INVALID);
         }
+    }
+
+    private BigDecimal resolveProductFeeRate(User seller) {
+        if (seller.getGrade() == UserGrade.RECORD) {
+            return new BigDecimal("0.0300");
+        }
+        return new BigDecimal("0.0600");
     }
 
     private void validateAttachedOotdIds(Item item, Long currentUserId, List<Long> attachedOotdIds) {

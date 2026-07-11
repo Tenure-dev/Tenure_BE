@@ -19,6 +19,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -67,6 +68,9 @@ public class PurchaseOffer extends BaseTimeEntity {
     @Column(name = "proposer_service_fee", nullable = false)
     private Integer proposerServiceFee = 0;
 
+    @Column(name = "fee_rate_snapshot", nullable = false, precision = 5, scale = 4)
+    private BigDecimal feeRateSnapshot;
+
     @Column(name = "total_payment_amount", nullable = false)
     private Integer totalPaymentAmount;
 
@@ -82,6 +86,24 @@ public class PurchaseOffer extends BaseTimeEntity {
 
     @Column(name = "payment_method_id", nullable = false, length = 100)
     private String paymentMethodId;
+
+    @Column(name = "delivery_receiver_name", nullable = false, length = 50)
+    private String deliveryReceiverName;
+
+    @Column(name = "delivery_phone", nullable = false, length = 20)
+    private String deliveryPhone;
+
+    @Column(name = "delivery_address_line1", nullable = false, length = 255)
+    private String deliveryAddressLine1;
+
+    @Column(name = "delivery_address_line2", nullable = false, length = 255)
+    private String deliveryAddressLine2;
+
+    @Column(name = "delivery_postal_code", length = 10)
+    private String deliveryPostalCode;
+
+    @Column(name = "delivery_request_note", length = 300)
+    private String deliveryRequestNote;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
