@@ -27,6 +27,21 @@ public class TradeService {
     private final TradeRepository tradeRepository;
 
     @Transactional(readOnly = true)
+    public PageResponse<TradeListItemResponse> getTradeList(
+            Long currentUserId,
+            TradeRole role,
+            TradeStatus status,
+            int page,
+            int size
+    ) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+
+        Page<Trade> trades = findTrades(currentUserId, role, status, pageable);
+
+        return PageResponse.from(trades, TradeListItemResponse::of);
+    }
+
+    @Transactional(readOnly = true)
     public TradeDetailResponse getTradeDetail(Long tradeId, Long currentUserId) {
         Trade trade = tradeRepository.findById(tradeId)
                 .orElseThrow(() -> new CustomException(TradeErrorCode.TRADE_NOT_FOUND));
@@ -35,6 +50,16 @@ public class TradeService {
         List<TradeAction> availableActions = resolveAvailableActions(viewerMode, trade.getStatus());
 
         return TradeDetailResponse.of(trade, viewerMode, availableActions);
+    }
+
+    private Page<Trade> findTrades(Long currentUserId, TradeRole role, TradeStatus status, Pageable pageable) {
+        if (role == TradeRole.BUYER) {
+            return tradeRepository.findAllByBuyer(currentUserId, status, pageable);
+        }
+        if (role == TradeRole.SELLER) {
+            return tradeRepository.findAllBySeller(currentUserId, status, pageable);
+        }
+        return tradeRepository.findAllByParticipant(currentUserId, status, pageable);
     }
 
     private TradeViewerMode resolveViewerMode(Trade trade, Long currentUserId) {
@@ -56,30 +81,5 @@ public class TradeService {
             return List.of(TradeAction.CONFIRM_PURCHASE);
         }
         return List.of();
-    }
-
-    @Transactional(readOnly = true)
-    public PageResponse<TradeListItemResponse> getTradeList(
-            Long currentUserId,
-            TradeRole role,
-            TradeStatus status,
-            int page,
-            int size
-    ) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
-
-        Page<Trade> trades = findTrades(currentUserId, role, status, pageable);
-
-        return PageResponse.from(trades, TradeListItemResponse::of);
-    }
-
-    private Page<Trade> findTrades(Long currentUserId, TradeRole role, TradeStatus status, Pageable pageable) {
-        if (role == TradeRole.BUYER) {
-            return tradeRepository.findAllByBuyer(currentUserId, status, pageable);
-        }
-        if (role == TradeRole.SELLER) {
-            return tradeRepository.findAllBySeller(currentUserId, status, pageable);
-        }
-        return tradeRepository.findAllByParticipant(currentUserId, status, pageable);
     }
 }

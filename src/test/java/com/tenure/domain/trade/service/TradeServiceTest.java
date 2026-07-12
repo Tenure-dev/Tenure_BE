@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.tenure.domain.item.entity.Item;
+import com.tenure.domain.product.entity.Product;
 import com.tenure.domain.trade.dto.TradeDetailResponse;
 import com.tenure.domain.trade.dto.TradeListItemResponse;
 import com.tenure.domain.trade.entity.Trade;
@@ -104,23 +105,6 @@ class TradeServiceTest {
         verify(tradeRepository).findAllByParticipant(eq(CURRENT_USER_ID), eq(TradeStatus.SETTLED), any(Pageable.class));
     }
 
-    private Trade trade(Long id, Long buyerId, Long sellerId, TradeStatus status) {
-        Trade trade = instantiate(Trade.class);
-        ReflectionTestUtils.setField(trade, "id", id);
-        ReflectionTestUtils.setField(trade, "sourceType", TradeSourceType.PURCHASE_INTENT);
-        ReflectionTestUtils.setField(trade, "sourceId", 1L);
-        ReflectionTestUtils.setField(trade, "item", item(10L));
-        ReflectionTestUtils.setField(trade, "buyer", user(buyerId));
-        ReflectionTestUtils.setField(trade, "seller", user(sellerId));
-        ReflectionTestUtils.setField(trade, "paymentAmount", 50000);
-        ReflectionTestUtils.setField(trade, "buyerShippingFee", 0);
-        ReflectionTestUtils.setField(trade, "buyerServiceFee", 1500);
-        ReflectionTestUtils.setField(trade, "sellerServiceFee", 1500);
-        ReflectionTestUtils.setField(trade, "settlementAmount", 48000);
-        ReflectionTestUtils.setField(trade, "status", status);
-        return trade;
-    }
-
     @Test
     void getTradeDetail_asBuyer_returnsBuyerView() {
         Trade trade = trade(100L, CURRENT_USER_ID, 2L, TradeStatus.PAID);
@@ -129,9 +113,11 @@ class TradeServiceTest {
         TradeDetailResponse response = tradeService.getTradeDetail(100L, CURRENT_USER_ID);
 
         assertThat(response.viewerMode()).isEqualTo(TradeViewerMode.BUYER);
-        assertThat(response.paymentAmount()).isEqualTo(50000);
+        assertThat(response.itemPrice()).isEqualTo(40000);
+        assertThat(response.shippingFee()).isEqualTo(3000);
+        assertThat(response.paymentAmount()).isEqualTo(43000);
         assertThat(response.settlementAmount()).isNull();
-        assertThat(response.buyerServiceFee()).isEqualTo(1500);
+        assertThat(response.buyerServiceFee()).isEqualTo(0);
         assertThat(response.sellerServiceFee()).isNull();
     }
 
@@ -143,9 +129,11 @@ class TradeServiceTest {
         TradeDetailResponse response = tradeService.getTradeDetail(101L, CURRENT_USER_ID);
 
         assertThat(response.viewerMode()).isEqualTo(TradeViewerMode.SELLER);
-        assertThat(response.settlementAmount()).isEqualTo(48000);
+        assertThat(response.itemPrice()).isEqualTo(40000);
+        assertThat(response.shippingFee()).isEqualTo(3000);
+        assertThat(response.settlementAmount()).isEqualTo(40600);
         assertThat(response.paymentAmount()).isNull();
-        assertThat(response.sellerServiceFee()).isEqualTo(1500);
+        assertThat(response.sellerServiceFee()).isEqualTo(2400);
         assertThat(response.buyerServiceFee()).isNull();
     }
 
@@ -200,10 +188,50 @@ class TradeServiceTest {
         assertThat(response.availableActions()).containsExactly(TradeAction.CONFIRM_PURCHASE);
     }
 
+    @Test
+    void getTradeDetail_withProduct_returnsProductId() {
+        Trade trade = tradeWithProduct(106L, CURRENT_USER_ID, 2L, TradeStatus.PAID, 5L);
+        when(tradeRepository.findById(106L)).thenReturn(Optional.of(trade));
+
+        TradeDetailResponse response = tradeService.getTradeDetail(106L, CURRENT_USER_ID);
+
+        assertThat(response.productId()).isEqualTo(5L);
+    }
+
+    private Trade trade(Long id, Long buyerId, Long sellerId, TradeStatus status) {
+        Trade trade = instantiate(Trade.class);
+        ReflectionTestUtils.setField(trade, "id", id);
+        ReflectionTestUtils.setField(trade, "sourceType", TradeSourceType.PURCHASE_INTENT);
+        ReflectionTestUtils.setField(trade, "sourceId", 1L);
+        ReflectionTestUtils.setField(trade, "item", item(10L));
+        ReflectionTestUtils.setField(trade, "buyer", user(buyerId));
+        ReflectionTestUtils.setField(trade, "seller", user(sellerId));
+        ReflectionTestUtils.setField(trade, "itemPrice", 40000);
+        ReflectionTestUtils.setField(trade, "buyerShippingFee", 3000);
+        ReflectionTestUtils.setField(trade, "buyerServiceFee", 0);
+        ReflectionTestUtils.setField(trade, "sellerServiceFee", 2400);
+        ReflectionTestUtils.setField(trade, "paymentAmount", 43000);
+        ReflectionTestUtils.setField(trade, "settlementAmount", 40600);
+        ReflectionTestUtils.setField(trade, "status", status);
+        return trade;
+    }
+
+    private Trade tradeWithProduct(Long id, Long buyerId, Long sellerId, TradeStatus status, Long productId) {
+        Trade trade = trade(id, buyerId, sellerId, status);
+        ReflectionTestUtils.setField(trade, "product", product(productId));
+        return trade;
+    }
+
     private Item item(Long id) {
         Item item = instantiate(Item.class);
         ReflectionTestUtils.setField(item, "id", id);
         return item;
+    }
+
+    private Product product(Long id) {
+        Product product = instantiate(Product.class);
+        ReflectionTestUtils.setField(product, "id", id);
+        return product;
     }
 
     private User user(Long id) {

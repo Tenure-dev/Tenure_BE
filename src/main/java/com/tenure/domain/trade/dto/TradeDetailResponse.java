@@ -47,6 +47,9 @@ public record TradeDetailResponse(
         @Schema(description = "배송사", example = "CJ_LOGISTICS")
         DeliveryCarrier deliveryCarrier,
 
+        @Schema(description = "deliveryCarrier가 OTHER일 때 실제 택배사명", example = "로젠택배")
+        String customDeliveryCarrierName,
+
         @Schema(description = "운송장 번호", example = "123456789")
         String trackingNumber,
 
@@ -89,6 +92,7 @@ public record TradeDetailResponse(
                 trade.getSeller().getId(),
                 trade.getStatus(),
                 trade.getDeliveryCarrier(),
+                trade.getCustomDeliveryCarrierName(),
                 trade.getTrackingNumber(),
                 trade.getItemPrice(),
                 trade.getBuyerShippingFee(),

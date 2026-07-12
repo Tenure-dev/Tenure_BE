@@ -156,6 +156,7 @@ public class TradeController {
                                         "sellerUserId": 1,
                                         "status": "PAID",
                                         "deliveryCarrier": null,
+                                        "customDeliveryCarrierName": null,
                                         "trackingNumber": null,
                                         "itemPrice": 50000,
                                         "shippingFee": 0,
