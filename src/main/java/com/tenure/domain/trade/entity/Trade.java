@@ -58,6 +58,9 @@ public class Trade extends BaseTimeEntity {
     @JoinColumn(name = "seller_user_id", nullable = false)
     private User seller;
 
+    @Column(name = "item_price", nullable = false)
+    private Integer itemPrice;
+
     @Column(name = "payment_amount", nullable = false)
     private Integer paymentAmount;
 
