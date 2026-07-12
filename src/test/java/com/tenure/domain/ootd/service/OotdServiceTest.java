@@ -86,6 +86,16 @@ class OotdServiceTest {
     }
 
     @Test
+    void createOotd_rejectsNullSource() {
+        MultipartFile image = new MockMultipartFile("image", "photo.jpg", "image/jpeg", "content".getBytes());
+
+        assertThatThrownBy(() -> ootdService.createOotd(CURRENT_USER_ID, image, null))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(OotdErrorCode.OOTD_SOURCE_INVALID);
+    }
+
+    @Test
     void createOotd_rejectsUnknownUser() {
         MultipartFile image = new MockMultipartFile("image", "photo.jpg", "image/jpeg", "content".getBytes());
 

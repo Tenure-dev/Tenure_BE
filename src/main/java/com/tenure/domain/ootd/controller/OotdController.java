@@ -50,7 +50,7 @@ public class OotdController {
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public BaseResponse<OotdCreateResponse> createOotd(
             @RequestParam("image") MultipartFile image,
-            @RequestParam(value = "source", required = false, defaultValue = "CAMERA") String source
+            @RequestParam(value = "source", required = false) String source
     ) {
         Long currentUserId = currentUserProvider.getCurrentUserId();
         OotdCreateResponse response = ootdService.createOotd(currentUserId, image, source);
