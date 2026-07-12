@@ -2,6 +2,8 @@ package com.tenure.domain.purchase.controller;
 
 import com.tenure.domain.purchase.dto.PurchaseIntentCreateRequest;
 import com.tenure.domain.purchase.dto.PurchaseIntentCreateResponse;
+import com.tenure.domain.purchase.dto.PurchaseIntentSentListResponse;
+import com.tenure.domain.purchase.enums.PurchaseIntentStatus;
 import com.tenure.domain.purchase.service.PurchaseIntentService;
 import com.tenure.global.response.BaseResponse;
 import com.tenure.global.security.CurrentUserProvider;
@@ -15,12 +17,17 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.net.URI;
+import java.time.OffsetDateTime;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @Tag(name = "PurchaseIntent", description = "거래 의사 API")
@@ -104,5 +111,104 @@ public class PurchaseIntentController {
         return ResponseEntity
                 .created(URI.create("/purchase-intents/" + response.intentId()))
                 .body(BaseResponse.success(response, "거래 의사를 보냈습니다."));
+    }
+
+    @Operation(
+            summary = "내가 보낸 거래 의사 목록 조회",
+            description = "로그인 사용자가 판매중 상품에 보낸 거래 의사 목록을 커서 기반으로 조회합니다. SENT 만료 요청은 조회 시 EXPIRED와 RELEASED로 보정합니다.",
+            parameters = {
+                    @Parameter(
+                            name = "X-USER-ID",
+                            in = ParameterIn.HEADER,
+                            required = true,
+                            description = "JWT 적용 전 Swagger 테스트용 현재 사용자 ID. JWT 적용 후에는 SecurityContext 값을 사용합니다.",
+                            example = "2"
+                    ),
+                    @Parameter(
+                            name = "statuses",
+                            description = "조회할 상태 목록. 예: statuses=SENT 또는 statuses=SENT,EXPIRED. 생략 시 전체 상태",
+                            example = "SENT"
+                    ),
+                    @Parameter(
+                            name = "cursorCreatedAt",
+                            description = "다음 페이지 조회용 생성 시각 커서",
+                            example = "2026-07-12T10:00:00+09:00"
+                    ),
+                    @Parameter(
+                            name = "cursorIntentId",
+                            description = "다음 페이지 조회용 거래 의사 ID 커서",
+                            example = "123"
+                    ),
+                    @Parameter(
+                            name = "size",
+                            description = "페이지 크기. 기본 20, 최대 50",
+                            example = "20"
+                    )
+            }
+    )
+    @ApiResponse(
+            responseCode = "200",
+            description = "보낸 거래 의사 목록 조회 성공",
+            content = @Content(
+                    schema = @Schema(implementation = PurchaseIntentSentListResponse.class),
+                    examples = @ExampleObject(
+                            value = """
+                                    {
+                                      "success": true,
+                                      "code": "COMMON_200",
+                                      "message": "조회에 성공했습니다.",
+                                      "data": {
+                                        "content": [
+                                          {
+                                            "intentId": 123,
+                                            "status": "SENT",
+                                            "productId": 10,
+                                            "itemId": 5,
+                                            "brandName": "Levis",
+                                            "itemName": "LVC 1955 501",
+                                            "imageUrl": "https://image.url/product.jpg",
+                                            "sellerId": 1,
+                                            "sellerUsername": "YuJin",
+                                            "productAmount": 10000000,
+                                            "deliveryFee": 0,
+                                            "buyerServiceFee": 0,
+                                            "buyerPaymentAmount": 10000000,
+                                            "paymentAuthorizationStatus": "AUTHORIZED",
+                                            "createdAt": "2026-03-25T10:00:00+09:00",
+                                            "expiresAt": "2026-03-26T10:00:00+09:00",
+                                            "remainingSeconds": 82000,
+                                            "canCancel": true,
+                                            "tradeId": null
+                                          }
+                                        ],
+                                        "nextCursor": {
+                                          "cursorCreatedAt": "2026-03-25T10:00:00+09:00",
+                                          "cursorIntentId": 123
+                                        },
+                                        "hasNext": true
+                                      }
+                                    }
+                                    """
+                    )
+            )
+    )
+    @GetMapping("/purchase-intents/sent")
+    public BaseResponse<PurchaseIntentSentListResponse> getSentPurchaseIntents(
+            @RequestParam(required = false) List<PurchaseIntentStatus> statuses,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+            OffsetDateTime cursorCreatedAt,
+            @RequestParam(required = false) Long cursorIntentId,
+            @RequestParam(required = false) Integer size
+    ) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        PurchaseIntentSentListResponse response = purchaseIntentService.getSentPurchaseIntents(
+                currentUserId,
+                statuses,
+                cursorCreatedAt,
+                cursorIntentId,
+                size
+        );
+        return BaseResponse.success(response, "조회에 성공했습니다.");
     }
 }

@@ -1,7 +1,10 @@
 package com.tenure.domain.trade.repository;
 
 import com.tenure.domain.trade.entity.Trade;
+import com.tenure.domain.trade.enums.TradeSourceType;
 import com.tenure.domain.trade.enums.TradeStatus;
+import java.util.Collection;
+import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -45,4 +48,16 @@ public interface TradeRepository extends JpaRepository<Trade, Long> {
             @Param("status") TradeStatus status,
             Pageable pageable
     );
+
+    @Query("""
+            select trade
+            from Trade trade
+            where trade.sourceType = :sourceType
+              and trade.sourceId in :sourceIds
+            """)
+    List<Trade> findAllBySourceTypeAndSourceIdIn(
+            @Param("sourceType") TradeSourceType sourceType,
+            @Param("sourceIds") Collection<Long> sourceIds
+    );
+
 }
