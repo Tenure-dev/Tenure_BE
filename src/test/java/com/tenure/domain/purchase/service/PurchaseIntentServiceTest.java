@@ -18,6 +18,9 @@ import com.tenure.domain.product.enums.ProductStatus;
 import com.tenure.domain.product.repository.ProductRepository;
 import com.tenure.domain.purchase.dto.PurchaseIntentCreateRequest;
 import com.tenure.domain.purchase.dto.PurchaseIntentCreateResponse;
+import com.tenure.domain.purchase.dto.PurchaseIntentDetailResponse;
+import com.tenure.domain.purchase.dto.PurchaseIntentDetailResponse.DeliveryDisclosureStatus;
+import com.tenure.domain.purchase.dto.PurchaseIntentDetailResponse.ViewerRole;
 import com.tenure.domain.purchase.entity.PurchaseIntent;
 import com.tenure.domain.purchase.enums.PurchaseIntentStatus;
 import com.tenure.domain.purchase.exception.PurchaseIntentErrorCode;
@@ -68,16 +71,19 @@ class PurchaseIntentServiceTest {
     private FollowRelationshipRepository followRelationshipRepository;
 
     private PurchaseIntentService purchaseIntentService;
+    private PurchaseIntentExpirationService purchaseIntentExpirationService;
 
     @BeforeEach
     void setUp() {
+        purchaseIntentExpirationService = new PurchaseIntentExpirationService();
         purchaseIntentService = new PurchaseIntentService(
                 productRepository,
                 itemRepository,
                 purchaseIntentRepository,
                 deliveryAddressRepository,
                 userRepository,
-                followRelationshipRepository
+                followRelationshipRepository,
+                purchaseIntentExpirationService
         );
     }
 
@@ -215,6 +221,81 @@ class PurchaseIntentServiceTest {
         assertThat(response.amounts().sellerSettlementAmount()).isEqualTo(32867);
     }
 
+    @Test
+    void getPurchaseIntentDetail_returnsBuyerViewWithDeliveryAndWithoutSellerSettlement() {
+        User seller = user(SELLER_ID, UserGrade.BASIC);
+        User buyer = user(BUYER_ID, UserGrade.BASIC);
+        Item item = item(ITEM_ID, seller);
+        Product product = product(PRODUCT_ID, item, seller, FeePolicy.SELLER_PAYS, new BigDecimal("0.0600"));
+        PurchaseIntent intent = existingIntent(123L, product, buyer, seller, LocalDateTime.now().plusHours(2));
+
+        givenIntentDetail(product, item, intent);
+
+        PurchaseIntentDetailResponse response = purchaseIntentService.getPurchaseIntentDetail(123L, BUYER_ID);
+
+        assertThat(response.viewerRole()).isEqualTo(ViewerRole.BUYER);
+        assertThat(response.status()).isEqualTo(PurchaseIntentStatus.SENT);
+        assertThat(response.paymentAuthorizationStatus()).isEqualTo(PaymentAuthorizationStatus.AUTHORIZED);
+        assertThat(response.remainingSeconds()).isPositive();
+        assertThat(response.amounts().sellerServiceFee()).isNull();
+        assertThat(response.amounts().sellerSettlementAmount()).isNull();
+        assertThat(response.deliveryDisclosureStatus()).isEqualTo(DeliveryDisclosureStatus.VISIBLE);
+        assertThat(response.delivery()).isNotNull();
+        assertThat(response.delivery().phone()).isEqualTo("010-1234-5678");
+    }
+
+    @Test
+    void getPurchaseIntentDetail_returnsSellerViewWithoutDeliveryBeforeAcceptance() {
+        User seller = user(SELLER_ID, UserGrade.BASIC);
+        User buyer = user(BUYER_ID, UserGrade.BASIC);
+        Item item = item(ITEM_ID, seller);
+        Product product = product(PRODUCT_ID, item, seller, FeePolicy.SELLER_PAYS, new BigDecimal("0.0600"));
+        PurchaseIntent intent = existingIntent(123L, product, buyer, seller, LocalDateTime.now().plusHours(2));
+
+        givenIntentDetail(product, item, intent);
+
+        PurchaseIntentDetailResponse response = purchaseIntentService.getPurchaseIntentDetail(123L, SELLER_ID);
+
+        assertThat(response.viewerRole()).isEqualTo(ViewerRole.SELLER);
+        assertThat(response.amounts().sellerServiceFee()).isEqualTo(21600);
+        assertThat(response.amounts().sellerSettlementAmount()).isEqualTo(343400);
+        assertThat(response.delivery()).isNull();
+        assertThat(response.deliveryDisclosureStatus()).isEqualTo(DeliveryDisclosureStatus.AFTER_ACCEPTANCE);
+    }
+
+    @Test
+    void getPurchaseIntentDetail_expiresSentIntentWhenPastDeadline() {
+        User seller = user(SELLER_ID, UserGrade.BASIC);
+        User buyer = user(BUYER_ID, UserGrade.BASIC);
+        Item item = item(ITEM_ID, seller);
+        Product product = product(PRODUCT_ID, item, seller, FeePolicy.SELLER_PAYS, new BigDecimal("0.0600"));
+        PurchaseIntent intent = existingIntent(123L, product, buyer, seller, LocalDateTime.now().minusMinutes(1));
+
+        givenIntentDetail(product, item, intent);
+
+        PurchaseIntentDetailResponse response = purchaseIntentService.getPurchaseIntentDetail(123L, BUYER_ID);
+
+        assertThat(response.status()).isEqualTo(PurchaseIntentStatus.EXPIRED);
+        assertThat(response.paymentAuthorizationStatus()).isEqualTo(PaymentAuthorizationStatus.RELEASED);
+        assertThat(response.remainingSeconds()).isZero();
+    }
+
+    @Test
+    void getPurchaseIntentDetail_rejectsNonParticipant() {
+        User seller = user(SELLER_ID, UserGrade.BASIC);
+        User buyer = user(BUYER_ID, UserGrade.BASIC);
+        Item item = item(ITEM_ID, seller);
+        Product product = product(PRODUCT_ID, item, seller, FeePolicy.SELLER_PAYS, new BigDecimal("0.0600"));
+        PurchaseIntent intent = existingIntent(123L, product, buyer, seller, LocalDateTime.now().plusHours(2));
+
+        givenIntentDetail(product, item, intent);
+
+        assertThatThrownBy(() -> purchaseIntentService.getPurchaseIntentDetail(123L, 999L))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(PurchaseIntentErrorCode.PURCHASE_INTENT_ACCESS_DENIED);
+    }
+
     private void givenPurchasableProduct(
             Product product,
             Item item,
@@ -229,6 +310,13 @@ class PurchaseIntentServiceTest {
                 BUYER_ID,
                 PurchaseIntentStatus.SENT
         )).thenReturn(sentIntents);
+    }
+
+    private void givenIntentDetail(Product product, Item item, PurchaseIntent intent) {
+        when(purchaseIntentRepository.findProductIdById(intent.getId())).thenReturn(Optional.of(PRODUCT_ID));
+        when(productRepository.findByIdForUpdate(PRODUCT_ID)).thenReturn(Optional.of(product));
+        when(itemRepository.findByIdForUpdate(ITEM_ID)).thenReturn(Optional.of(item));
+        when(purchaseIntentRepository.findByIdForUpdate(intent.getId())).thenReturn(Optional.of(intent));
     }
 
     private PurchaseIntentCreateRequest request(Boolean agreement) {

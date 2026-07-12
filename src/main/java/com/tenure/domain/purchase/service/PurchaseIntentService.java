@@ -12,6 +12,8 @@ import com.tenure.domain.product.enums.ProductStatus;
 import com.tenure.domain.product.repository.ProductRepository;
 import com.tenure.domain.purchase.dto.PurchaseIntentCreateRequest;
 import com.tenure.domain.purchase.dto.PurchaseIntentCreateResponse;
+import com.tenure.domain.purchase.dto.PurchaseIntentDetailResponse;
+import com.tenure.domain.purchase.dto.PurchaseIntentDetailResponse.ViewerRole;
 import com.tenure.domain.purchase.entity.PurchaseIntent;
 import com.tenure.domain.purchase.enums.PurchaseIntentStatus;
 import com.tenure.domain.purchase.exception.PurchaseIntentErrorCode;
@@ -42,6 +44,7 @@ public class PurchaseIntentService {
     private final DeliveryAddressRepository deliveryAddressRepository;
     private final UserRepository userRepository;
     private final FollowRelationshipRepository followRelationshipRepository;
+    private final PurchaseIntentExpirationService purchaseIntentExpirationService;
 
     @Transactional
     public PurchaseIntentCreateResponse createPurchaseIntent(
@@ -128,8 +131,7 @@ public class PurchaseIntentService {
         );
 
         for (PurchaseIntent intent : sentIntents) {
-            if (intent.isExpiredAt(now)) {
-                intent.expireAndReleaseAuthorization();
+            if (purchaseIntentExpirationService.expireIfSentAndExpired(intent, now)) {
                 continue;
             }
             throw new CustomException(
@@ -170,6 +172,33 @@ public class PurchaseIntentService {
 
     private String createMockPaymentAuthorizationId() {
         return "mock_auth_" + UUID.randomUUID();
+    }
+
+    @Transactional
+    public PurchaseIntentDetailResponse getPurchaseIntentDetail(Long intentId, Long currentUserId) {
+        Long productId = purchaseIntentRepository.findProductIdById(intentId)
+                .orElseThrow(() -> new CustomException(PurchaseIntentErrorCode.PURCHASE_INTENT_NOT_FOUND));
+        Product product = productRepository.findByIdForUpdate(productId)
+                .orElseThrow(() -> new CustomException(PurchaseIntentErrorCode.PRODUCT_NOT_FOUND));
+        itemRepository.findByIdForUpdate(product.getItem().getId())
+                .orElseThrow(() -> new CustomException(PurchaseIntentErrorCode.ITEM_NOT_FOUND));
+        PurchaseIntent intent = purchaseIntentRepository.findByIdForUpdate(intentId)
+                .orElseThrow(() -> new CustomException(PurchaseIntentErrorCode.PURCHASE_INTENT_NOT_FOUND));
+
+        ViewerRole viewerRole = resolveViewerRole(intent, currentUserId);
+        LocalDateTime now = LocalDateTime.now();
+        purchaseIntentExpirationService.expireIfSentAndExpired(intent, now);
+        return PurchaseIntentDetailResponse.from(intent, viewerRole, now);
+    }
+
+    private ViewerRole resolveViewerRole(PurchaseIntent intent, Long currentUserId) {
+        if (intent.getBuyer().getId().equals(currentUserId)) {
+            return ViewerRole.BUYER;
+        }
+        if (intent.getSeller().getId().equals(currentUserId)) {
+            return ViewerRole.SELLER;
+        }
+        throw new CustomException(PurchaseIntentErrorCode.PURCHASE_INTENT_ACCESS_DENIED);
     }
 
     private record FeeAmounts(
