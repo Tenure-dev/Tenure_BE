@@ -1,4 +1,4 @@
-HELP.md
+Rj 먼저HELP.md
 .gradle
 build/
 !gradle/wrapper/gradle-wrapper.jar
@@ -43,3 +43,6 @@ application-secret.yml
 *.pem
 *.p12
 *.jks
+
+### Local file storage ###
+/uploads/
