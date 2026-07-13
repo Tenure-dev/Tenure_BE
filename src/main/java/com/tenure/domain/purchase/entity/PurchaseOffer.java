@@ -1,11 +1,10 @@
 package com.tenure.domain.purchase.entity;
 
-import com.tenure.domain.purchase.enums.PurchaseOfferStatus;
-
 import com.tenure.domain.address.entity.DeliveryAddress;
 import com.tenure.domain.common.entity.BaseTimeEntity;
 import com.tenure.domain.common.enums.PaymentAuthorizationStatus;
 import com.tenure.domain.item.entity.Item;
+import com.tenure.domain.purchase.enums.PurchaseOfferStatus;
 import com.tenure.domain.user.entity.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -111,6 +110,46 @@ public class PurchaseOffer extends BaseTimeEntity {
 
     @Column(name = "expires_at", nullable = false)
     private LocalDateTime expiresAt;
+
+    public static PurchaseOffer create(
+            Item item,
+            User proposer,
+            User owner,
+            DeliveryAddress deliveryAddress,
+            Integer offerPrice,
+            Integer proposerShippingFee,
+            Integer proposerServiceFee,
+            BigDecimal feeRateSnapshot,
+            Integer totalPaymentAmount,
+            Integer ownerSettlementAmount,
+            String paymentAuthorizationId,
+            String paymentMethodId,
+            LocalDateTime expiresAt
+    ) {
+        PurchaseOffer offer = new PurchaseOffer();
+        offer.item = item;
+        offer.proposer = proposer;
+        offer.owner = owner;
+        offer.deliveryAddress = deliveryAddress;
+        offer.offerPrice = offerPrice;
+        offer.proposerShippingFee = proposerShippingFee;
+        offer.proposerServiceFee = proposerServiceFee;
+        offer.feeRateSnapshot = feeRateSnapshot;
+        offer.totalPaymentAmount = totalPaymentAmount;
+        offer.ownerSettlementAmount = ownerSettlementAmount;
+        offer.paymentAuthorizationId = paymentAuthorizationId;
+        offer.paymentAuthorizationStatus = PaymentAuthorizationStatus.AUTHORIZED;
+        offer.paymentMethodId = paymentMethodId;
+        offer.deliveryReceiverName = deliveryAddress.getReceiverName();
+        offer.deliveryPhone = deliveryAddress.getPhone();
+        offer.deliveryAddressLine1 = deliveryAddress.getAddressLine1();
+        offer.deliveryAddressLine2 = deliveryAddress.getAddressLine2();
+        offer.deliveryPostalCode = deliveryAddress.getPostalCode();
+        offer.deliveryRequestNote = deliveryAddress.getRequestNote();
+        offer.status = PurchaseOfferStatus.SENT;
+        offer.expiresAt = expiresAt;
+        return offer;
+    }
 
     public boolean isSent() {
         return status == PurchaseOfferStatus.SENT;

@@ -15,6 +15,9 @@ import org.springframework.data.repository.query.Param;
 
 public interface PurchaseOfferRepository extends JpaRepository<PurchaseOffer, Long> {
 
+    @Query("select offer.item.id from PurchaseOffer offer where offer.id = :offerId")
+    Optional<Long> findItemIdById(@Param("offerId") Long offerId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select offer from PurchaseOffer offer where offer.id = :offerId")
     Optional<PurchaseOffer> findByIdForUpdate(@Param("offerId") Long offerId);
@@ -55,6 +58,18 @@ public interface PurchaseOfferRepository extends JpaRepository<PurchaseOffer, Lo
             @Param("cursorCreatedAt") LocalDateTime cursorCreatedAt,
             @Param("cursorOfferId") Long cursorOfferId,
             Pageable pageable
+    );
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select offer
+            from PurchaseOffer offer
+            where offer.item.id = :itemId
+              and offer.proposer.id = :proposerUserId
+            """)
+    Optional<PurchaseOffer> findByItemIdAndProposerIdForUpdate(
+            @Param("itemId") Long itemId,
+            @Param("proposerUserId") Long proposerUserId
     );
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

@@ -1,5 +1,8 @@
 package com.tenure.domain.purchase.controller;
 
+import com.tenure.domain.purchase.dto.PurchaseOfferCreateRequest;
+import com.tenure.domain.purchase.dto.PurchaseOfferCreateResponse;
+import com.tenure.domain.purchase.dto.PurchaseOfferDetailResponse;
 import com.tenure.domain.purchase.dto.PurchaseOfferSentListResponse;
 import com.tenure.domain.purchase.enums.PurchaseOfferStatus;
 import com.tenure.domain.purchase.service.PurchaseOfferService;
@@ -9,19 +12,26 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import java.net.URI;
 import java.time.OffsetDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-@Tag(name = "PurchaseOffer", description = "구매 제안 API")
+@Tag(name = "PurchaseOffer", description = "Purchase offer API")
 @RestController
 @RequestMapping
 @RequiredArgsConstructor
@@ -31,41 +41,122 @@ public class PurchaseOfferController {
     private final CurrentUserProvider currentUserProvider;
 
     @Operation(
-            summary = "내가 보낸 구매 제안 목록 조회",
-            description = "로그인 사용자가 미판매 아이템에 보낸 구매 제안 목록을 커서 기반으로 조회합니다. SENT 만료 요청은 조회 시 EXPIRED와 RELEASED로 보정합니다.",
+            summary = "Create purchase offer",
+            description = "Creates a one-time purchase offer for an owned, non-sale item.",
             parameters = {
                     @Parameter(
                             name = "X-USER-ID",
                             in = ParameterIn.HEADER,
                             required = true,
-                            description = "JWT 적용 전 Swagger 테스트용 현재 사용자 ID. JWT 적용 후에는 SecurityContext 값을 사용합니다.",
+                            description = "Temporary current user id for Swagger/local testing before JWT is fully connected.",
+                            example = "2"
+                    )
+            },
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    required = true,
+                    content = @Content(
+                            schema = @Schema(implementation = PurchaseOfferCreateRequest.class),
+                            examples = @ExampleObject(
+                                    name = "Create purchase offer request",
+                                    value = """
+                                            {
+                                              "offerPrice": 360000,
+                                              "deliveryAddressId": 1,
+                                              "paymentMethodId": "MOCK_CARD",
+                                              "agreement": true
+                                            }
+                                            """
+                            )
+                    )
+            )
+    )
+    @ApiResponse(
+            responseCode = "201",
+            description = "Purchase offer created successfully.",
+            content = @Content(schema = @Schema(implementation = PurchaseOfferCreateResponse.class))
+    )
+    @PostMapping("/items/{itemId}/offers")
+    public ResponseEntity<BaseResponse<PurchaseOfferCreateResponse>> createPurchaseOffer(
+            @PathVariable Long itemId,
+            @Valid @RequestBody PurchaseOfferCreateRequest request
+    ) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        PurchaseOfferCreateResponse response = purchaseOfferService.createPurchaseOffer(
+                itemId,
+                currentUserId,
+                request
+        );
+        return ResponseEntity
+                .created(URI.create("/purchase-offers/" + response.offerId()))
+                .body(BaseResponse.success(response, "Purchase offer created."));
+    }
+
+    @Operation(
+            summary = "Get purchase offer detail",
+            description = "Returns purchase offer waiting detail for the proposer or item owner. Expired SENT offers are updated to EXPIRED and RELEASED.",
+            parameters = {
+                    @Parameter(
+                            name = "X-USER-ID",
+                            in = ParameterIn.HEADER,
+                            required = true,
+                            description = "Temporary current user id for Swagger/local testing before JWT is fully connected.",
+                            example = "2"
+                    )
+            }
+    )
+    @ApiResponse(
+            responseCode = "200",
+            description = "Purchase offer detail returned successfully.",
+            content = @Content(schema = @Schema(implementation = PurchaseOfferDetailResponse.class))
+    )
+    @GetMapping("/purchase-offers/{offerId}")
+    public BaseResponse<PurchaseOfferDetailResponse> getPurchaseOfferDetail(
+            @PathVariable Long offerId
+    ) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        PurchaseOfferDetailResponse response = purchaseOfferService.getPurchaseOfferDetail(
+                offerId,
+                currentUserId
+        );
+        return BaseResponse.success(response, "Query succeeded.");
+    }
+
+    @Operation(
+            summary = "Get sent purchase offers",
+            description = "Returns the current user's sent purchase offers with cursor pagination. Expired SENT offers are updated to EXPIRED and RELEASED before querying.",
+            parameters = {
+                    @Parameter(
+                            name = "X-USER-ID",
+                            in = ParameterIn.HEADER,
+                            required = true,
+                            description = "Temporary current user id for Swagger/local testing before JWT is fully connected.",
                             example = "2"
                     ),
                     @Parameter(
                             name = "statuses",
-                            description = "조회할 상태 목록. 예: statuses=SENT 또는 statuses=SENT,EXPIRED. 생략 시 전체 상태",
+                            description = "Status filter. Example: statuses=SENT or statuses=SENT,EXPIRED. Omit to return all statuses.",
                             example = "SENT"
                     ),
                     @Parameter(
                             name = "cursorCreatedAt",
-                            description = "다음 페이지 조회용 생성 시각 커서",
+                            description = "Created-at cursor for the next page.",
                             example = "2026-07-12T10:00:00+09:00"
                     ),
                     @Parameter(
                             name = "cursorOfferId",
-                            description = "다음 페이지 조회용 구매 제안 ID 커서",
+                            description = "Purchase offer id cursor for the next page.",
                             example = "123"
                     ),
                     @Parameter(
                             name = "size",
-                            description = "페이지 크기. 기본 20, 최대 50",
+                            description = "Page size. Default 20, max 50.",
                             example = "20"
                     )
             }
     )
     @ApiResponse(
             responseCode = "200",
-            description = "보낸 구매 제안 목록 조회 성공",
+            description = "Sent purchase offers returned successfully.",
             content = @Content(schema = @Schema(implementation = PurchaseOfferSentListResponse.class))
     )
     @GetMapping("/purchase-offers/sent")
@@ -85,6 +176,6 @@ public class PurchaseOfferController {
                 cursorOfferId,
                 size
         );
-        return BaseResponse.success(response, "조회에 성공했습니다.");
+        return BaseResponse.success(response, "Query succeeded.");
     }
 }
