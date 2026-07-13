@@ -1,6 +1,13 @@
 package com.tenure.domain.purchase.controller;
 
 import com.tenure.domain.purchase.dto.PurchaseOfferCancelResponse;
+import com.tenure.domain.purchase.dto.PurchaseOfferCreateRequest;
+import com.tenure.domain.purchase.dto.PurchaseOfferCreateResponse;
+import com.tenure.domain.purchase.dto.PurchaseOfferDetailResponse;
+import com.tenure.domain.purchase.dto.PurchaseOfferReceivedListResponse;
+import com.tenure.domain.purchase.dto.PurchaseOfferRejectResponse;
+import com.tenure.domain.purchase.dto.PurchaseOfferSentListResponse;
+import com.tenure.domain.purchase.enums.PurchaseOfferStatus;
 import com.tenure.domain.purchase.service.PurchaseOfferService;
 import com.tenure.global.response.BaseResponse;
 import com.tenure.global.security.CurrentUserProvider;
@@ -8,13 +15,23 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import java.net.URI;
+import java.time.OffsetDateTime;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @Tag(name = "PurchaseOffer", description = "Purchase offer API")
@@ -27,32 +44,113 @@ public class PurchaseOfferController {
     private final CurrentUserProvider currentUserProvider;
 
     @Operation(
-            summary = "Cancel purchase offer",
-            description = "The proposer cancels a SENT purchase offer and releases the mock payment authorization. The one-time offer chance is not restored.",
+            summary = "Create purchase offer",
+            description = "Creates a one-time purchase offer for an owned, non-sale item.",
             parameters = {
-                    @Parameter(
-                            name = "X-USER-ID",
-                            in = ParameterIn.HEADER,
-                            required = true,
-                            description = "Temporary current user id for Swagger/local testing before JWT is fully connected.",
-                            example = "2"
+                    @Parameter(name = "X-USER-ID", in = ParameterIn.HEADER, required = true, example = "2")
+            },
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    required = true,
+                    content = @Content(
+                            schema = @Schema(implementation = PurchaseOfferCreateRequest.class),
+                            examples = @ExampleObject(
+                                    name = "Create purchase offer request",
+                                    value = """
+                                            {
+                                              "offerPrice": 360000,
+                                              "deliveryAddressId": 1,
+                                              "paymentMethodId": "MOCK_CARD",
+                                              "agreement": true
+                                            }
+                                            """
+                            )
                     )
-            }
+            )
     )
-    @ApiResponse(
-            responseCode = "200",
-            description = "Purchase offer canceled successfully.",
-            content = @Content(schema = @Schema(implementation = PurchaseOfferCancelResponse.class))
-    )
-    @PostMapping("/purchase-offers/{offerId}/cancel")
-    public BaseResponse<PurchaseOfferCancelResponse> cancelPurchaseOffer(
-            @PathVariable Long offerId
+    @ApiResponse(responseCode = "201", content = @Content(schema = @Schema(implementation = PurchaseOfferCreateResponse.class)))
+    @PostMapping("/items/{itemId}/offers")
+    public ResponseEntity<BaseResponse<PurchaseOfferCreateResponse>> createPurchaseOffer(
+            @PathVariable Long itemId,
+            @Valid @RequestBody PurchaseOfferCreateRequest request
     ) {
         Long currentUserId = currentUserProvider.getCurrentUserId();
-        PurchaseOfferCancelResponse response = purchaseOfferService.cancelPurchaseOffer(
-                offerId,
-                currentUserId
+        PurchaseOfferCreateResponse response = purchaseOfferService.createPurchaseOffer(itemId, currentUserId, request);
+        return ResponseEntity
+                .created(URI.create("/purchase-offers/" + response.offerId()))
+                .body(BaseResponse.success(response, "Purchase offer created."));
+    }
+
+    @Operation(summary = "Get purchase offer detail")
+    @ApiResponse(responseCode = "200", content = @Content(schema = @Schema(implementation = PurchaseOfferDetailResponse.class)))
+    @GetMapping("/purchase-offers/{offerId}")
+    public BaseResponse<PurchaseOfferDetailResponse> getPurchaseOfferDetail(@PathVariable Long offerId) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        PurchaseOfferDetailResponse response = purchaseOfferService.getPurchaseOfferDetail(offerId, currentUserId);
+        return BaseResponse.success(response, "Query succeeded.");
+    }
+
+    @Operation(summary = "Get sent purchase offers")
+    @ApiResponse(responseCode = "200", content = @Content(schema = @Schema(implementation = PurchaseOfferSentListResponse.class)))
+    @GetMapping("/purchase-offers/sent")
+    public BaseResponse<PurchaseOfferSentListResponse> getSentPurchaseOffers(
+            @RequestParam(required = false) List<PurchaseOfferStatus> statuses,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+            OffsetDateTime cursorCreatedAt,
+            @RequestParam(required = false) Long cursorOfferId,
+            @RequestParam(required = false) Integer size
+    ) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        PurchaseOfferSentListResponse response = purchaseOfferService.getSentPurchaseOffers(
+                currentUserId,
+                statuses,
+                cursorCreatedAt,
+                cursorOfferId,
+                size
         );
-        return BaseResponse.success(response, "구매 제안을 취소했습니다.");
+        return BaseResponse.success(response, "Query succeeded.");
+    }
+
+    @Operation(summary = "Get received purchase offers")
+    @ApiResponse(responseCode = "200", content = @Content(schema = @Schema(implementation = PurchaseOfferReceivedListResponse.class)))
+    @GetMapping("/purchase-offers/received")
+    public BaseResponse<PurchaseOfferReceivedListResponse> getReceivedPurchaseOffers(
+            @RequestParam(required = false) List<PurchaseOfferStatus> statuses,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+            OffsetDateTime cursorCreatedAt,
+            @RequestParam(required = false) Long cursorOfferId,
+            @RequestParam(required = false) Integer size
+    ) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        PurchaseOfferReceivedListResponse response = purchaseOfferService.getReceivedPurchaseOffers(
+                currentUserId,
+                statuses,
+                cursorCreatedAt,
+                cursorOfferId,
+                size
+        );
+        return BaseResponse.success(response, "Query succeeded.");
+    }
+
+    @Operation(summary = "Reject purchase offer")
+    @ApiResponse(responseCode = "200", content = @Content(schema = @Schema(implementation = PurchaseOfferRejectResponse.class)))
+    @PostMapping("/purchase-offers/{offerId}/reject")
+    public BaseResponse<PurchaseOfferRejectResponse> rejectPurchaseOffer(@PathVariable Long offerId) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        PurchaseOfferRejectResponse response = purchaseOfferService.rejectPurchaseOffer(offerId, currentUserId);
+        return BaseResponse.success(response, "Purchase offer rejected.");
+    }
+
+    @Operation(
+            summary = "Cancel purchase offer",
+            description = "The proposer cancels a SENT purchase offer and releases the mock payment authorization. The one-time offer chance is not restored."
+    )
+    @ApiResponse(responseCode = "200", content = @Content(schema = @Schema(implementation = PurchaseOfferCancelResponse.class)))
+    @PostMapping("/purchase-offers/{offerId}/cancel")
+    public BaseResponse<PurchaseOfferCancelResponse> cancelPurchaseOffer(@PathVariable Long offerId) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        PurchaseOfferCancelResponse response = purchaseOfferService.cancelPurchaseOffer(offerId, currentUserId);
+        return BaseResponse.success(response, "Purchase offer canceled.");
     }
 }

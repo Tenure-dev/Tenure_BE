@@ -18,6 +18,7 @@ public enum ProductErrorCode implements ErrorCode {
     ATTACHED_OOTD_DUPLICATED("PRODUCT_004", "공개할 OOTD가 중복 선택되었습니다.", HttpStatus.BAD_REQUEST),
     ATTACHED_OOTD_INVALID("PRODUCT_005", "공개할 수 없는 OOTD가 포함되어 있습니다.", HttpStatus.BAD_REQUEST),
     PRODUCT_JSON_INVALID("PRODUCT_006", "판매 상품 입력값을 저장할 수 없습니다.", HttpStatus.BAD_REQUEST),
+    PRODUCT_NOT_TRADING("PRODUCT_007", "거래 중인 상품이 아닙니다.", HttpStatus.CONFLICT),
     PRODUCT_DETAIL_DATA_INVALID("PRODUCT_500", "판매 상품 정보를 불러올 수 없습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
 
     private final String code;
