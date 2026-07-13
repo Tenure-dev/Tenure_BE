@@ -81,4 +81,8 @@ public class Item extends BaseTimeEntity {
     public void markOnSale() {
         this.itemStatus = ItemStatus.ON_SALE;
     }
+
+    public void markOwned() {
+        this.itemStatus = ItemStatus.OWNED;
+    }
 }
