@@ -1,5 +1,6 @@
 package com.tenure.domain.purchase.controller;
 
+import com.tenure.domain.purchase.dto.PurchaseOfferCancelResponse;
 import com.tenure.domain.purchase.dto.PurchaseOfferCreateRequest;
 import com.tenure.domain.purchase.dto.PurchaseOfferCreateResponse;
 import com.tenure.domain.purchase.dto.PurchaseOfferDetailResponse;
@@ -46,13 +47,7 @@ public class PurchaseOfferController {
             summary = "Create purchase offer",
             description = "Creates a one-time purchase offer for an owned, non-sale item.",
             parameters = {
-                    @Parameter(
-                            name = "X-USER-ID",
-                            in = ParameterIn.HEADER,
-                            required = true,
-                            description = "Temporary current user id for Swagger/local testing before JWT is fully connected.",
-                            example = "2"
-                    )
+                    @Parameter(name = "X-USER-ID", in = ParameterIn.HEADER, required = true, example = "2")
             },
             requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
                     required = true,
@@ -72,73 +67,30 @@ public class PurchaseOfferController {
                     )
             )
     )
-    @ApiResponse(
-            responseCode = "201",
-            description = "Purchase offer created successfully.",
-            content = @Content(schema = @Schema(implementation = PurchaseOfferCreateResponse.class))
-    )
+    @ApiResponse(responseCode = "201", content = @Content(schema = @Schema(implementation = PurchaseOfferCreateResponse.class)))
     @PostMapping("/items/{itemId}/offers")
     public ResponseEntity<BaseResponse<PurchaseOfferCreateResponse>> createPurchaseOffer(
             @PathVariable Long itemId,
             @Valid @RequestBody PurchaseOfferCreateRequest request
     ) {
         Long currentUserId = currentUserProvider.getCurrentUserId();
-        PurchaseOfferCreateResponse response = purchaseOfferService.createPurchaseOffer(
-                itemId,
-                currentUserId,
-                request
-        );
+        PurchaseOfferCreateResponse response = purchaseOfferService.createPurchaseOffer(itemId, currentUserId, request);
         return ResponseEntity
                 .created(URI.create("/purchase-offers/" + response.offerId()))
                 .body(BaseResponse.success(response, "Purchase offer created."));
     }
 
-    @Operation(
-            summary = "Get purchase offer detail",
-            description = "Returns purchase offer waiting detail for the proposer or item owner. Expired SENT offers are updated to EXPIRED and RELEASED.",
-            parameters = {
-                    @Parameter(
-                            name = "X-USER-ID",
-                            in = ParameterIn.HEADER,
-                            required = true,
-                            description = "Temporary current user id for Swagger/local testing before JWT is fully connected.",
-                            example = "2"
-                    )
-            }
-    )
-    @ApiResponse(
-            responseCode = "200",
-            description = "Purchase offer detail returned successfully.",
-            content = @Content(schema = @Schema(implementation = PurchaseOfferDetailResponse.class))
-    )
+    @Operation(summary = "Get purchase offer detail")
+    @ApiResponse(responseCode = "200", content = @Content(schema = @Schema(implementation = PurchaseOfferDetailResponse.class)))
     @GetMapping("/purchase-offers/{offerId}")
-    public BaseResponse<PurchaseOfferDetailResponse> getPurchaseOfferDetail(
-            @PathVariable Long offerId
-    ) {
+    public BaseResponse<PurchaseOfferDetailResponse> getPurchaseOfferDetail(@PathVariable Long offerId) {
         Long currentUserId = currentUserProvider.getCurrentUserId();
-        PurchaseOfferDetailResponse response = purchaseOfferService.getPurchaseOfferDetail(
-                offerId,
-                currentUserId
-        );
+        PurchaseOfferDetailResponse response = purchaseOfferService.getPurchaseOfferDetail(offerId, currentUserId);
         return BaseResponse.success(response, "Query succeeded.");
     }
 
-    @Operation(
-            summary = "Get sent purchase offers",
-            description = "Returns the current user's sent purchase offers with cursor pagination. Expired SENT offers are updated to EXPIRED and RELEASED before querying.",
-            parameters = {
-                    @Parameter(name = "X-USER-ID", in = ParameterIn.HEADER, required = true, example = "2"),
-                    @Parameter(name = "statuses", description = "Status filter. Omit to return all statuses.", example = "SENT"),
-                    @Parameter(name = "cursorCreatedAt", description = "Created-at cursor for the next page.", example = "2026-07-12T10:00:00+09:00"),
-                    @Parameter(name = "cursorOfferId", description = "Purchase offer id cursor for the next page.", example = "123"),
-                    @Parameter(name = "size", description = "Page size. Default 20, max 50.", example = "20")
-            }
-    )
-    @ApiResponse(
-            responseCode = "200",
-            description = "Sent purchase offers returned successfully.",
-            content = @Content(schema = @Schema(implementation = PurchaseOfferSentListResponse.class))
-    )
+    @Operation(summary = "Get sent purchase offers")
+    @ApiResponse(responseCode = "200", content = @Content(schema = @Schema(implementation = PurchaseOfferSentListResponse.class)))
     @GetMapping("/purchase-offers/sent")
     public BaseResponse<PurchaseOfferSentListResponse> getSentPurchaseOffers(
             @RequestParam(required = false) List<PurchaseOfferStatus> statuses,
@@ -159,22 +111,8 @@ public class PurchaseOfferController {
         return BaseResponse.success(response, "Query succeeded.");
     }
 
-    @Operation(
-            summary = "Get received purchase offers",
-            description = "Returns purchase offers received by the current item owner. Expired SENT offers are updated to EXPIRED and RELEASED before querying.",
-            parameters = {
-                    @Parameter(name = "X-USER-ID", in = ParameterIn.HEADER, required = true, example = "1"),
-                    @Parameter(name = "statuses", description = "Status filter. Omit to return all statuses.", example = "SENT"),
-                    @Parameter(name = "cursorCreatedAt", description = "Created-at cursor for the next page.", example = "2026-07-12T10:00:00+09:00"),
-                    @Parameter(name = "cursorOfferId", description = "Purchase offer id cursor for the next page.", example = "123"),
-                    @Parameter(name = "size", description = "Page size. Default 20, max 50.", example = "20")
-            }
-    )
-    @ApiResponse(
-            responseCode = "200",
-            description = "Received purchase offers returned successfully.",
-            content = @Content(schema = @Schema(implementation = PurchaseOfferReceivedListResponse.class))
-    )
+    @Operation(summary = "Get received purchase offers")
+    @ApiResponse(responseCode = "200", content = @Content(schema = @Schema(implementation = PurchaseOfferReceivedListResponse.class)))
     @GetMapping("/purchase-offers/received")
     public BaseResponse<PurchaseOfferReceivedListResponse> getReceivedPurchaseOffers(
             @RequestParam(required = false) List<PurchaseOfferStatus> statuses,
@@ -195,33 +133,24 @@ public class PurchaseOfferController {
         return BaseResponse.success(response, "Query succeeded.");
     }
 
-    @Operation(
-            summary = "Reject purchase offer",
-            description = "The item owner rejects a SENT purchase offer and releases the mock payment authorization.",
-            parameters = {
-                    @Parameter(
-                            name = "X-USER-ID",
-                            in = ParameterIn.HEADER,
-                            required = true,
-                            description = "Temporary current user id for Swagger/local testing before JWT is fully connected.",
-                            example = "1"
-                    )
-            }
-    )
-    @ApiResponse(
-            responseCode = "200",
-            description = "Purchase offer rejected successfully.",
-            content = @Content(schema = @Schema(implementation = PurchaseOfferRejectResponse.class))
-    )
+    @Operation(summary = "Reject purchase offer")
+    @ApiResponse(responseCode = "200", content = @Content(schema = @Schema(implementation = PurchaseOfferRejectResponse.class)))
     @PostMapping("/purchase-offers/{offerId}/reject")
-    public BaseResponse<PurchaseOfferRejectResponse> rejectPurchaseOffer(
-            @PathVariable Long offerId
-    ) {
+    public BaseResponse<PurchaseOfferRejectResponse> rejectPurchaseOffer(@PathVariable Long offerId) {
         Long currentUserId = currentUserProvider.getCurrentUserId();
-        PurchaseOfferRejectResponse response = purchaseOfferService.rejectPurchaseOffer(
-                offerId,
-                currentUserId
-        );
+        PurchaseOfferRejectResponse response = purchaseOfferService.rejectPurchaseOffer(offerId, currentUserId);
         return BaseResponse.success(response, "Purchase offer rejected.");
+    }
+
+    @Operation(
+            summary = "Cancel purchase offer",
+            description = "The proposer cancels a SENT purchase offer and releases the mock payment authorization. The one-time offer chance is not restored."
+    )
+    @ApiResponse(responseCode = "200", content = @Content(schema = @Schema(implementation = PurchaseOfferCancelResponse.class)))
+    @PostMapping("/purchase-offers/{offerId}/cancel")
+    public BaseResponse<PurchaseOfferCancelResponse> cancelPurchaseOffer(@PathVariable Long offerId) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        PurchaseOfferCancelResponse response = purchaseOfferService.cancelPurchaseOffer(offerId, currentUserId);
+        return BaseResponse.success(response, "Purchase offer canceled.");
     }
 }

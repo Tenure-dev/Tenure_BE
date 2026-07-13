@@ -5,6 +5,7 @@ import com.tenure.domain.address.repository.DeliveryAddressRepository;
 import com.tenure.domain.item.entity.Item;
 import com.tenure.domain.item.enums.ItemStatus;
 import com.tenure.domain.item.repository.ItemRepository;
+import com.tenure.domain.purchase.dto.PurchaseOfferCancelResponse;
 import com.tenure.domain.purchase.dto.PurchaseOfferCreateRequest;
 import com.tenure.domain.purchase.dto.PurchaseOfferCreateResponse;
 import com.tenure.domain.purchase.dto.PurchaseOfferDetailResponse;
@@ -102,13 +103,7 @@ public class PurchaseOfferService {
 
     @Transactional
     public PurchaseOfferDetailResponse getPurchaseOfferDetail(Long offerId, Long currentUserId) {
-        Long itemId = purchaseOfferRepository.findItemIdById(offerId)
-                .orElseThrow(() -> new CustomException(PurchaseOfferErrorCode.PURCHASE_OFFER_NOT_FOUND));
-        itemRepository.findByIdForUpdate(itemId)
-                .orElseThrow(() -> new CustomException(PurchaseOfferErrorCode.ITEM_NOT_FOUND));
-        PurchaseOffer offer = purchaseOfferRepository.findByIdForUpdate(offerId)
-                .orElseThrow(() -> new CustomException(PurchaseOfferErrorCode.PURCHASE_OFFER_NOT_FOUND));
-
+        PurchaseOffer offer = findOfferWithItemLock(offerId);
         ViewerRole viewerRole = resolveViewerRole(offer, currentUserId);
         LocalDateTime now = LocalDateTime.now();
         purchaseOfferExpirationService.expireIfSentAndExpired(offer, now);
@@ -128,18 +123,16 @@ public class PurchaseOfferService {
         LocalDateTime now = LocalDateTime.now();
         expireSentOffersForProposer(currentUserId, now);
 
-        List<PurchaseOfferStatus> normalizedStatuses = normalizeStatuses(statuses);
         List<PurchaseOffer> fetched = purchaseOfferRepository.findSentListByProposerWithCursor(
                 currentUserId,
-                normalizedStatuses,
+                normalizeStatuses(statuses),
                 cursorCreatedAt == null ? null : cursorCreatedAt.toLocalDateTime(),
                 cursorOfferId,
                 PageRequest.of(0, pageSize + 1)
         );
         boolean hasNext = fetched.size() > pageSize;
         List<PurchaseOffer> pageItems = hasNext ? fetched.subList(0, pageSize) : fetched;
-        Map<Long, Long> tradeIdByOfferId = findTradeIds(pageItems);
-        return PurchaseOfferSentListResponse.of(pageItems, tradeIdByOfferId, now, hasNext);
+        return PurchaseOfferSentListResponse.of(pageItems, findTradeIds(pageItems), now, hasNext);
     }
 
     @Transactional
@@ -155,41 +148,52 @@ public class PurchaseOfferService {
         LocalDateTime now = LocalDateTime.now();
         expireSentOffersForOwner(currentUserId, now);
 
-        List<PurchaseOfferStatus> normalizedStatuses = normalizeStatuses(statuses);
         List<PurchaseOffer> fetched = purchaseOfferRepository.findReceivedListByOwnerWithCursor(
                 currentUserId,
-                normalizedStatuses,
+                normalizeStatuses(statuses),
                 cursorCreatedAt == null ? null : cursorCreatedAt.toLocalDateTime(),
                 cursorOfferId,
                 PageRequest.of(0, pageSize + 1)
         );
         boolean hasNext = fetched.size() > pageSize;
         List<PurchaseOffer> pageItems = hasNext ? fetched.subList(0, pageSize) : fetched;
-        Map<Long, Long> tradeIdByOfferId = findTradeIds(pageItems);
-        return PurchaseOfferReceivedListResponse.of(pageItems, tradeIdByOfferId, now, hasNext);
+        return PurchaseOfferReceivedListResponse.of(pageItems, findTradeIds(pageItems), now, hasNext);
     }
 
     @Transactional(noRollbackFor = CustomException.class)
     public PurchaseOfferRejectResponse rejectPurchaseOffer(Long offerId, Long currentUserId) {
+        PurchaseOffer offer = findOfferWithItemLock(offerId);
+        validateOwner(offer, currentUserId);
+        validateSentOrExpire(offer, LocalDateTime.now());
+        offer.rejectAndReleaseAuthorization();
+        return PurchaseOfferRejectResponse.from(offer, LocalDateTime.now());
+    }
+
+    @Transactional(noRollbackFor = CustomException.class)
+    public PurchaseOfferCancelResponse cancelPurchaseOffer(Long offerId, Long currentUserId) {
+        PurchaseOffer offer = findOfferWithItemLock(offerId);
+        validateProposer(offer, currentUserId);
+        validateSentOrExpire(offer, LocalDateTime.now());
+        offer.cancelAndReleaseAuthorization();
+        return PurchaseOfferCancelResponse.from(offer, LocalDateTime.now());
+    }
+
+    private PurchaseOffer findOfferWithItemLock(Long offerId) {
         Long itemId = purchaseOfferRepository.findItemIdById(offerId)
                 .orElseThrow(() -> new CustomException(PurchaseOfferErrorCode.PURCHASE_OFFER_NOT_FOUND));
         itemRepository.findByIdForUpdate(itemId)
                 .orElseThrow(() -> new CustomException(PurchaseOfferErrorCode.ITEM_NOT_FOUND));
-        PurchaseOffer offer = purchaseOfferRepository.findByIdForUpdate(offerId)
+        return purchaseOfferRepository.findByIdForUpdate(offerId)
                 .orElseThrow(() -> new CustomException(PurchaseOfferErrorCode.PURCHASE_OFFER_NOT_FOUND));
+    }
 
-        validateOwner(offer, currentUserId);
-
-        LocalDateTime now = LocalDateTime.now();
+    private void validateSentOrExpire(PurchaseOffer offer, LocalDateTime now) {
         if (purchaseOfferExpirationService.expireIfSentAndExpired(offer, now)) {
             throw new CustomException(PurchaseOfferErrorCode.PURCHASE_REQUEST_EXPIRED);
         }
         if (!offer.isSent()) {
             throw new CustomException(PurchaseOfferErrorCode.PURCHASE_OFFER_NOT_SENT);
         }
-
-        offer.rejectAndReleaseAuthorization();
-        return PurchaseOfferRejectResponse.from(offer, now);
     }
 
     private void validateAgreement(Boolean agreement) {
@@ -263,6 +267,12 @@ public class PurchaseOfferService {
 
     private void validateOwner(PurchaseOffer offer, Long currentUserId) {
         if (!offer.getOwner().getId().equals(currentUserId)) {
+            throw new CustomException(PurchaseOfferErrorCode.PURCHASE_OFFER_ACCESS_DENIED);
+        }
+    }
+
+    private void validateProposer(PurchaseOffer offer, Long currentUserId) {
+        if (!offer.getProposer().getId().equals(currentUserId)) {
             throw new CustomException(PurchaseOfferErrorCode.PURCHASE_OFFER_ACCESS_DENIED);
         }
     }

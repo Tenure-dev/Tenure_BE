@@ -20,7 +20,7 @@ public enum PurchaseOfferErrorCode implements ErrorCode {
     PURCHASE_OFFER_DISABLED("PURCHASE_OFFER_DISABLED", "이 아이템은 구매 제안을 받지 않습니다.", HttpStatus.BAD_REQUEST),
     PURCHASE_OFFER_ALREADY_USED("PURCHASE_OFFER_ALREADY_USED", "이미 이 아이템에 구매 제안을 보냈습니다.", HttpStatus.CONFLICT),
     PURCHASE_REQUEST_EXPIRED("PURCHASE_REQUEST_EXPIRED", "응답 시간이 지나 자동 취소된 요청입니다.", HttpStatus.CONFLICT),
-    PURCHASE_OFFER_NOT_SENT("PURCHASE_OFFER_NOT_SENT", "응답 대기 중인 구매 제안만 거절할 수 있습니다.", HttpStatus.CONFLICT);
+    PURCHASE_OFFER_NOT_SENT("PURCHASE_OFFER_NOT_SENT", "응답 대기 중인 구매 제안만 처리할 수 있습니다.", HttpStatus.CONFLICT);
 
     private final String code;
     private final String message;
