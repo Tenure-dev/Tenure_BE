@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 public interface NotificationRepository extends JpaRepository<Notification, Long> {
 
@@ -27,5 +28,10 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
             @Param("cursorId") Long cursorId,
             Pageable pageable);
 
-
+    // 전체 읽음 수정
+    // readAt = null (읽지 않은 알림들) 모두 조회
+    @Query("select n from Notification n " +
+            "where n.receiver.id = :currentUserId " +
+            "and n.readAt is NULL")
+    List<Notification> findNotRead(@Param("currentUserId") Long currentUserId);
 }

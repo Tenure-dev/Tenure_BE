@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -81,5 +82,18 @@ public class NotificationService {
         log.debug("[단건 읽기 처리] notificationId = {} 읽음처리", notificationId);
         return NotificationMarkReadResponse.from(notification);
 
+    }
+
+    //전체 읽음 처리
+    @Transactional
+    public void markReadAll(Long currentUserId) {
+        log.info("[알림 모두 읽기 처리 api 호출] currentId = {}", currentUserId);
+
+        List<Notification> notifications = notificationRepository.findNotRead(currentUserId);
+        log.debug("[알림 모두 읽기 처리] 총 {}건", notifications.size());
+
+        //안읽은 게시물 모두 읽음 처리
+        notifications.forEach(Notification::markRead);
+        log.debug("[알림 모두 읽기 처리 완료] 총 {}건", notifications.size());
     }
 }
