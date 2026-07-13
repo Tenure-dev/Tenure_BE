@@ -66,4 +66,48 @@ public class OotdTag extends BaseTimeEntity {
 
     @Column(precision = 5, scale = 4)
     private BigDecimal confidence;
+
+    public static OotdTag createAiTag(
+            Ootd ootd,
+            String labelText,
+            BigDecimal bboxX,
+            BigDecimal bboxY,
+            BigDecimal bboxWidth,
+            BigDecimal bboxHeight,
+            BigDecimal confidence
+    ) {
+        OotdTag tag = new OotdTag();
+        tag.ootd = ootd;
+        tag.labelText = labelText;
+        tag.bboxX = bboxX;
+        tag.bboxY = bboxY;
+        tag.bboxWidth = bboxWidth;
+        tag.bboxHeight = bboxHeight;
+        tag.confidence = confidence;
+        tag.source = TagSource.AI;
+        tag.status = TagStatus.AUTO_UNCONFIRMED;
+        return tag;
+    }
+
+    public static OotdTag createManualTag(
+            Ootd ootd,
+            Item item,
+            String labelText,
+            BigDecimal bboxX,
+            BigDecimal bboxY,
+            BigDecimal bboxWidth,
+            BigDecimal bboxHeight
+    ) {
+        OotdTag tag = new OotdTag();
+        tag.ootd = ootd;
+        tag.item = item;
+        tag.labelText = labelText;
+        tag.bboxX = bboxX;
+        tag.bboxY = bboxY;
+        tag.bboxWidth = bboxWidth;
+        tag.bboxHeight = bboxHeight;
+        tag.source = TagSource.MANUAL;
+        tag.status = TagStatus.CONFIRMED;
+        return tag;
+    }
 }

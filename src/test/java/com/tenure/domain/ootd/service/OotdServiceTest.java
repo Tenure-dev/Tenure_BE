@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 
 import com.tenure.domain.ootd.dto.OotdCreateResponse;
 import com.tenure.domain.ootd.entity.Ootd;
+import com.tenure.domain.ootd.event.OotdCreatedEvent;
 import com.tenure.domain.ootd.exception.OotdErrorCode;
 import com.tenure.domain.ootd.repository.OotdRepository;
 import com.tenure.domain.user.entity.User;
@@ -22,8 +23,10 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.multipart.MultipartFile;
@@ -42,15 +45,18 @@ class OotdServiceTest {
     @Mock
     private ImageStorageService imageStorageService;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     private OotdService ootdService;
 
     @BeforeEach
     void setUp() {
-        ootdService = new OotdService(ootdRepository, userRepository, imageStorageService);
+        ootdService = new OotdService(ootdRepository, userRepository, imageStorageService, eventPublisher);
     }
 
     @Test
-    void createOotd_savesOotdOnSuccess() {
+    void createOotd_savesOotdAndPublishesEventOnSuccess() {
         User owner = user(CURRENT_USER_ID);
         MultipartFile image = new MockMultipartFile("image", "photo.jpg", "image/jpeg", "content".getBytes());
 
@@ -63,6 +69,11 @@ class OotdServiceTest {
         assertThat(response.ownerId()).isEqualTo(CURRENT_USER_ID);
 
         verify(ootdRepository).save(any(Ootd.class));
+
+        ArgumentCaptor<OotdCreatedEvent> captor = ArgumentCaptor.forClass(OotdCreatedEvent.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        assertThat(captor.getValue().ownerId()).isEqualTo(CURRENT_USER_ID);
+        assertThat(captor.getValue().imageUrl()).isEqualTo("/files/ootds/photo.jpg");
     }
 
     @Test

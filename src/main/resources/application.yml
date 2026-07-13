@@ -40,3 +40,10 @@ tenure:
     local:
       base-dir: ${STORAGE_BASE_DIR:./uploads}
       base-url: ${STORAGE_BASE_URL:/files}
+  ai:
+    gemini:
+      api-key: ${GEMINI_API_KEY:}
+      endpoint: ${GEMINI_API_ENDPOINT:https://generativelanguage.googleapis.com/v1beta/models}
+      model: ${GEMINI_MODEL:gemini-3.5-flash}
+    tag:
+      confidence-threshold: ${AI_TAG_CONFIDENCE_THRESHOLD:0.6}
