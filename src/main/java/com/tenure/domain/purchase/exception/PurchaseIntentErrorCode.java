@@ -18,6 +18,8 @@ public enum PurchaseIntentErrorCode implements ErrorCode {
     SELF_PURCHASE_NOT_ALLOWED("PURCHASE_001", "본인 상품에는 거래 의사를 보낼 수 없습니다.", HttpStatus.BAD_REQUEST),
     PRODUCT_NOT_ON_SALE("PRODUCT_409", "거래 의사를 보낼 수 없는 상품입니다.", HttpStatus.CONFLICT),
     ACTIVE_INTENT_EXISTS("ACTIVE_INTENT_EXISTS", "이미 응답 대기 중인 거래 의사가 있습니다.", HttpStatus.CONFLICT),
+    PURCHASE_REQUEST_EXPIRED("PURCHASE_REQUEST_EXPIRED", "응답 시간이 지나 자동 취소된 요청입니다.", HttpStatus.CONFLICT),
+    PURCHASE_INTENT_NOT_SENT("PURCHASE_INTENT_NOT_SENT", "응답 대기 중인 거래 의사만 거절할 수 있습니다.", HttpStatus.CONFLICT),
     PRIVATE_PRODUCT_ACCESS_DENIED("PRIVATE_403", "비공개 계정입니다. 팔로우 요청 후 확인할 수 있어요.", HttpStatus.FORBIDDEN);
 
     private final String code;
