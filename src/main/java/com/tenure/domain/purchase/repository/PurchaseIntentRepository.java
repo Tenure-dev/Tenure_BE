@@ -15,6 +15,18 @@ import org.springframework.data.repository.query.Param;
 
 public interface PurchaseIntentRepository extends JpaRepository<PurchaseIntent, Long> {
 
+    @Query("""
+            select intent.id
+            from PurchaseIntent intent
+            where intent.status = :status
+              and intent.expiresAt <= :now
+            order by intent.expiresAt asc, intent.id asc
+            """)
+    List<Long> findExpiredSentIds(
+            @Param("status") PurchaseIntentStatus status,
+            @Param("now") LocalDateTime now
+    );
+
     @Query("select intent.product.id from PurchaseIntent intent where intent.id = :intentId")
     Optional<Long> findProductIdById(@Param("intentId") Long intentId);
 
