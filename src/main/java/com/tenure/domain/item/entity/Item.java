@@ -78,6 +78,34 @@ public class Item extends BaseTimeEntity {
     @Column(name = "purchase_offer_enabled", nullable = false)
     private Boolean purchaseOfferEnabled = true;
 
+    public static Item create(
+            User owner,
+            Category category,
+            String brandName,
+            String itemName,
+            WearingTarget wearingTarget,
+            String sizeSystem,
+            String sizeValue,
+            LocalDate firstOwnedAt,
+            String representativeImageUrl
+    ) {
+        Item item = new Item();
+        item.owner = owner;
+        item.category = category;
+        item.brandName = brandName;
+        item.itemName = itemName;
+        item.wearingTarget = wearingTarget;
+        item.sizeSystem = sizeSystem;
+        item.sizeValue = sizeValue;
+        item.firstOwnedAt = firstOwnedAt;
+        item.representativeImageUrl = representativeImageUrl;
+        item.itemStatus = ItemStatus.OWNED;
+        item.ootdVerifiedWearCount = 0;
+        item.wishCount = 0;
+        item.purchaseOfferEnabled = true;
+        return item;
+    }
+
     public void markOnSale() {
         this.itemStatus = ItemStatus.ON_SALE;
     }
