@@ -111,4 +111,22 @@ public class PurchaseOffer extends BaseTimeEntity {
 
     @Column(name = "expires_at", nullable = false)
     private LocalDateTime expiresAt;
+
+    public boolean isSent() {
+        return status == PurchaseOfferStatus.SENT;
+    }
+
+    public boolean isExpiredAt(LocalDateTime now) {
+        return !expiresAt.isAfter(now);
+    }
+
+    public void expireAndReleaseAuthorization() {
+        this.status = PurchaseOfferStatus.EXPIRED;
+        this.paymentAuthorizationStatus = PaymentAuthorizationStatus.RELEASED;
+    }
+
+    public void rejectAndReleaseAuthorization() {
+        this.status = PurchaseOfferStatus.REJECTED;
+        this.paymentAuthorizationStatus = PaymentAuthorizationStatus.RELEASED;
+    }
 }
