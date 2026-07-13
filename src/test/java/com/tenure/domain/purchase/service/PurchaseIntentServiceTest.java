@@ -110,7 +110,7 @@ class PurchaseIntentServiceTest {
         DeliveryAddress address = address(ADDRESS_ID, buyer);
 
         givenPurchasableProduct(product, item, buyer, List.of());
-        when(deliveryAddressRepository.findByIdAndUserId(ADDRESS_ID, BUYER_ID)).thenReturn(Optional.of(address));
+        when(deliveryAddressRepository.findByIdAndUser_Id(ADDRESS_ID, BUYER_ID)).thenReturn(Optional.of(address));
         when(purchaseIntentRepository.save(any(PurchaseIntent.class))).thenAnswer(invocation -> {
             PurchaseIntent intent = invocation.getArgument(0);
             ReflectionTestUtils.setField(intent, "id", 123L);
@@ -184,7 +184,7 @@ class PurchaseIntentServiceTest {
         PurchaseIntent expiredIntent = existingIntent(777L, product, buyer, seller, LocalDateTime.now().minusMinutes(1));
 
         givenPurchasableProduct(product, item, buyer, List.of(expiredIntent));
-        when(deliveryAddressRepository.findByIdAndUserId(ADDRESS_ID, BUYER_ID)).thenReturn(Optional.of(address));
+        when(deliveryAddressRepository.findByIdAndUser_Id(ADDRESS_ID, BUYER_ID)).thenReturn(Optional.of(address));
         when(purchaseIntentRepository.save(any(PurchaseIntent.class))).thenAnswer(invocation -> {
             PurchaseIntent intent = invocation.getArgument(0);
             ReflectionTestUtils.setField(intent, "id", 124L);
@@ -216,7 +216,7 @@ class PurchaseIntentServiceTest {
         DeliveryAddress address = address(ADDRESS_ID, buyer);
 
         givenPurchasableProduct(product, item, buyer, List.of());
-        when(deliveryAddressRepository.findByIdAndUserId(ADDRESS_ID, BUYER_ID)).thenReturn(Optional.of(address));
+        when(deliveryAddressRepository.findByIdAndUser_Id(ADDRESS_ID, BUYER_ID)).thenReturn(Optional.of(address));
         when(purchaseIntentRepository.save(any(PurchaseIntent.class))).thenAnswer(invocation -> {
             PurchaseIntent intent = invocation.getArgument(0);
             ReflectionTestUtils.setField(intent, "id", 125L);

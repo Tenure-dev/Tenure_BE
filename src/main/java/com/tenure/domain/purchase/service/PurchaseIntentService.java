@@ -78,7 +78,7 @@ public class PurchaseIntentService {
         expireSentIntentsIfNeeded(product.getId(), currentUserId);
 
         DeliveryAddress deliveryAddress = deliveryAddressRepository
-                .findByIdAndUserId(request.deliveryAddressId(), currentUserId)
+                .findByIdAndUser_Id(request.deliveryAddressId(), currentUserId)
                 .orElseThrow(() -> new CustomException(PurchaseIntentErrorCode.DELIVERY_ADDRESS_NOT_FOUND));
 
         FeeAmounts amounts = calculateFeeAmounts(product);
@@ -193,7 +193,7 @@ public class PurchaseIntentService {
             return;
         }
 
-        boolean acceptedFollower = followRelationshipRepository.existsByFollowerIdAndFollowingIdAndStatus(
+        boolean acceptedFollower = followRelationshipRepository.existsByFollower_IdAndFollowing_IdAndStatus(
                 currentUserId,
                 seller.getId(),
                 FollowStatus.ACCEPTED
