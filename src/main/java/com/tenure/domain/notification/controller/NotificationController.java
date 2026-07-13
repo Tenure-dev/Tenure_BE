@@ -1,6 +1,7 @@
 package com.tenure.domain.notification.controller;
 
 import com.tenure.domain.notification.dto.response.NotificationCursorResponse;
+import com.tenure.domain.notification.dto.response.NotificationMarkReadResponse;
 import com.tenure.domain.notification.enums.NotificationCategory;
 import com.tenure.domain.notification.service.NotificationService;
 import com.tenure.global.response.BaseResponse;
@@ -55,5 +56,21 @@ public class NotificationController {
         return BaseResponse.success(notifications);
     }
 
+    @Operation(
+            summary = "알림 단건 읽음 처리",
+            description = "특정 알림을 읽음 처리합니다. 본인 알림만 처리할 수 있습니다.",
+            parameters = {
+                    @Parameter(name = "X-USER-ID", in = ParameterIn.HEADER, required = true,
+                            description = "JWT 적용 전 Swagger 테스트용 현재 사용자 ID", example = "1"),
+                    @Parameter(name = "notificationId", in = ParameterIn.PATH, required = true,
+                            description = "읽음 처리할 알림 ID", example = "1")
+            }
+    )
+    @PostMapping("/{notificationId}/read")
+    public BaseResponse<NotificationMarkReadResponse> markRead(@PathVariable Long notificationId) {
+        NotificationMarkReadResponse response = notificationService
+                .markAsRead(notificationId, currentUserProvider.getCurrentUserId());
+        return BaseResponse.success(response);
+    }
 
 }
