@@ -2,6 +2,7 @@ package com.tenure.domain.purchase.controller;
 
 import com.tenure.domain.purchase.dto.PurchaseOfferCreateRequest;
 import com.tenure.domain.purchase.dto.PurchaseOfferCreateResponse;
+import com.tenure.domain.purchase.dto.PurchaseOfferDetailResponse;
 import com.tenure.domain.purchase.service.PurchaseOfferService;
 import com.tenure.global.response.BaseResponse;
 import com.tenure.global.security.CurrentUserProvider;
@@ -17,13 +18,14 @@ import jakarta.validation.Valid;
 import java.net.URI;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-@Tag(name = "PurchaseOffer", description = "구매 제안 API")
+@Tag(name = "PurchaseOffer", description = "Purchase offer API")
 @RestController
 @RequestMapping
 @RequiredArgsConstructor
@@ -33,14 +35,14 @@ public class PurchaseOfferController {
     private final CurrentUserProvider currentUserProvider;
 
     @Operation(
-            summary = "미판매 아이템 구매 제안 전송",
-            description = "미판매 보유 아이템에 대해 1회성 구매 제안을 전송하고 결제 승인을 AUTHORIZED 상태로 시뮬레이션합니다.",
+            summary = "Create purchase offer",
+            description = "Creates a one-time purchase offer for an owned, non-sale item.",
             parameters = {
                     @Parameter(
                             name = "X-USER-ID",
                             in = ParameterIn.HEADER,
                             required = true,
-                            description = "JWT 적용 전 Swagger 테스트용 현재 사용자 ID. JWT 적용 후에는 SecurityContext 값을 사용합니다.",
+                            description = "Temporary current user id for Swagger/local testing before JWT is fully connected.",
                             example = "2"
                     )
             },
@@ -49,7 +51,7 @@ public class PurchaseOfferController {
                     content = @Content(
                             schema = @Schema(implementation = PurchaseOfferCreateRequest.class),
                             examples = @ExampleObject(
-                                    name = "구매 제안 전송 요청",
+                                    name = "Create purchase offer request",
                                     value = """
                                             {
                                               "offerPrice": 360000,
@@ -64,7 +66,7 @@ public class PurchaseOfferController {
     )
     @ApiResponse(
             responseCode = "201",
-            description = "구매 제안 전송 성공",
+            description = "Purchase offer created successfully.",
             content = @Content(schema = @Schema(implementation = PurchaseOfferCreateResponse.class))
     )
     @PostMapping("/items/{itemId}/offers")
@@ -81,5 +83,35 @@ public class PurchaseOfferController {
         return ResponseEntity
                 .created(URI.create("/purchase-offers/" + response.offerId()))
                 .body(BaseResponse.success(response, "구매 제안을 보냈습니다."));
+    }
+
+    @Operation(
+            summary = "Get purchase offer detail",
+            description = "Returns purchase offer waiting detail for the proposer or item owner. Expired SENT offers are updated to EXPIRED and RELEASED.",
+            parameters = {
+                    @Parameter(
+                            name = "X-USER-ID",
+                            in = ParameterIn.HEADER,
+                            required = true,
+                            description = "Temporary current user id for Swagger/local testing before JWT is fully connected.",
+                            example = "2"
+                    )
+            }
+    )
+    @ApiResponse(
+            responseCode = "200",
+            description = "Purchase offer detail returned successfully.",
+            content = @Content(schema = @Schema(implementation = PurchaseOfferDetailResponse.class))
+    )
+    @GetMapping("/purchase-offers/{offerId}")
+    public BaseResponse<PurchaseOfferDetailResponse> getPurchaseOfferDetail(
+            @PathVariable Long offerId
+    ) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        PurchaseOfferDetailResponse response = purchaseOfferService.getPurchaseOfferDetail(
+                offerId,
+                currentUserId
+        );
+        return BaseResponse.success(response, "조회에 성공했습니다.");
     }
 }

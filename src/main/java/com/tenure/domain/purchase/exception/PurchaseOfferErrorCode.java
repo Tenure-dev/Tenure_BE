@@ -11,6 +11,8 @@ public enum PurchaseOfferErrorCode implements ErrorCode {
     ITEM_NOT_FOUND("ITEM_404", "아이템 정보를 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
     PROPOSER_NOT_FOUND("USER_404", "사용자 정보를 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
     DELIVERY_ADDRESS_NOT_FOUND("DELIVERY_ADDRESS_NOT_FOUND", "배송지를 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
+    PURCHASE_OFFER_NOT_FOUND("PURCHASE_OFFER_404", "구매 제안 정보를 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
+    PURCHASE_OFFER_ACCESS_DENIED("PURCHASE_OFFER_403", "구매 제안을 조회할 권한이 없습니다.", HttpStatus.FORBIDDEN),
     AGREEMENT_REQUIRED("AGREEMENT_REQUIRED", "거래 조건에 동의해주세요.", HttpStatus.BAD_REQUEST),
     OFFER_PRICE_TOO_LOW("PURCHASE_OFFER_PRICE_TOO_LOW", "최소 제안 금액은 1,000원입니다.", HttpStatus.BAD_REQUEST),
     SELF_OFFER_NOT_ALLOWED("PURCHASE_OFFER_SELF_NOT_ALLOWED", "본인 아이템에는 구매 제안을 보낼 수 없습니다.", HttpStatus.BAD_REQUEST),

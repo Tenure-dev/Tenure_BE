@@ -12,6 +12,9 @@ import org.springframework.data.repository.query.Param;
 
 public interface PurchaseOfferRepository extends JpaRepository<PurchaseOffer, Long> {
 
+    @Query("select offer.item.id from PurchaseOffer offer where offer.id = :offerId")
+    Optional<Long> findItemIdById(@Param("offerId") Long offerId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select offer from PurchaseOffer offer where offer.id = :offerId")
     Optional<PurchaseOffer> findByIdForUpdate(@Param("offerId") Long offerId);

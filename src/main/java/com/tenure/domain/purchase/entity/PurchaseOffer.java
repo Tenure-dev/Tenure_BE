@@ -1,11 +1,10 @@
 package com.tenure.domain.purchase.entity;
 
-import com.tenure.domain.purchase.enums.PurchaseOfferStatus;
-
 import com.tenure.domain.address.entity.DeliveryAddress;
 import com.tenure.domain.common.entity.BaseTimeEntity;
 import com.tenure.domain.common.enums.PaymentAuthorizationStatus;
 import com.tenure.domain.item.entity.Item;
+import com.tenure.domain.purchase.enums.PurchaseOfferStatus;
 import com.tenure.domain.user.entity.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

@@ -3,6 +3,7 @@ package com.tenure.domain.purchase.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -14,6 +15,9 @@ import com.tenure.domain.item.enums.ItemStatus;
 import com.tenure.domain.item.repository.ItemRepository;
 import com.tenure.domain.purchase.dto.PurchaseOfferCreateRequest;
 import com.tenure.domain.purchase.dto.PurchaseOfferCreateResponse;
+import com.tenure.domain.purchase.dto.PurchaseOfferDetailResponse;
+import com.tenure.domain.purchase.dto.PurchaseOfferDetailResponse.DeliveryDisclosureStatus;
+import com.tenure.domain.purchase.dto.PurchaseOfferDetailResponse.ViewerRole;
 import com.tenure.domain.purchase.entity.PurchaseOffer;
 import com.tenure.domain.purchase.enums.PurchaseOfferStatus;
 import com.tenure.domain.purchase.exception.PurchaseOfferErrorCode;
@@ -23,12 +27,14 @@ import com.tenure.domain.user.enums.UserGrade;
 import com.tenure.domain.user.repository.UserRepository;
 import com.tenure.global.exception.CustomException;
 import java.lang.reflect.Constructor;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -36,6 +42,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 @ExtendWith(MockitoExtension.class)
 class PurchaseOfferServiceTest {
 
+    private static final Long OFFER_ID = 123L;
     private static final Long ITEM_ID = 10L;
     private static final Long OWNER_ID = 1L;
     private static final Long PROPOSER_ID = 2L;
@@ -60,6 +67,7 @@ class PurchaseOfferServiceTest {
         purchaseOfferService = new PurchaseOfferService(
                 itemRepository,
                 purchaseOfferRepository,
+                new PurchaseOfferExpirationService(),
                 deliveryAddressRepository,
                 userRepository
         );
@@ -76,7 +84,7 @@ class PurchaseOfferServiceTest {
         when(deliveryAddressRepository.findByIdAndUser_Id(ADDRESS_ID, PROPOSER_ID)).thenReturn(Optional.of(address));
         when(purchaseOfferRepository.save(any(PurchaseOffer.class))).thenAnswer(invocation -> {
             PurchaseOffer offer = invocation.getArgument(0);
-            ReflectionTestUtils.setField(offer, "id", 123L);
+            ReflectionTestUtils.setField(offer, "id", OFFER_ID);
             return offer;
         });
 
@@ -86,7 +94,7 @@ class PurchaseOfferServiceTest {
                 request(360000, true)
         );
 
-        assertThat(response.offerId()).isEqualTo(123L);
+        assertThat(response.offerId()).isEqualTo(OFFER_ID);
         assertThat(response.status()).isEqualTo(PurchaseOfferStatus.SENT);
         assertThat(response.paymentAuthorizationStatus()).isEqualTo(PaymentAuthorizationStatus.AUTHORIZED);
         assertThat(response.remainingSeconds()).isPositive();
@@ -191,7 +199,7 @@ class PurchaseOfferServiceTest {
         User owner = user(OWNER_ID, UserGrade.BASIC, null);
         User proposer = user(PROPOSER_ID, UserGrade.BASIC, null);
         Item item = item(ITEM_ID, owner);
-        PurchaseOffer existingOffer = existingOffer(777L, item, proposer, owner);
+        PurchaseOffer existingOffer = offer(777L, item, proposer, owner, LocalDateTime.now().plusHours(1));
 
         givenOfferableItem(item, proposer, Optional.of(existingOffer));
 
@@ -205,11 +213,93 @@ class PurchaseOfferServiceTest {
                 .isEqualTo(PurchaseOfferErrorCode.PURCHASE_OFFER_ALREADY_USED);
     }
 
+    @Test
+    void getPurchaseOfferDetail_returnsProposerViewWithDeliveryAndWithoutOwnerSettlement() {
+        User owner = user(OWNER_ID, UserGrade.BASIC, null);
+        User proposer = user(PROPOSER_ID, UserGrade.BASIC, null);
+        Item item = item(ITEM_ID, owner);
+        PurchaseOffer offer = offer(OFFER_ID, item, proposer, owner, LocalDateTime.now().plusHours(2));
+
+        givenOfferDetail(item, offer);
+
+        PurchaseOfferDetailResponse response = purchaseOfferService.getPurchaseOfferDetail(OFFER_ID, PROPOSER_ID);
+
+        assertThat(response.viewerRole()).isEqualTo(ViewerRole.PROPOSER);
+        assertThat(response.status()).isEqualTo(PurchaseOfferStatus.SENT);
+        assertThat(response.paymentAuthorizationStatus()).isEqualTo(PaymentAuthorizationStatus.AUTHORIZED);
+        assertThat(response.remainingSeconds()).isPositive();
+        assertThat(response.amounts().offerAmount()).isEqualTo(360000);
+        assertThat(response.amounts().ownerSettlementAmount()).isNull();
+        assertThat(response.deliveryDisclosureStatus()).isEqualTo(DeliveryDisclosureStatus.VISIBLE);
+        assertThat(response.delivery()).isNotNull();
+        assertThat(response.delivery().phone()).isEqualTo("010-1234-5678");
+
+        InOrder lockOrder = inOrder(itemRepository, purchaseOfferRepository);
+        lockOrder.verify(itemRepository).findByIdForUpdate(ITEM_ID);
+        lockOrder.verify(purchaseOfferRepository).findByIdForUpdate(OFFER_ID);
+    }
+
+    @Test
+    void getPurchaseOfferDetail_returnsOwnerViewWithoutDeliveryBeforeAcceptance() {
+        User owner = user(OWNER_ID, UserGrade.BASIC, null);
+        User proposer = user(PROPOSER_ID, UserGrade.BASIC, null);
+        Item item = item(ITEM_ID, owner);
+        PurchaseOffer offer = offer(OFFER_ID, item, proposer, owner, LocalDateTime.now().plusHours(2));
+
+        givenOfferDetail(item, offer);
+
+        PurchaseOfferDetailResponse response = purchaseOfferService.getPurchaseOfferDetail(OFFER_ID, OWNER_ID);
+
+        assertThat(response.viewerRole()).isEqualTo(ViewerRole.OWNER);
+        assertThat(response.amounts().ownerSettlementAmount()).isEqualTo(365000);
+        assertThat(response.delivery()).isNull();
+        assertThat(response.deliveryDisclosureStatus()).isEqualTo(DeliveryDisclosureStatus.AFTER_ACCEPTANCE);
+    }
+
+    @Test
+    void getPurchaseOfferDetail_expiresSentOfferWhenPastDeadline() {
+        User owner = user(OWNER_ID, UserGrade.BASIC, null);
+        User proposer = user(PROPOSER_ID, UserGrade.BASIC, null);
+        Item item = item(ITEM_ID, owner);
+        PurchaseOffer offer = offer(OFFER_ID, item, proposer, owner, LocalDateTime.now().minusMinutes(1));
+
+        givenOfferDetail(item, offer);
+
+        PurchaseOfferDetailResponse response = purchaseOfferService.getPurchaseOfferDetail(OFFER_ID, PROPOSER_ID);
+
+        assertThat(response.status()).isEqualTo(PurchaseOfferStatus.EXPIRED);
+        assertThat(response.paymentAuthorizationStatus()).isEqualTo(PaymentAuthorizationStatus.RELEASED);
+        assertThat(response.remainingSeconds()).isZero();
+        assertThat(offer.getStatus()).isEqualTo(PurchaseOfferStatus.EXPIRED);
+        assertThat(offer.getPaymentAuthorizationStatus()).isEqualTo(PaymentAuthorizationStatus.RELEASED);
+    }
+
+    @Test
+    void getPurchaseOfferDetail_rejectsNonParticipant() {
+        User owner = user(OWNER_ID, UserGrade.BASIC, null);
+        User proposer = user(PROPOSER_ID, UserGrade.BASIC, null);
+        Item item = item(ITEM_ID, owner);
+        PurchaseOffer offer = offer(OFFER_ID, item, proposer, owner, LocalDateTime.now().plusHours(2));
+
+        givenOfferDetail(item, offer);
+
+        assertThatThrownBy(() -> purchaseOfferService.getPurchaseOfferDetail(OFFER_ID, 999L))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(PurchaseOfferErrorCode.PURCHASE_OFFER_ACCESS_DENIED);
+    }
+
     private void givenOfferableItem(Item item, User proposer, Optional<PurchaseOffer> existingOffer) {
         when(itemRepository.findByIdForUpdate(ITEM_ID)).thenReturn(Optional.of(item));
         when(userRepository.findById(PROPOSER_ID)).thenReturn(Optional.of(proposer));
         when(purchaseOfferRepository.findByItemIdAndProposerIdForUpdate(ITEM_ID, PROPOSER_ID))
                 .thenReturn(existingOffer);
+    }
+
+    private void givenOfferDetail(Item item, PurchaseOffer offer) {
+        when(purchaseOfferRepository.findItemIdById(OFFER_ID)).thenReturn(Optional.of(ITEM_ID));
+        when(itemRepository.findByIdForUpdate(ITEM_ID)).thenReturn(Optional.of(item));
+        when(purchaseOfferRepository.findByIdForUpdate(OFFER_ID)).thenReturn(Optional.of(offer));
     }
 
     private PurchaseOfferCreateRequest request(Integer offerPrice, Boolean agreement) {
@@ -231,6 +321,7 @@ class PurchaseOfferServiceTest {
         ReflectionTestUtils.setField(item, "owner", owner);
         ReflectionTestUtils.setField(item, "brandName", "Levis");
         ReflectionTestUtils.setField(item, "itemName", "LVC 1955 501");
+        ReflectionTestUtils.setField(item, "representativeImageUrl", "https://image.url/item.jpg");
         ReflectionTestUtils.setField(item, "itemStatus", ItemStatus.OWNED);
         ReflectionTestUtils.setField(item, "purchaseOfferEnabled", true);
         return item;
@@ -249,21 +340,27 @@ class PurchaseOfferServiceTest {
         return address;
     }
 
-    private PurchaseOffer existingOffer(Long id, Item item, User proposer, User owner) {
+    private PurchaseOffer offer(
+            Long id,
+            Item item,
+            User proposer,
+            User owner,
+            LocalDateTime expiresAt
+    ) {
         PurchaseOffer offer = PurchaseOffer.create(
                 item,
                 proposer,
                 owner,
                 address(ADDRESS_ID, proposer),
-                1000,
-                0,
-                60,
-                java.math.BigDecimal.valueOf(0.0600),
-                1060,
-                1000,
+                360000,
+                5000,
+                21600,
+                new BigDecimal("0.0600"),
+                386600,
+                365000,
                 "mock_offer_auth_existing",
                 "MOCK_CARD",
-                LocalDateTime.now().plusHours(1)
+                expiresAt
         );
         ReflectionTestUtils.setField(offer, "id", id);
         return offer;

@@ -16,6 +16,42 @@ import org.springframework.data.repository.query.Param;
 
 public interface TradeRepository extends JpaRepository<Trade, Long> {
 
+    @Query("""
+            select trade
+            from Trade trade
+            where trade.buyer.id = :userId
+              and (:status is null or trade.status = :status)
+            """)
+    Page<Trade> findAllByBuyer(
+            @Param("userId") Long userId,
+            @Param("status") TradeStatus status,
+            Pageable pageable
+    );
+
+    @Query("""
+            select trade
+            from Trade trade
+            where trade.seller.id = :userId
+              and (:status is null or trade.status = :status)
+            """)
+    Page<Trade> findAllBySeller(
+            @Param("userId") Long userId,
+            @Param("status") TradeStatus status,
+            Pageable pageable
+    );
+
+    @Query("""
+            select trade
+            from Trade trade
+            where (trade.buyer.id = :userId or trade.seller.id = :userId)
+              and (:status is null or trade.status = :status)
+            """)
+    Page<Trade> findAllByParticipant(
+            @Param("userId") Long userId,
+            @Param("status") TradeStatus status,
+            Pageable pageable
+    );
+
     // ... findAllByBuyer / findAllBySeller / findAllByParticipant 그대로 ...
 
     // flushAutomatically: 벌크 UPDATE는 trades 테이블만 건드리므로, 같은 트랜잭션에 다른 테이블(products 등)의
