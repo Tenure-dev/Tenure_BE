@@ -5,7 +5,9 @@ import com.tenure.domain.product.enums.ProductStatus;
 import com.tenure.domain.common.entity.BaseTimeEntity;
 import com.tenure.domain.common.enums.FeePolicy;
 import com.tenure.domain.item.entity.Item;
+import com.tenure.domain.product.exception.ProductErrorCode;
 import com.tenure.domain.user.entity.User;
+import com.tenure.global.exception.CustomException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -130,5 +132,12 @@ public class Product extends BaseTimeEntity {
         if (sellerDescription != null) {
             this.sellerDescription = sellerDescription;
         }
+    }
+
+    public void markSold() {
+        if (productStatus != ProductStatus.TRADING) {
+            throw new CustomException(ProductErrorCode.PRODUCT_NOT_TRADING);
+        }
+        this.productStatus = ProductStatus.SOLD;
     }
 }
