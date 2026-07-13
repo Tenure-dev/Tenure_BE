@@ -15,6 +15,18 @@ import org.springframework.data.repository.query.Param;
 
 public interface PurchaseOfferRepository extends JpaRepository<PurchaseOffer, Long> {
 
+    @Query("""
+            select offer.id as offerId, offer.item.id as itemId
+            from PurchaseOffer offer
+            where offer.status = :status
+              and offer.expiresAt <= :now
+            order by offer.id asc
+            """)
+    List<ExpiredPurchaseOfferTarget> findExpiredSentTargets(
+            @Param("status") PurchaseOfferStatus status,
+            @Param("now") LocalDateTime now
+    );
+
     @Query("select offer.item.id from PurchaseOffer offer where offer.id = :offerId")
     Optional<Long> findItemIdById(@Param("offerId") Long offerId);
 
@@ -121,4 +133,10 @@ public interface PurchaseOfferRepository extends JpaRepository<PurchaseOffer, Lo
             @Param("cursorOfferId") Long cursorOfferId,
             Pageable pageable
     );
+
+    interface ExpiredPurchaseOfferTarget {
+        Long getOfferId();
+
+        Long getItemId();
+    }
 }

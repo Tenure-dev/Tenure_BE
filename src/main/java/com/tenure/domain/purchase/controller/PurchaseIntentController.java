@@ -2,6 +2,7 @@ package com.tenure.domain.purchase.controller;
 
 import com.tenure.domain.purchase.dto.PurchaseIntentCreateRequest;
 import com.tenure.domain.purchase.dto.PurchaseIntentCreateResponse;
+import com.tenure.domain.purchase.dto.PurchaseIntentCancelResponse;
 import com.tenure.domain.purchase.dto.PurchaseIntentDetailResponse;
 import com.tenure.domain.purchase.dto.PurchaseIntentRejectResponse;
 import com.tenure.domain.purchase.dto.PurchaseIntentReceivedListResponse;
@@ -266,5 +267,35 @@ public class PurchaseIntentController {
                 currentUserId
         );
         return BaseResponse.success(response, "거래 의사를 거절했습니다.");
+    }
+
+    @Operation(
+            summary = "Cancel purchase intent",
+            description = "The buyer cancels a SENT purchase intent and releases the mock payment authorization.",
+            parameters = {
+                    @Parameter(
+                            name = "X-USER-ID",
+                            in = ParameterIn.HEADER,
+                            required = true,
+                            description = "Temporary current user id for Swagger/local testing before JWT is fully connected.",
+                            example = "2"
+                    )
+            }
+    )
+    @ApiResponse(
+            responseCode = "200",
+            description = "Purchase intent canceled successfully.",
+            content = @Content(schema = @Schema(implementation = PurchaseIntentCancelResponse.class))
+    )
+    @PostMapping("/purchase-intents/{intentId}/cancel")
+    public BaseResponse<PurchaseIntentCancelResponse> cancelPurchaseIntent(
+            @PathVariable Long intentId
+    ) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        PurchaseIntentCancelResponse response = purchaseIntentService.cancelPurchaseIntent(
+                intentId,
+                currentUserId
+        );
+        return BaseResponse.success(response, "거래 의사를 취소했습니다.");
     }
 }
