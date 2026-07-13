@@ -19,6 +19,7 @@ import com.tenure.domain.item.repository.ItemRepository;
 import com.tenure.domain.product.entity.Product;
 import com.tenure.domain.product.enums.ProductStatus;
 import com.tenure.domain.product.repository.ProductRepository;
+import com.tenure.domain.purchase.dto.PurchaseIntentCancelResponse;
 import com.tenure.domain.purchase.dto.PurchaseIntentCreateRequest;
 import com.tenure.domain.purchase.dto.PurchaseIntentCreateResponse;
 import com.tenure.domain.purchase.dto.PurchaseIntentDetailResponse;
@@ -573,6 +574,82 @@ class PurchaseIntentServiceTest {
         givenIntentDetail(product, item, intent);
 
         assertThatThrownBy(() -> purchaseIntentService.rejectPurchaseIntent(123L, SELLER_ID))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(PurchaseIntentErrorCode.PURCHASE_REQUEST_EXPIRED);
+        assertThat(intent.getStatus()).isEqualTo(PurchaseIntentStatus.EXPIRED);
+        assertThat(intent.getPaymentAuthorizationStatus()).isEqualTo(PaymentAuthorizationStatus.RELEASED);
+    }
+
+    @Test
+    void cancelPurchaseIntent_cancelsSentIntentAndReleasesAuthorization() {
+        User seller = user(SELLER_ID, UserGrade.BASIC);
+        User buyer = user(BUYER_ID, UserGrade.BASIC);
+        Item item = item(ITEM_ID, seller);
+        Product product = product(PRODUCT_ID, item, seller, FeePolicy.SELLER_PAYS, new BigDecimal("0.0600"));
+        PurchaseIntent intent = existingIntent(123L, product, buyer, seller, LocalDateTime.now().plusHours(2));
+
+        givenIntentDetail(product, item, intent);
+
+        PurchaseIntentCancelResponse response = purchaseIntentService.cancelPurchaseIntent(123L, BUYER_ID);
+
+        assertThat(response.intentId()).isEqualTo(123L);
+        assertThat(response.status()).isEqualTo(PurchaseIntentStatus.CANCELED);
+        assertThat(response.paymentAuthorizationStatus()).isEqualTo(PaymentAuthorizationStatus.RELEASED);
+        assertThat(response.serverTime()).isNotNull();
+        assertThat(intent.getStatus()).isEqualTo(PurchaseIntentStatus.CANCELED);
+        assertThat(intent.getPaymentAuthorizationStatus()).isEqualTo(PaymentAuthorizationStatus.RELEASED);
+
+        InOrder lockOrder = inOrder(productRepository, itemRepository, purchaseIntentRepository);
+        lockOrder.verify(productRepository).findByIdForUpdate(PRODUCT_ID);
+        lockOrder.verify(itemRepository).findByIdForUpdate(ITEM_ID);
+        lockOrder.verify(purchaseIntentRepository).findByIdForUpdate(123L);
+    }
+
+    @Test
+    void cancelPurchaseIntent_rejectsNonBuyer() {
+        User seller = user(SELLER_ID, UserGrade.BASIC);
+        User buyer = user(BUYER_ID, UserGrade.BASIC);
+        Item item = item(ITEM_ID, seller);
+        Product product = product(PRODUCT_ID, item, seller, FeePolicy.SELLER_PAYS, new BigDecimal("0.0600"));
+        PurchaseIntent intent = existingIntent(123L, product, buyer, seller, LocalDateTime.now().plusHours(2));
+
+        givenIntentDetail(product, item, intent);
+
+        assertThatThrownBy(() -> purchaseIntentService.cancelPurchaseIntent(123L, SELLER_ID))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(PurchaseIntentErrorCode.PURCHASE_INTENT_ACCESS_DENIED);
+    }
+
+    @Test
+    void cancelPurchaseIntent_rejectsNonSentStatus() {
+        User seller = user(SELLER_ID, UserGrade.BASIC);
+        User buyer = user(BUYER_ID, UserGrade.BASIC);
+        Item item = item(ITEM_ID, seller);
+        Product product = product(PRODUCT_ID, item, seller, FeePolicy.SELLER_PAYS, new BigDecimal("0.0600"));
+        PurchaseIntent intent = existingIntent(123L, product, buyer, seller, LocalDateTime.now().plusHours(2));
+        ReflectionTestUtils.setField(intent, "status", PurchaseIntentStatus.ACCEPTED);
+
+        givenIntentDetail(product, item, intent);
+
+        assertThatThrownBy(() -> purchaseIntentService.cancelPurchaseIntent(123L, BUYER_ID))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(PurchaseIntentErrorCode.PURCHASE_INTENT_NOT_SENT);
+    }
+
+    @Test
+    void cancelPurchaseIntent_expiresPastDeadlineSentIntentBeforeCanceling() {
+        User seller = user(SELLER_ID, UserGrade.BASIC);
+        User buyer = user(BUYER_ID, UserGrade.BASIC);
+        Item item = item(ITEM_ID, seller);
+        Product product = product(PRODUCT_ID, item, seller, FeePolicy.SELLER_PAYS, new BigDecimal("0.0600"));
+        PurchaseIntent intent = existingIntent(123L, product, buyer, seller, LocalDateTime.now().minusMinutes(1));
+
+        givenIntentDetail(product, item, intent);
+
+        assertThatThrownBy(() -> purchaseIntentService.cancelPurchaseIntent(123L, BUYER_ID))
                 .isInstanceOf(CustomException.class)
                 .extracting("errorCode")
                 .isEqualTo(PurchaseIntentErrorCode.PURCHASE_REQUEST_EXPIRED);

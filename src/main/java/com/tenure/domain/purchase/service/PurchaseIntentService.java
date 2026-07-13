@@ -10,6 +10,7 @@ import com.tenure.domain.item.repository.ItemRepository;
 import com.tenure.domain.product.entity.Product;
 import com.tenure.domain.product.enums.ProductStatus;
 import com.tenure.domain.product.repository.ProductRepository;
+import com.tenure.domain.purchase.dto.PurchaseIntentCancelResponse;
 import com.tenure.domain.purchase.dto.PurchaseIntentCreateRequest;
 import com.tenure.domain.purchase.dto.PurchaseIntentCreateResponse;
 import com.tenure.domain.purchase.dto.PurchaseIntentDetailResponse;
@@ -201,6 +202,31 @@ public class PurchaseIntentService {
         return PurchaseIntentRejectResponse.from(intent, now);
     }
 
+    @Transactional(noRollbackFor = CustomException.class)
+    public PurchaseIntentCancelResponse cancelPurchaseIntent(Long intentId, Long currentUserId) {
+        Long productId = purchaseIntentRepository.findProductIdById(intentId)
+                .orElseThrow(() -> new CustomException(PurchaseIntentErrorCode.PURCHASE_INTENT_NOT_FOUND));
+        Product product = productRepository.findByIdForUpdate(productId)
+                .orElseThrow(() -> new CustomException(PurchaseIntentErrorCode.PRODUCT_NOT_FOUND));
+        itemRepository.findByIdForUpdate(product.getItem().getId())
+                .orElseThrow(() -> new CustomException(PurchaseIntentErrorCode.ITEM_NOT_FOUND));
+        PurchaseIntent intent = purchaseIntentRepository.findByIdForUpdate(intentId)
+                .orElseThrow(() -> new CustomException(PurchaseIntentErrorCode.PURCHASE_INTENT_NOT_FOUND));
+
+        validateBuyer(intent, currentUserId);
+
+        LocalDateTime now = LocalDateTime.now();
+        if (purchaseIntentExpirationService.expireIfSentAndExpired(intent, now)) {
+            throw new CustomException(PurchaseIntentErrorCode.PURCHASE_REQUEST_EXPIRED);
+        }
+        if (!intent.isSent()) {
+            throw new CustomException(PurchaseIntentErrorCode.PURCHASE_INTENT_NOT_SENT);
+        }
+
+        intent.cancelAndReleaseAuthorization();
+        return PurchaseIntentCancelResponse.from(intent, now);
+    }
+
     private void validateAgreement(Boolean agreement) {
         if (!Boolean.TRUE.equals(agreement)) {
             throw new CustomException(PurchaseIntentErrorCode.AGREEMENT_REQUIRED);
@@ -360,6 +386,12 @@ public class PurchaseIntentService {
 
     private void validateSeller(PurchaseIntent intent, Long currentUserId) {
         if (!intent.getSeller().getId().equals(currentUserId)) {
+            throw new CustomException(PurchaseIntentErrorCode.PURCHASE_INTENT_ACCESS_DENIED);
+        }
+    }
+
+    private void validateBuyer(PurchaseIntent intent, Long currentUserId) {
+        if (!intent.getBuyer().getId().equals(currentUserId)) {
             throw new CustomException(PurchaseIntentErrorCode.PURCHASE_INTENT_ACCESS_DENIED);
         }
     }
