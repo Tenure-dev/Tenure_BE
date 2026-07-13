@@ -14,6 +14,7 @@ import com.tenure.domain.purchase.dto.PurchaseIntentCreateRequest;
 import com.tenure.domain.purchase.dto.PurchaseIntentCreateResponse;
 import com.tenure.domain.purchase.dto.PurchaseIntentDetailResponse;
 import com.tenure.domain.purchase.dto.PurchaseIntentDetailResponse.ViewerRole;
+import com.tenure.domain.purchase.dto.PurchaseIntentReceivedListResponse;
 import com.tenure.domain.purchase.dto.PurchaseIntentSentListResponse;
 import com.tenure.domain.purchase.entity.PurchaseIntent;
 import com.tenure.domain.purchase.enums.PurchaseIntentStatus;
@@ -128,6 +129,33 @@ public class PurchaseIntentService {
         List<PurchaseIntent> pageItems = hasNext ? fetched.subList(0, pageSize) : fetched;
         Map<Long, Long> tradeIdByIntentId = findTradeIds(pageItems);
         return PurchaseIntentSentListResponse.of(pageItems, tradeIdByIntentId, now, hasNext);
+    }
+
+    @Transactional
+    public PurchaseIntentReceivedListResponse getReceivedPurchaseIntents(
+            Long currentUserId,
+            List<PurchaseIntentStatus> statuses,
+            OffsetDateTime cursorCreatedAt,
+            Long cursorIntentId,
+            Integer size
+    ) {
+        validateCursor(cursorCreatedAt, cursorIntentId);
+        int pageSize = normalizeSize(size);
+        LocalDateTime now = LocalDateTime.now();
+        expireSentIntentsForSeller(currentUserId, now);
+
+        List<PurchaseIntentStatus> normalizedStatuses = normalizeStatuses(statuses);
+        List<PurchaseIntent> fetched = purchaseIntentRepository.findReceivedListBySellerWithCursor(
+                currentUserId,
+                normalizedStatuses,
+                cursorCreatedAt == null ? null : cursorCreatedAt.toLocalDateTime(),
+                cursorIntentId,
+                PageRequest.of(0, pageSize + 1)
+        );
+        boolean hasNext = fetched.size() > pageSize;
+        List<PurchaseIntent> pageItems = hasNext ? fetched.subList(0, pageSize) : fetched;
+        Map<Long, Long> tradeIdByIntentId = findTradeIds(pageItems);
+        return PurchaseIntentReceivedListResponse.of(pageItems, tradeIdByIntentId, now, hasNext);
     }
 
     @Transactional
@@ -254,6 +282,17 @@ public class PurchaseIntentService {
 
     private void expireSentIntentsForBuyer(Long currentUserId, LocalDateTime now) {
         List<PurchaseIntent> expiredSentIntents = purchaseIntentRepository.findExpiredSentByBuyerIdForUpdate(
+                currentUserId,
+                PurchaseIntentStatus.SENT,
+                now
+        );
+        for (PurchaseIntent intent : expiredSentIntents) {
+            purchaseIntentExpirationService.expireIfSentAndExpired(intent, now);
+        }
+    }
+
+    private void expireSentIntentsForSeller(Long currentUserId, LocalDateTime now) {
+        List<PurchaseIntent> expiredSentIntents = purchaseIntentRepository.findExpiredSentBySellerIdForUpdate(
                 currentUserId,
                 PurchaseIntentStatus.SENT,
                 now
