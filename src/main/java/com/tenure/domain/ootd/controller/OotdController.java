@@ -30,9 +30,7 @@ public class OotdController {
     @Operation(
             summary = "OOTD 게시",
             description = "앱 내 전용 카메라로 촬영한 착장 사진을 OOTD로 게시합니다. "
-                    + "게시 응답은 AI 태그 분석을 기다리지 않고 즉시 반환되며, "
-                    + "OOTD_CREATED 이벤트를 통해 백그라운드에서 비동기로 AI(Gemini) 태그 분석이 진행됩니다. "
-                    + "분석 결과 중 신뢰도가 Threshold 이상인 태그만 AUTO_UNCONFIRMED 상태로 저장됩니다.",
+                    + "AI 태그 분석은 아직 연동되지 않았으며, 연동 시 OOTD_CREATED 이벤트 기반 비동기 처리로 전환될 예정입니다.",
             parameters = {
                     @Parameter(
                             name = "X-USER-ID",
