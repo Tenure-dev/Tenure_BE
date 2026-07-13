@@ -12,6 +12,9 @@ import org.springframework.data.repository.query.Param;
 
 public interface PurchaseIntentRepository extends JpaRepository<PurchaseIntent, Long> {
 
+    @Query("select intent.product.id from PurchaseIntent intent where intent.id = :intentId")
+    Optional<Long> findProductIdById(@Param("intentId") Long intentId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select intent from PurchaseIntent intent where intent.id = :intentId")
     Optional<PurchaseIntent> findByIdForUpdate(@Param("intentId") Long intentId);
