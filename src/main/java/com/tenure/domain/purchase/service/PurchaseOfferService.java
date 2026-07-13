@@ -9,6 +9,7 @@ import com.tenure.domain.purchase.dto.PurchaseOfferCreateRequest;
 import com.tenure.domain.purchase.dto.PurchaseOfferCreateResponse;
 import com.tenure.domain.purchase.dto.PurchaseOfferDetailResponse;
 import com.tenure.domain.purchase.dto.PurchaseOfferDetailResponse.ViewerRole;
+import com.tenure.domain.purchase.dto.PurchaseOfferReceivedListResponse;
 import com.tenure.domain.purchase.dto.PurchaseOfferSentListResponse;
 import com.tenure.domain.purchase.entity.PurchaseOffer;
 import com.tenure.domain.purchase.enums.PurchaseOfferStatus;
@@ -140,6 +141,33 @@ public class PurchaseOfferService {
         return PurchaseOfferSentListResponse.of(pageItems, tradeIdByOfferId, now, hasNext);
     }
 
+    @Transactional
+    public PurchaseOfferReceivedListResponse getReceivedPurchaseOffers(
+            Long currentUserId,
+            List<PurchaseOfferStatus> statuses,
+            OffsetDateTime cursorCreatedAt,
+            Long cursorOfferId,
+            Integer size
+    ) {
+        validateCursor(cursorCreatedAt, cursorOfferId);
+        int pageSize = normalizeSize(size);
+        LocalDateTime now = LocalDateTime.now();
+        expireSentOffersForOwner(currentUserId, now);
+
+        List<PurchaseOfferStatus> normalizedStatuses = normalizeStatuses(statuses);
+        List<PurchaseOffer> fetched = purchaseOfferRepository.findReceivedListByOwnerWithCursor(
+                currentUserId,
+                normalizedStatuses,
+                cursorCreatedAt == null ? null : cursorCreatedAt.toLocalDateTime(),
+                cursorOfferId,
+                PageRequest.of(0, pageSize + 1)
+        );
+        boolean hasNext = fetched.size() > pageSize;
+        List<PurchaseOffer> pageItems = hasNext ? fetched.subList(0, pageSize) : fetched;
+        Map<Long, Long> tradeIdByOfferId = findTradeIds(pageItems);
+        return PurchaseOfferReceivedListResponse.of(pageItems, tradeIdByOfferId, now, hasNext);
+    }
+
     private void validateAgreement(Boolean agreement) {
         if (!Boolean.TRUE.equals(agreement)) {
             throw new CustomException(PurchaseOfferErrorCode.AGREEMENT_REQUIRED);
@@ -234,6 +262,17 @@ public class PurchaseOfferService {
 
     private void expireSentOffersForProposer(Long currentUserId, LocalDateTime now) {
         List<PurchaseOffer> expiredSentOffers = purchaseOfferRepository.findExpiredSentByProposerIdForUpdate(
+                currentUserId,
+                PurchaseOfferStatus.SENT,
+                now
+        );
+        for (PurchaseOffer offer : expiredSentOffers) {
+            purchaseOfferExpirationService.expireIfSentAndExpired(offer, now);
+        }
+    }
+
+    private void expireSentOffersForOwner(Long currentUserId, LocalDateTime now) {
+        List<PurchaseOffer> expiredSentOffers = purchaseOfferRepository.findExpiredSentByOwnerIdForUpdate(
                 currentUserId,
                 PurchaseOfferStatus.SENT,
                 now

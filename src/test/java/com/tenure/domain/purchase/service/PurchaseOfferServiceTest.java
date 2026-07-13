@@ -20,6 +20,7 @@ import com.tenure.domain.purchase.dto.PurchaseOfferCreateResponse;
 import com.tenure.domain.purchase.dto.PurchaseOfferDetailResponse;
 import com.tenure.domain.purchase.dto.PurchaseOfferDetailResponse.DeliveryDisclosureStatus;
 import com.tenure.domain.purchase.dto.PurchaseOfferDetailResponse.ViewerRole;
+import com.tenure.domain.purchase.dto.PurchaseOfferReceivedListResponse;
 import com.tenure.domain.purchase.dto.PurchaseOfferSentListResponse;
 import com.tenure.domain.purchase.entity.PurchaseOffer;
 import com.tenure.domain.purchase.enums.PurchaseOfferStatus;
@@ -393,6 +394,103 @@ class PurchaseOfferServiceTest {
         assertThat(response.content().get(0).canCancel()).isFalse();
     }
 
+    @Test
+    void getReceivedPurchaseOffers_returnsReceivedListWithProposerAndOwnerAmounts() {
+        User owner = user(OWNER_ID, UserGrade.BASIC, null);
+        User proposer = user(PROPOSER_ID, UserGrade.BASIC, null);
+        Item item = item(ITEM_ID, owner);
+        PurchaseOffer offer = offer(OFFER_ID, item, proposer, owner, LocalDateTime.now().plusHours(2));
+        ReflectionTestUtils.setField(offer, "createdAt", LocalDateTime.now().minusMinutes(10));
+
+        givenReceivedList(List.of(), List.of(offer));
+
+        PurchaseOfferReceivedListResponse response = purchaseOfferService.getReceivedPurchaseOffers(
+                OWNER_ID,
+                List.of(PurchaseOfferStatus.SENT),
+                null,
+                null,
+                20
+        );
+
+        assertThat(response.content()).hasSize(1);
+        PurchaseOfferReceivedListResponse.Item itemResponse = response.content().get(0);
+        assertThat(itemResponse.offerId()).isEqualTo(OFFER_ID);
+        assertThat(itemResponse.status()).isEqualTo(PurchaseOfferStatus.SENT);
+        assertThat(itemResponse.itemId()).isEqualTo(ITEM_ID);
+        assertThat(itemResponse.brandName()).isEqualTo("Levis");
+        assertThat(itemResponse.proposerId()).isEqualTo(PROPOSER_ID);
+        assertThat(itemResponse.proposerUsername()).isEqualTo("user" + PROPOSER_ID);
+        assertThat(itemResponse.offerAmount()).isEqualTo(360000);
+        assertThat(itemResponse.shippingFee()).isEqualTo(5000);
+        assertThat(itemResponse.proposerServiceFee()).isEqualTo(21600);
+        assertThat(itemResponse.totalPaymentAmount()).isEqualTo(386600);
+        assertThat(itemResponse.ownerSettlementAmount()).isEqualTo(365000);
+        assertThat(itemResponse.paymentAuthorizationStatus()).isEqualTo(PaymentAuthorizationStatus.AUTHORIZED);
+        assertThat(itemResponse.remainingSeconds()).isPositive();
+        assertThat(itemResponse.canAccept()).isTrue();
+        assertThat(itemResponse.canReject()).isTrue();
+        assertThat(itemResponse.tradeId()).isNull();
+        assertThat(response.hasNext()).isFalse();
+        assertThat(response.nextCursor()).isNull();
+    }
+
+    @Test
+    void getReceivedPurchaseOffers_expiresSentBeforeQueryingList() {
+        User owner = user(OWNER_ID, UserGrade.BASIC, null);
+        User proposer = user(PROPOSER_ID, UserGrade.BASIC, null);
+        Item item = item(ITEM_ID, owner);
+        PurchaseOffer expiredOffer = offer(OFFER_ID, item, proposer, owner, LocalDateTime.now().minusMinutes(1));
+        ReflectionTestUtils.setField(expiredOffer, "createdAt", LocalDateTime.now().minusMinutes(10));
+
+        givenReceivedList(List.of(expiredOffer), List.of(expiredOffer));
+
+        PurchaseOfferReceivedListResponse response = purchaseOfferService.getReceivedPurchaseOffers(
+                OWNER_ID,
+                List.of(PurchaseOfferStatus.EXPIRED),
+                null,
+                null,
+                20
+        );
+
+        assertThat(expiredOffer.getStatus()).isEqualTo(PurchaseOfferStatus.EXPIRED);
+        assertThat(expiredOffer.getPaymentAuthorizationStatus()).isEqualTo(PaymentAuthorizationStatus.RELEASED);
+        assertThat(response.content()).hasSize(1);
+        assertThat(response.content().get(0).remainingSeconds()).isNull();
+        assertThat(response.content().get(0).canAccept()).isFalse();
+        assertThat(response.content().get(0).canReject()).isFalse();
+    }
+
+    @Test
+    void getReceivedPurchaseOffers_mapsTradeIdForAcceptedOffer() {
+        User owner = user(OWNER_ID, UserGrade.BASIC, null);
+        User proposer = user(PROPOSER_ID, UserGrade.BASIC, null);
+        Item item = item(ITEM_ID, owner);
+        PurchaseOffer acceptedOffer = offer(OFFER_ID, item, proposer, owner, LocalDateTime.now().plusHours(2));
+        ReflectionTestUtils.setField(acceptedOffer, "status", PurchaseOfferStatus.ACCEPTED);
+        ReflectionTestUtils.setField(acceptedOffer, "createdAt", LocalDateTime.now().minusMinutes(10));
+        Trade trade = trade(900L, acceptedOffer.getId());
+
+        givenReceivedList(List.of(), List.of(acceptedOffer));
+        when(tradeRepository.findAllBySourceTypeAndSourceIdIn(
+                TradeSourceType.PURCHASE_OFFER,
+                List.of(acceptedOffer.getId())
+        )).thenReturn(List.of(trade));
+
+        PurchaseOfferReceivedListResponse response = purchaseOfferService.getReceivedPurchaseOffers(
+                OWNER_ID,
+                List.of(PurchaseOfferStatus.ACCEPTED),
+                null,
+                null,
+                20
+        );
+
+        assertThat(response.content()).hasSize(1);
+        assertThat(response.content().get(0).tradeId()).isEqualTo(900L);
+        assertThat(response.content().get(0).remainingSeconds()).isNull();
+        assertThat(response.content().get(0).canAccept()).isFalse();
+        assertThat(response.content().get(0).canReject()).isFalse();
+    }
+
     private void givenOfferableItem(Item item, User proposer, Optional<PurchaseOffer> existingOffer) {
         when(itemRepository.findByIdForUpdate(ITEM_ID)).thenReturn(Optional.of(item));
         when(userRepository.findById(PROPOSER_ID)).thenReturn(Optional.of(proposer));
@@ -421,6 +519,21 @@ class PurchaseOfferServiceTest {
         )).thenReturn(fetchedOffers);
     }
 
+    private void givenReceivedList(List<PurchaseOffer> expiredOffers, List<PurchaseOffer> fetchedOffers) {
+        when(purchaseOfferRepository.findExpiredSentByOwnerIdForUpdate(
+                eq(OWNER_ID),
+                eq(PurchaseOfferStatus.SENT),
+                any(LocalDateTime.class)
+        )).thenReturn(expiredOffers);
+        when(purchaseOfferRepository.findReceivedListByOwnerWithCursor(
+                eq(OWNER_ID),
+                any(),
+                isNull(),
+                isNull(),
+                any(Pageable.class)
+        )).thenReturn(fetchedOffers);
+    }
+
     private PurchaseOfferCreateRequest request(Integer offerPrice, Boolean agreement) {
         return new PurchaseOfferCreateRequest(offerPrice, ADDRESS_ID, "MOCK_CARD", agreement);
     }
@@ -430,6 +543,7 @@ class PurchaseOfferServiceTest {
         ReflectionTestUtils.setField(user, "id", id);
         ReflectionTestUtils.setField(user, "grade", grade);
         ReflectionTestUtils.setField(user, "username", "user" + id);
+        ReflectionTestUtils.setField(user, "profileImageUrl", "https://image.url/profile-" + id + ".jpg");
         ReflectionTestUtils.setField(user, "defaultShippingFee", defaultShippingFee);
         return user;
     }

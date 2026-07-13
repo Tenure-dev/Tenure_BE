@@ -83,4 +83,42 @@ public interface PurchaseOfferRepository extends JpaRepository<PurchaseOffer, Lo
             @Param("itemId") Long itemId,
             @Param("status") PurchaseOfferStatus status
     );
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select offer
+            from PurchaseOffer offer
+            join fetch offer.item item
+            join fetch offer.proposer proposer
+            where offer.owner.id = :ownerUserId
+              and offer.status = :status
+              and offer.expiresAt <= :now
+            """)
+    List<PurchaseOffer> findExpiredSentByOwnerIdForUpdate(
+            @Param("ownerUserId") Long ownerUserId,
+            @Param("status") PurchaseOfferStatus status,
+            @Param("now") LocalDateTime now
+    );
+
+    @Query("""
+            select offer
+            from PurchaseOffer offer
+            join fetch offer.item item
+            join fetch offer.proposer proposer
+            where offer.owner.id = :ownerUserId
+              and offer.status in :statuses
+              and (
+                    :cursorCreatedAt is null
+                    or offer.createdAt < :cursorCreatedAt
+                    or (offer.createdAt = :cursorCreatedAt and offer.id < :cursorOfferId)
+                  )
+            order by offer.createdAt desc, offer.id desc
+            """)
+    List<PurchaseOffer> findReceivedListByOwnerWithCursor(
+            @Param("ownerUserId") Long ownerUserId,
+            @Param("statuses") Collection<PurchaseOfferStatus> statuses,
+            @Param("cursorCreatedAt") LocalDateTime cursorCreatedAt,
+            @Param("cursorOfferId") Long cursorOfferId,
+            Pageable pageable
+    );
 }

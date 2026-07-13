@@ -3,6 +3,7 @@ package com.tenure.domain.purchase.controller;
 import com.tenure.domain.purchase.dto.PurchaseOfferCreateRequest;
 import com.tenure.domain.purchase.dto.PurchaseOfferCreateResponse;
 import com.tenure.domain.purchase.dto.PurchaseOfferDetailResponse;
+import com.tenure.domain.purchase.dto.PurchaseOfferReceivedListResponse;
 import com.tenure.domain.purchase.dto.PurchaseOfferSentListResponse;
 import com.tenure.domain.purchase.enums.PurchaseOfferStatus;
 import com.tenure.domain.purchase.service.PurchaseOfferService;
@@ -125,33 +126,11 @@ public class PurchaseOfferController {
             summary = "Get sent purchase offers",
             description = "Returns the current user's sent purchase offers with cursor pagination. Expired SENT offers are updated to EXPIRED and RELEASED before querying.",
             parameters = {
-                    @Parameter(
-                            name = "X-USER-ID",
-                            in = ParameterIn.HEADER,
-                            required = true,
-                            description = "Temporary current user id for Swagger/local testing before JWT is fully connected.",
-                            example = "2"
-                    ),
-                    @Parameter(
-                            name = "statuses",
-                            description = "Status filter. Example: statuses=SENT or statuses=SENT,EXPIRED. Omit to return all statuses.",
-                            example = "SENT"
-                    ),
-                    @Parameter(
-                            name = "cursorCreatedAt",
-                            description = "Created-at cursor for the next page.",
-                            example = "2026-07-12T10:00:00+09:00"
-                    ),
-                    @Parameter(
-                            name = "cursorOfferId",
-                            description = "Purchase offer id cursor for the next page.",
-                            example = "123"
-                    ),
-                    @Parameter(
-                            name = "size",
-                            description = "Page size. Default 20, max 50.",
-                            example = "20"
-                    )
+                    @Parameter(name = "X-USER-ID", in = ParameterIn.HEADER, required = true, example = "2"),
+                    @Parameter(name = "statuses", description = "Status filter. Omit to return all statuses.", example = "SENT"),
+                    @Parameter(name = "cursorCreatedAt", description = "Created-at cursor for the next page.", example = "2026-07-12T10:00:00+09:00"),
+                    @Parameter(name = "cursorOfferId", description = "Purchase offer id cursor for the next page.", example = "123"),
+                    @Parameter(name = "size", description = "Page size. Default 20, max 50.", example = "20")
             }
     )
     @ApiResponse(
@@ -170,6 +149,42 @@ public class PurchaseOfferController {
     ) {
         Long currentUserId = currentUserProvider.getCurrentUserId();
         PurchaseOfferSentListResponse response = purchaseOfferService.getSentPurchaseOffers(
+                currentUserId,
+                statuses,
+                cursorCreatedAt,
+                cursorOfferId,
+                size
+        );
+        return BaseResponse.success(response, "Query succeeded.");
+    }
+
+    @Operation(
+            summary = "Get received purchase offers",
+            description = "Returns purchase offers received by the current item owner. Expired SENT offers are updated to EXPIRED and RELEASED before querying.",
+            parameters = {
+                    @Parameter(name = "X-USER-ID", in = ParameterIn.HEADER, required = true, example = "1"),
+                    @Parameter(name = "statuses", description = "Status filter. Omit to return all statuses.", example = "SENT"),
+                    @Parameter(name = "cursorCreatedAt", description = "Created-at cursor for the next page.", example = "2026-07-12T10:00:00+09:00"),
+                    @Parameter(name = "cursorOfferId", description = "Purchase offer id cursor for the next page.", example = "123"),
+                    @Parameter(name = "size", description = "Page size. Default 20, max 50.", example = "20")
+            }
+    )
+    @ApiResponse(
+            responseCode = "200",
+            description = "Received purchase offers returned successfully.",
+            content = @Content(schema = @Schema(implementation = PurchaseOfferReceivedListResponse.class))
+    )
+    @GetMapping("/purchase-offers/received")
+    public BaseResponse<PurchaseOfferReceivedListResponse> getReceivedPurchaseOffers(
+            @RequestParam(required = false) List<PurchaseOfferStatus> statuses,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+            OffsetDateTime cursorCreatedAt,
+            @RequestParam(required = false) Long cursorOfferId,
+            @RequestParam(required = false) Integer size
+    ) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        PurchaseOfferReceivedListResponse response = purchaseOfferService.getReceivedPurchaseOffers(
                 currentUserId,
                 statuses,
                 cursorCreatedAt,
