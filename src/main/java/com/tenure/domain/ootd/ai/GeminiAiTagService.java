@@ -6,6 +6,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tenure.global.config.GeminiProperties;
 import com.tenure.global.config.StorageProperties;
 import java.io.IOException;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Base64;
@@ -17,21 +19,26 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
 /**
- * Google Gemini(gemini-1.5-flash) 이미지 분석을 통해 OOTD 착장 태그 후보를 생성한다.
+ * Google Gemini 이미지 분석을 통해 OOTD 착장 태그 후보를 생성한다.
  * 분석 실패 시 예외를 전파하지 않고 빈 목록을 반환한다 (비동기 리스너의 흐름을 막지 않기 위함).
+ * Gemini는 bbox 좌표를 0~1 정규화 지시와 무관하게 0~1000 스케일로 반환하는 경향이 있어,
+ * 응답을 그대로 신뢰하지 않고 1000으로 나눠 0~1 스케일로 변환한다.
  */
 @Slf4j
 @Service
 public class GeminiAiTagService implements AiTagService {
 
+    private static final BigDecimal BBOX_SCALE = BigDecimal.valueOf(1000);
+    private static final int BBOX_DECIMAL_SCALE = 5;
+
     private static final String PROMPT = """
             이미지 속 착장(의류/패션 아이템)을 분석해서 각 아이템의 위치와 라벨을 JSON 배열로만 응답하세요.
             다른 설명 없이 아래 형식의 JSON 배열만 출력하세요.
-            bbox 좌표(bboxX, bboxY, bboxWidth, bboxHeight)는 이미지 전체 기준 0~1 사이의 상대값입니다.
+            bbox 좌표(bboxX, bboxY, bboxWidth, bboxHeight)는 이미지 전체 기준 0~1000 사이의 정수값입니다.
             confidence는 0~1 사이의 신뢰도입니다.
 
             [
-              {"labelText": "아이템명", "bboxX": 0.0, "bboxY": 0.0, "bboxWidth": 0.0, "bboxHeight": 0.0, "confidence": 0.0}
+              {"labelText": "아이템명", "bboxX": 0, "bboxY": 0, "bboxWidth": 0, "bboxHeight": 0, "confidence": 0.0}
             ]
             """;
 
@@ -96,8 +103,27 @@ public class GeminiAiTagService implements AiTagService {
         JsonNode root = objectMapper.readTree(responseBody);
         String text = root.path("candidates").path(0).path("content").path("parts").path(0).path("text").asText();
         String json = extractJsonArray(text);
-        return objectMapper.readValue(json, new TypeReference<List<AiTagResult>>() {
+        List<AiTagResult> rawResults = objectMapper.readValue(json, new TypeReference<>() {
         });
+        return rawResults.stream().map(this::normalizeBbox).toList();
+    }
+
+    private AiTagResult normalizeBbox(AiTagResult result) {
+        return new AiTagResult(
+                result.labelText(),
+                toUnitScale(result.bboxX()),
+                toUnitScale(result.bboxY()),
+                toUnitScale(result.bboxWidth()),
+                toUnitScale(result.bboxHeight()),
+                result.confidence()
+        );
+    }
+
+    private BigDecimal toUnitScale(BigDecimal value) {
+        if (value == null) {
+            return null;
+        }
+        return value.divide(BBOX_SCALE, BBOX_DECIMAL_SCALE, RoundingMode.HALF_UP);
     }
 
     private String extractJsonArray(String text) {

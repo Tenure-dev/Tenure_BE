@@ -2,6 +2,8 @@ package com.tenure.domain.tag.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -32,18 +34,26 @@ public record OotdTagCreateRequest(
     public record BboxRequest(
 
             @NotNull(message = "bbox.x는 필수입니다.")
+            @DecimalMin(value = "0.0", message = "bbox.x는 0 이상이어야 합니다.")
+            @DecimalMax(value = "1.0", message = "bbox.x는 1 이하여야 합니다.")
             @Schema(example = "0.12")
             BigDecimal x,
 
             @NotNull(message = "bbox.y는 필수입니다.")
+            @DecimalMin(value = "0.0", message = "bbox.y는 0 이상이어야 합니다.")
+            @DecimalMax(value = "1.0", message = "bbox.y는 1 이하여야 합니다.")
             @Schema(example = "0.08")
             BigDecimal y,
 
             @NotNull(message = "bbox.width는 필수입니다.")
+            @DecimalMin(value = "0.0", message = "bbox.width는 0 이상이어야 합니다.")
+            @DecimalMax(value = "1.0", message = "bbox.width는 1 이하여야 합니다.")
             @Schema(example = "0.40")
             BigDecimal width,
 
             @NotNull(message = "bbox.height는 필수입니다.")
+            @DecimalMin(value = "0.0", message = "bbox.height는 0 이상이어야 합니다.")
+            @DecimalMax(value = "1.0", message = "bbox.height는 1 이하여야 합니다.")
             @Schema(example = "0.55")
             BigDecimal height
     ) {

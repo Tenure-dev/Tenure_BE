@@ -44,6 +44,6 @@ tenure:
     gemini:
       api-key: ${GEMINI_API_KEY:}
       endpoint: ${GEMINI_API_ENDPOINT:https://generativelanguage.googleapis.com/v1beta/models}
-      model: ${GEMINI_MODEL:gemini-3.5-flash}
+      model: ${GEMINI_MODEL:gemini-flash-lite-latest}
     tag:
       confidence-threshold: ${AI_TAG_CONFIDENCE_THRESHOLD:0.6}

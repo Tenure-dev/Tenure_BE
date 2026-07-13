@@ -156,6 +156,34 @@ class OotdTagServiceTest {
     }
 
     @Test
+    void saveAiTags_filtersOutResultsWithOutOfRangeBbox() {
+        User owner = user(OWNER_ID);
+        Ootd ootd = ootd(OOTD_ID, owner);
+
+        when(ootdRepository.findById(OOTD_ID)).thenReturn(Optional.of(ootd));
+
+        AiTagResult validResult = aiTagResult("블루종 자켓", BigDecimal.valueOf(0.92));
+        AiTagResult outOfRangeResult = new AiTagResult(
+                "청바지",
+                BigDecimal.valueOf(120),
+                BigDecimal.valueOf(0.2),
+                BigDecimal.valueOf(0.3),
+                BigDecimal.valueOf(0.4),
+                BigDecimal.valueOf(0.9)
+        );
+
+        ootdTagService.saveAiTags(OOTD_ID, List.of(validResult, outOfRangeResult));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<OotdTag>> captor = ArgumentCaptor.forClass(List.class);
+        verify(ootdTagRepository).saveAll(captor.capture());
+
+        List<OotdTag> savedTags = captor.getValue();
+        assertThat(savedTags).hasSize(1);
+        assertThat(savedTags.get(0).getLabelText()).isEqualTo("블루종 자켓");
+    }
+
+    @Test
     void saveAiTags_doesNothingWhenOotdNotFound() {
         when(ootdRepository.findById(OOTD_ID)).thenReturn(Optional.empty());
 

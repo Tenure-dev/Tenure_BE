@@ -13,6 +13,7 @@ import com.tenure.domain.tag.exception.TagErrorCode;
 import com.tenure.domain.tag.repository.OotdTagRepository;
 import com.tenure.global.config.AiTagProperties;
 import com.tenure.global.exception.CustomException;
+import java.math.BigDecimal;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -39,6 +40,7 @@ public class OotdTagService {
 
         List<OotdTag> tags = results.stream()
                 .filter(this::meetsConfidenceThreshold)
+                .filter(this::hasValidBbox)
                 .map(result -> OotdTag.createAiTag(
                         ootd,
                         result.labelText(),
@@ -82,6 +84,24 @@ public class OotdTagService {
     private boolean meetsConfidenceThreshold(AiTagResult result) {
         return result.confidence() != null
                 && result.confidence().compareTo(aiTagProperties.confidenceThreshold()) >= 0;
+    }
+
+    private boolean hasValidBbox(AiTagResult result) {
+        boolean valid = isNormalized(result.bboxX())
+                && isNormalized(result.bboxY())
+                && isNormalized(result.bboxWidth())
+                && isNormalized(result.bboxHeight());
+        if (!valid) {
+            log.warn("AI 태그 bbox 값이 0~1 범위를 벗어나 제외됨 - labelText={}, bbox=({}, {}, {}, {})",
+                    result.labelText(), result.bboxX(), result.bboxY(), result.bboxWidth(), result.bboxHeight());
+        }
+        return valid;
+    }
+
+    private boolean isNormalized(BigDecimal value) {
+        return value != null
+                && value.compareTo(BigDecimal.ZERO) >= 0
+                && value.compareTo(BigDecimal.ONE) <= 0;
     }
 
     private void validateOwner(Ootd ootd, Long currentUserId) {
