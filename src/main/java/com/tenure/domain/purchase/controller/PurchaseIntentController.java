@@ -2,6 +2,7 @@ package com.tenure.domain.purchase.controller;
 
 import com.tenure.domain.purchase.dto.PurchaseIntentCreateRequest;
 import com.tenure.domain.purchase.dto.PurchaseIntentCreateResponse;
+import com.tenure.domain.purchase.dto.PurchaseIntentDetailResponse;
 import com.tenure.domain.purchase.dto.PurchaseIntentSentListResponse;
 import com.tenure.domain.purchase.enums.PurchaseIntentStatus;
 import com.tenure.domain.purchase.service.PurchaseIntentService;
@@ -71,31 +72,7 @@ public class PurchaseIntentController {
     @ApiResponse(
             responseCode = "201",
             description = "거래 의사 전송 성공",
-            content = @Content(
-                    schema = @Schema(implementation = PurchaseIntentCreateResponse.class),
-                    examples = @ExampleObject(
-                            value = """
-                                    {
-                                      "success": true,
-                                      "code": "COMMON_200",
-                                      "message": "거래 의사를 보냈습니다.",
-                                      "data": {
-                                        "intentId": 123,
-                                        "status": "SENT",
-                                        "expiresAt": "2026-07-12T15:00:00+09:00",
-                                        "amounts": {
-                                          "productAmount": 360000,
-                                          "shippingFee": 5000,
-                                          "buyerServiceFee": 0,
-                                          "sellerServiceFee": 21600,
-                                          "buyerPaymentAmount": 365000,
-                                          "sellerSettlementAmount": 343400
-                                        }
-                                      }
-                                    }
-                                    """
-                    )
-            )
+            content = @Content(schema = @Schema(implementation = PurchaseIntentCreateResponse.class))
     )
     @PostMapping("/products/{productId}/purchase-intents")
     public ResponseEntity<BaseResponse<PurchaseIntentCreateResponse>> createPurchaseIntent(
@@ -149,48 +126,7 @@ public class PurchaseIntentController {
     @ApiResponse(
             responseCode = "200",
             description = "보낸 거래 의사 목록 조회 성공",
-            content = @Content(
-                    schema = @Schema(implementation = PurchaseIntentSentListResponse.class),
-                    examples = @ExampleObject(
-                            value = """
-                                    {
-                                      "success": true,
-                                      "code": "COMMON_200",
-                                      "message": "조회에 성공했습니다.",
-                                      "data": {
-                                        "content": [
-                                          {
-                                            "intentId": 123,
-                                            "status": "SENT",
-                                            "productId": 10,
-                                            "itemId": 5,
-                                            "brandName": "Levis",
-                                            "itemName": "LVC 1955 501",
-                                            "imageUrl": "https://image.url/product.jpg",
-                                            "sellerId": 1,
-                                            "sellerUsername": "YuJin",
-                                            "productAmount": 10000000,
-                                            "deliveryFee": 0,
-                                            "buyerServiceFee": 0,
-                                            "buyerPaymentAmount": 10000000,
-                                            "paymentAuthorizationStatus": "AUTHORIZED",
-                                            "createdAt": "2026-03-25T10:00:00+09:00",
-                                            "expiresAt": "2026-03-26T10:00:00+09:00",
-                                            "remainingSeconds": 82000,
-                                            "canCancel": true,
-                                            "tradeId": null
-                                          }
-                                        ],
-                                        "nextCursor": {
-                                          "cursorCreatedAt": "2026-03-25T10:00:00+09:00",
-                                          "cursorIntentId": 123
-                                        },
-                                        "hasNext": true
-                                      }
-                                    }
-                                    """
-                    )
-            )
+            content = @Content(schema = @Schema(implementation = PurchaseIntentSentListResponse.class))
     )
     @GetMapping("/purchase-intents/sent")
     public BaseResponse<PurchaseIntentSentListResponse> getSentPurchaseIntents(
@@ -208,6 +144,36 @@ public class PurchaseIntentController {
                 cursorCreatedAt,
                 cursorIntentId,
                 size
+        );
+        return BaseResponse.success(response, "조회에 성공했습니다.");
+    }
+
+    @Operation(
+            summary = "거래 의사 상세 조회",
+            description = "구매자 본인 또는 판매자가 거래 의사 응답 대기 상세를 조회합니다. SENT 상태가 만료된 경우 조회 시점에 EXPIRED와 RELEASED로 갱신합니다.",
+            parameters = {
+                    @Parameter(
+                            name = "X-USER-ID",
+                            in = ParameterIn.HEADER,
+                            required = true,
+                            description = "JWT 적용 전 Swagger 테스트용 현재 사용자 ID. JWT 적용 후에는 SecurityContext 값을 사용합니다.",
+                            example = "2"
+                    )
+            }
+    )
+    @ApiResponse(
+            responseCode = "200",
+            description = "거래 의사 상세 조회 성공",
+            content = @Content(schema = @Schema(implementation = PurchaseIntentDetailResponse.class))
+    )
+    @GetMapping("/purchase-intents/{intentId}")
+    public BaseResponse<PurchaseIntentDetailResponse> getPurchaseIntentDetail(
+            @PathVariable Long intentId
+    ) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        PurchaseIntentDetailResponse response = purchaseIntentService.getPurchaseIntentDetail(
+                intentId,
+                currentUserId
         );
         return BaseResponse.success(response, "조회에 성공했습니다.");
     }

@@ -1,5 +1,6 @@
 package com.tenure.domain.trade.controller;
 
+import com.tenure.domain.trade.dto.TradeDetailResponse;
 import com.tenure.domain.trade.dto.TradeListItemResponse;
 import com.tenure.domain.trade.enums.TradeRole;
 import com.tenure.domain.trade.enums.TradeStatus;
@@ -17,6 +18,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -114,6 +116,67 @@ public class TradeController {
         Long currentUserId = currentUserProvider.getCurrentUserId();
         PageResponse<TradeListItemResponse> response =
                 tradeService.getTradeList(currentUserId, role, status, page, size);
+        return BaseResponse.success(response, "조회에 성공했습니다.");
+    }
+
+    @Operation(
+            summary = "거래 상세 조회",
+            description = "거래 상세를 조회합니다. 현재 사용자가 거래의 구매자 또는 판매자가 아니면 거래 존재 여부 노출을 막기 위해 "
+                    + "404 TRADE_404를 반환합니다.",
+            parameters = {
+                    @Parameter(
+                            name = "X-USER-ID",
+                            in = ParameterIn.HEADER,
+                            required = true,
+                            description = "JWT 적용 전 Swagger 테스트용 현재 사용자 ID. JWT 적용 후에는 SecurityContext 값을 사용합니다.",
+                            example = "2"
+                    )
+            }
+    )
+    @ApiResponse(
+            responseCode = "200",
+            description = "거래 상세 조회 성공",
+            content = @Content(
+                    schema = @Schema(implementation = TradeDetailResponse.class),
+                    examples = @ExampleObject(
+                            value = """
+                                    {
+                                      "success": true,
+                                      "code": "COMMON_200",
+                                      "message": "조회에 성공했습니다.",
+                                      "data": {
+                                        "tradeId": 1,
+                                        "viewerMode": "BUYER",
+                                        "availableActions": [],
+                                        "sourceType": "PURCHASE_INTENT",
+                                        "sourceId": 1,
+                                        "itemId": 10,
+                                        "productId": 1,
+                                        "buyerUserId": 2,
+                                        "sellerUserId": 1,
+                                        "status": "PAID",
+                                        "deliveryCarrier": null,
+                                        "customDeliveryCarrierName": null,
+                                        "trackingNumber": null,
+                                        "itemPrice": 50000,
+                                        "shippingFee": 0,
+                                        "buyerServiceFee": 1500,
+                                        "paymentAmount": 51500,
+                                        "sellerServiceFee": null,
+                                        "settlementAmount": null,
+                                        "createdAt": "2026-07-10T12:00:00",
+                                        "updatedAt": "2026-07-10T12:00:00"
+                                      }
+                                    }
+                                    """
+                    )
+            )
+    )
+    @ApiResponse(responseCode = "404", description = "거래 정보를 찾을 수 없거나 참여자가 아님")
+    @GetMapping("/trades/{tradeId}")
+    public BaseResponse<TradeDetailResponse> getTradeDetail(@PathVariable Long tradeId) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        TradeDetailResponse response = tradeService.getTradeDetail(tradeId, currentUserId);
         return BaseResponse.success(response, "조회에 성공했습니다.");
     }
 }
