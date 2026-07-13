@@ -4,6 +4,7 @@ import com.tenure.domain.purchase.dto.PurchaseOfferCreateRequest;
 import com.tenure.domain.purchase.dto.PurchaseOfferCreateResponse;
 import com.tenure.domain.purchase.dto.PurchaseOfferDetailResponse;
 import com.tenure.domain.purchase.dto.PurchaseOfferReceivedListResponse;
+import com.tenure.domain.purchase.dto.PurchaseOfferRejectResponse;
 import com.tenure.domain.purchase.dto.PurchaseOfferSentListResponse;
 import com.tenure.domain.purchase.enums.PurchaseOfferStatus;
 import com.tenure.domain.purchase.service.PurchaseOfferService;
@@ -192,5 +193,35 @@ public class PurchaseOfferController {
                 size
         );
         return BaseResponse.success(response, "Query succeeded.");
+    }
+
+    @Operation(
+            summary = "Reject purchase offer",
+            description = "The item owner rejects a SENT purchase offer and releases the mock payment authorization.",
+            parameters = {
+                    @Parameter(
+                            name = "X-USER-ID",
+                            in = ParameterIn.HEADER,
+                            required = true,
+                            description = "Temporary current user id for Swagger/local testing before JWT is fully connected.",
+                            example = "1"
+                    )
+            }
+    )
+    @ApiResponse(
+            responseCode = "200",
+            description = "Purchase offer rejected successfully.",
+            content = @Content(schema = @Schema(implementation = PurchaseOfferRejectResponse.class))
+    )
+    @PostMapping("/purchase-offers/{offerId}/reject")
+    public BaseResponse<PurchaseOfferRejectResponse> rejectPurchaseOffer(
+            @PathVariable Long offerId
+    ) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        PurchaseOfferRejectResponse response = purchaseOfferService.rejectPurchaseOffer(
+                offerId,
+                currentUserId
+        );
+        return BaseResponse.success(response, "Purchase offer rejected.");
     }
 }

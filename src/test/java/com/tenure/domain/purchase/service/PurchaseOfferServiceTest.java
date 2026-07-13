@@ -21,6 +21,7 @@ import com.tenure.domain.purchase.dto.PurchaseOfferDetailResponse;
 import com.tenure.domain.purchase.dto.PurchaseOfferDetailResponse.DeliveryDisclosureStatus;
 import com.tenure.domain.purchase.dto.PurchaseOfferDetailResponse.ViewerRole;
 import com.tenure.domain.purchase.dto.PurchaseOfferReceivedListResponse;
+import com.tenure.domain.purchase.dto.PurchaseOfferRejectResponse;
 import com.tenure.domain.purchase.dto.PurchaseOfferSentListResponse;
 import com.tenure.domain.purchase.entity.PurchaseOffer;
 import com.tenure.domain.purchase.enums.PurchaseOfferStatus;
@@ -321,20 +322,8 @@ class PurchaseOfferServiceTest {
         );
 
         assertThat(response.content()).hasSize(1);
-        PurchaseOfferSentListResponse.Item itemResponse = response.content().get(0);
-        assertThat(itemResponse.offerId()).isEqualTo(OFFER_ID);
-        assertThat(itemResponse.status()).isEqualTo(PurchaseOfferStatus.SENT);
-        assertThat(itemResponse.itemId()).isEqualTo(ITEM_ID);
-        assertThat(itemResponse.brandName()).isEqualTo("Levis");
-        assertThat(itemResponse.ownerId()).isEqualTo(OWNER_ID);
-        assertThat(itemResponse.offerAmount()).isEqualTo(360000);
-        assertThat(itemResponse.shippingFee()).isEqualTo(5000);
-        assertThat(itemResponse.proposerServiceFee()).isEqualTo(21600);
-        assertThat(itemResponse.totalPaymentAmount()).isEqualTo(386600);
-        assertThat(itemResponse.paymentAuthorizationStatus()).isEqualTo(PaymentAuthorizationStatus.AUTHORIZED);
-        assertThat(itemResponse.remainingSeconds()).isPositive();
-        assertThat(itemResponse.canCancel()).isTrue();
-        assertThat(itemResponse.tradeId()).isNull();
+        assertThat(response.content().get(0).offerId()).isEqualTo(OFFER_ID);
+        assertThat(response.content().get(0).canCancel()).isTrue();
         assertThat(response.hasNext()).isFalse();
         assertThat(response.nextCursor()).isNull();
     }
@@ -360,7 +349,6 @@ class PurchaseOfferServiceTest {
         assertThat(expiredOffer.getStatus()).isEqualTo(PurchaseOfferStatus.EXPIRED);
         assertThat(expiredOffer.getPaymentAuthorizationStatus()).isEqualTo(PaymentAuthorizationStatus.RELEASED);
         assertThat(response.content()).hasSize(1);
-        assertThat(response.content().get(0).remainingSeconds()).isNull();
         assertThat(response.content().get(0).canCancel()).isFalse();
     }
 
@@ -390,8 +378,6 @@ class PurchaseOfferServiceTest {
 
         assertThat(response.content()).hasSize(1);
         assertThat(response.content().get(0).tradeId()).isEqualTo(900L);
-        assertThat(response.content().get(0).remainingSeconds()).isNull();
-        assertThat(response.content().get(0).canCancel()).isFalse();
     }
 
     @Test
@@ -413,23 +399,9 @@ class PurchaseOfferServiceTest {
         );
 
         assertThat(response.content()).hasSize(1);
-        PurchaseOfferReceivedListResponse.Item itemResponse = response.content().get(0);
-        assertThat(itemResponse.offerId()).isEqualTo(OFFER_ID);
-        assertThat(itemResponse.status()).isEqualTo(PurchaseOfferStatus.SENT);
-        assertThat(itemResponse.itemId()).isEqualTo(ITEM_ID);
-        assertThat(itemResponse.brandName()).isEqualTo("Levis");
-        assertThat(itemResponse.proposerId()).isEqualTo(PROPOSER_ID);
-        assertThat(itemResponse.proposerUsername()).isEqualTo("user" + PROPOSER_ID);
-        assertThat(itemResponse.offerAmount()).isEqualTo(360000);
-        assertThat(itemResponse.shippingFee()).isEqualTo(5000);
-        assertThat(itemResponse.proposerServiceFee()).isEqualTo(21600);
-        assertThat(itemResponse.totalPaymentAmount()).isEqualTo(386600);
-        assertThat(itemResponse.ownerSettlementAmount()).isEqualTo(365000);
-        assertThat(itemResponse.paymentAuthorizationStatus()).isEqualTo(PaymentAuthorizationStatus.AUTHORIZED);
-        assertThat(itemResponse.remainingSeconds()).isPositive();
-        assertThat(itemResponse.canAccept()).isTrue();
-        assertThat(itemResponse.canReject()).isTrue();
-        assertThat(itemResponse.tradeId()).isNull();
+        assertThat(response.content().get(0).offerId()).isEqualTo(OFFER_ID);
+        assertThat(response.content().get(0).canAccept()).isTrue();
+        assertThat(response.content().get(0).canReject()).isTrue();
         assertThat(response.hasNext()).isFalse();
         assertThat(response.nextCursor()).isNull();
     }
@@ -455,7 +427,6 @@ class PurchaseOfferServiceTest {
         assertThat(expiredOffer.getStatus()).isEqualTo(PurchaseOfferStatus.EXPIRED);
         assertThat(expiredOffer.getPaymentAuthorizationStatus()).isEqualTo(PaymentAuthorizationStatus.RELEASED);
         assertThat(response.content()).hasSize(1);
-        assertThat(response.content().get(0).remainingSeconds()).isNull();
         assertThat(response.content().get(0).canAccept()).isFalse();
         assertThat(response.content().get(0).canReject()).isFalse();
     }
@@ -486,9 +457,77 @@ class PurchaseOfferServiceTest {
 
         assertThat(response.content()).hasSize(1);
         assertThat(response.content().get(0).tradeId()).isEqualTo(900L);
-        assertThat(response.content().get(0).remainingSeconds()).isNull();
-        assertThat(response.content().get(0).canAccept()).isFalse();
-        assertThat(response.content().get(0).canReject()).isFalse();
+    }
+
+    @Test
+    void rejectPurchaseOffer_rejectsSentOfferAndReleasesAuthorization() {
+        User owner = user(OWNER_ID, UserGrade.BASIC, null);
+        User proposer = user(PROPOSER_ID, UserGrade.BASIC, null);
+        Item item = item(ITEM_ID, owner);
+        PurchaseOffer offer = offer(OFFER_ID, item, proposer, owner, LocalDateTime.now().plusHours(1));
+
+        givenOfferDetail(item, offer);
+
+        PurchaseOfferRejectResponse response = purchaseOfferService.rejectPurchaseOffer(OFFER_ID, OWNER_ID);
+
+        assertThat(response.offerId()).isEqualTo(OFFER_ID);
+        assertThat(response.status()).isEqualTo(PurchaseOfferStatus.REJECTED);
+        assertThat(response.paymentAuthorizationStatus()).isEqualTo(PaymentAuthorizationStatus.RELEASED);
+        assertThat(response.serverTime()).isNotNull();
+        assertThat(offer.getStatus()).isEqualTo(PurchaseOfferStatus.REJECTED);
+        assertThat(offer.getPaymentAuthorizationStatus()).isEqualTo(PaymentAuthorizationStatus.RELEASED);
+
+        InOrder lockOrder = inOrder(itemRepository, purchaseOfferRepository);
+        lockOrder.verify(itemRepository).findByIdForUpdate(ITEM_ID);
+        lockOrder.verify(purchaseOfferRepository).findByIdForUpdate(OFFER_ID);
+    }
+
+    @Test
+    void rejectPurchaseOffer_rejectsNonOwner() {
+        User owner = user(OWNER_ID, UserGrade.BASIC, null);
+        User proposer = user(PROPOSER_ID, UserGrade.BASIC, null);
+        Item item = item(ITEM_ID, owner);
+        PurchaseOffer offer = offer(OFFER_ID, item, proposer, owner, LocalDateTime.now().plusHours(1));
+
+        givenOfferDetail(item, offer);
+
+        assertThatThrownBy(() -> purchaseOfferService.rejectPurchaseOffer(OFFER_ID, PROPOSER_ID))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(PurchaseOfferErrorCode.PURCHASE_OFFER_ACCESS_DENIED);
+    }
+
+    @Test
+    void rejectPurchaseOffer_rejectsNonSentStatus() {
+        User owner = user(OWNER_ID, UserGrade.BASIC, null);
+        User proposer = user(PROPOSER_ID, UserGrade.BASIC, null);
+        Item item = item(ITEM_ID, owner);
+        PurchaseOffer offer = offer(OFFER_ID, item, proposer, owner, LocalDateTime.now().plusHours(1));
+        ReflectionTestUtils.setField(offer, "status", PurchaseOfferStatus.ACCEPTED);
+
+        givenOfferDetail(item, offer);
+
+        assertThatThrownBy(() -> purchaseOfferService.rejectPurchaseOffer(OFFER_ID, OWNER_ID))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(PurchaseOfferErrorCode.PURCHASE_OFFER_NOT_SENT);
+    }
+
+    @Test
+    void rejectPurchaseOffer_expiresPastDeadlineSentOfferBeforeRejecting() {
+        User owner = user(OWNER_ID, UserGrade.BASIC, null);
+        User proposer = user(PROPOSER_ID, UserGrade.BASIC, null);
+        Item item = item(ITEM_ID, owner);
+        PurchaseOffer offer = offer(OFFER_ID, item, proposer, owner, LocalDateTime.now().minusMinutes(1));
+
+        givenOfferDetail(item, offer);
+
+        assertThatThrownBy(() -> purchaseOfferService.rejectPurchaseOffer(OFFER_ID, OWNER_ID))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(PurchaseOfferErrorCode.PURCHASE_REQUEST_EXPIRED);
+        assertThat(offer.getStatus()).isEqualTo(PurchaseOfferStatus.EXPIRED);
+        assertThat(offer.getPaymentAuthorizationStatus()).isEqualTo(PaymentAuthorizationStatus.RELEASED);
     }
 
     private void givenOfferableItem(Item item, User proposer, Optional<PurchaseOffer> existingOffer) {

@@ -10,6 +10,7 @@ import com.tenure.domain.purchase.dto.PurchaseOfferCreateResponse;
 import com.tenure.domain.purchase.dto.PurchaseOfferDetailResponse;
 import com.tenure.domain.purchase.dto.PurchaseOfferDetailResponse.ViewerRole;
 import com.tenure.domain.purchase.dto.PurchaseOfferReceivedListResponse;
+import com.tenure.domain.purchase.dto.PurchaseOfferRejectResponse;
 import com.tenure.domain.purchase.dto.PurchaseOfferSentListResponse;
 import com.tenure.domain.purchase.entity.PurchaseOffer;
 import com.tenure.domain.purchase.enums.PurchaseOfferStatus;
@@ -168,6 +169,29 @@ public class PurchaseOfferService {
         return PurchaseOfferReceivedListResponse.of(pageItems, tradeIdByOfferId, now, hasNext);
     }
 
+    @Transactional(noRollbackFor = CustomException.class)
+    public PurchaseOfferRejectResponse rejectPurchaseOffer(Long offerId, Long currentUserId) {
+        Long itemId = purchaseOfferRepository.findItemIdById(offerId)
+                .orElseThrow(() -> new CustomException(PurchaseOfferErrorCode.PURCHASE_OFFER_NOT_FOUND));
+        itemRepository.findByIdForUpdate(itemId)
+                .orElseThrow(() -> new CustomException(PurchaseOfferErrorCode.ITEM_NOT_FOUND));
+        PurchaseOffer offer = purchaseOfferRepository.findByIdForUpdate(offerId)
+                .orElseThrow(() -> new CustomException(PurchaseOfferErrorCode.PURCHASE_OFFER_NOT_FOUND));
+
+        validateOwner(offer, currentUserId);
+
+        LocalDateTime now = LocalDateTime.now();
+        if (purchaseOfferExpirationService.expireIfSentAndExpired(offer, now)) {
+            throw new CustomException(PurchaseOfferErrorCode.PURCHASE_REQUEST_EXPIRED);
+        }
+        if (!offer.isSent()) {
+            throw new CustomException(PurchaseOfferErrorCode.PURCHASE_OFFER_NOT_SENT);
+        }
+
+        offer.rejectAndReleaseAuthorization();
+        return PurchaseOfferRejectResponse.from(offer, now);
+    }
+
     private void validateAgreement(Boolean agreement) {
         if (!Boolean.TRUE.equals(agreement)) {
             throw new CustomException(PurchaseOfferErrorCode.AGREEMENT_REQUIRED);
@@ -235,6 +259,12 @@ public class PurchaseOfferService {
             return ViewerRole.OWNER;
         }
         throw new CustomException(PurchaseOfferErrorCode.PURCHASE_OFFER_ACCESS_DENIED);
+    }
+
+    private void validateOwner(PurchaseOffer offer, Long currentUserId) {
+        if (!offer.getOwner().getId().equals(currentUserId)) {
+            throw new CustomException(PurchaseOfferErrorCode.PURCHASE_OFFER_ACCESS_DENIED);
+        }
     }
 
     private void validateCursor(OffsetDateTime cursorCreatedAt, Long cursorOfferId) {

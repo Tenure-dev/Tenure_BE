@@ -163,4 +163,9 @@ public class PurchaseOffer extends BaseTimeEntity {
         this.status = PurchaseOfferStatus.EXPIRED;
         this.paymentAuthorizationStatus = PaymentAuthorizationStatus.RELEASED;
     }
+
+    public void rejectAndReleaseAuthorization() {
+        this.status = PurchaseOfferStatus.REJECTED;
+        this.paymentAuthorizationStatus = PaymentAuthorizationStatus.RELEASED;
+    }
 }
