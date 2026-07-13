@@ -69,4 +69,10 @@ public class Notification {
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
     }
+
+    public void markRead() {
+        if(this.readAt == null) {
+            this.readAt = LocalDateTime.now();
+        }
+    }
 }
