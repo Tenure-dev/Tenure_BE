@@ -21,6 +21,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -89,6 +90,9 @@ public class Trade extends BaseTimeEntity {
 
     @Column(name = "tracking_number", length = 100)
     private String trackingNumber;
+
+    @Column(name = "delivered_at")
+    private LocalDateTime deliveredAt;
 
     @Column(name = "payment_method_id", nullable = false, length = 100)
     private String paymentMethodId;
