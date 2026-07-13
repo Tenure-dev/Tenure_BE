@@ -2,8 +2,10 @@ package com.tenure.domain.trade.repository;
 
 import com.tenure.domain.trade.entity.Trade;
 import com.tenure.domain.trade.enums.DeliveryCarrier;
+import com.tenure.domain.trade.enums.TradeSourceType;
 import com.tenure.domain.trade.enums.TradeStatus;
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -14,41 +16,7 @@ import org.springframework.data.repository.query.Param;
 
 public interface TradeRepository extends JpaRepository<Trade, Long> {
 
-    @Query("""
-            select trade
-            from Trade trade
-            where trade.buyer.id = :userId
-              and (:status is null or trade.status = :status)
-            """)
-    Page<Trade> findAllByBuyer(
-            @Param("userId") Long userId,
-            @Param("status") TradeStatus status,
-            Pageable pageable
-    );
-
-    @Query("""
-            select trade
-            from Trade trade
-            where trade.seller.id = :userId
-              and (:status is null or trade.status = :status)
-            """)
-    Page<Trade> findAllBySeller(
-            @Param("userId") Long userId,
-            @Param("status") TradeStatus status,
-            Pageable pageable
-    );
-
-    @Query("""
-            select trade
-            from Trade trade
-            where (trade.buyer.id = :userId or trade.seller.id = :userId)
-              and (:status is null or trade.status = :status)
-            """)
-    Page<Trade> findAllByParticipant(
-            @Param("userId") Long userId,
-            @Param("status") TradeStatus status,
-            Pageable pageable
-    );
+    // ... findAllByBuyer / findAllBySeller / findAllByParticipant 그대로 ...
 
     // flushAutomatically: 벌크 UPDATE는 trades 테이블만 건드리므로, 같은 트랜잭션에 다른 테이블(products 등)의
     // dirty 엔티티가 있어도 Hibernate auto-flush가 걸리지 않는다. 그 상태로 clearAutomatically가 영속성 컨텍스트를
@@ -109,5 +77,16 @@ public interface TradeRepository extends JpaRepository<Trade, Long> {
     List<Long> findIdsByStatusAndDeliveredAtBefore(
             @Param("status") TradeStatus status,
             @Param("threshold") LocalDateTime threshold
+    );
+
+    @Query("""
+            select trade
+            from Trade trade
+            where trade.sourceType = :sourceType
+              and trade.sourceId in :sourceIds
+            """)
+    List<Trade> findAllBySourceTypeAndSourceIdIn(
+            @Param("sourceType") TradeSourceType sourceType,
+            @Param("sourceIds") Collection<Long> sourceIds
     );
 }

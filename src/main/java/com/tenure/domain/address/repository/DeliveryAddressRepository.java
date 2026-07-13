@@ -6,5 +6,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface DeliveryAddressRepository extends JpaRepository<DeliveryAddress, Long> {
 
-    Optional<DeliveryAddress> findByIdAndUserId(Long id, Long userId);
+    Optional<DeliveryAddress> findByIdAndUser_Id(Long id, Long userId);
 }

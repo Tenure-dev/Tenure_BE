@@ -12,10 +12,14 @@ public enum PurchaseIntentErrorCode implements ErrorCode {
     ITEM_NOT_FOUND("ITEM_404", "아이템 정보를 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
     BUYER_NOT_FOUND("USER_404", "사용자 정보를 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
     DELIVERY_ADDRESS_NOT_FOUND("DELIVERY_ADDRESS_NOT_FOUND", "배송지를 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
+    PURCHASE_INTENT_NOT_FOUND("PURCHASE_INTENT_404", "거래 의사 정보를 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
+    PURCHASE_INTENT_ACCESS_DENIED("PURCHASE_INTENT_403", "거래 의사를 조회할 권한이 없습니다.", HttpStatus.FORBIDDEN),
     AGREEMENT_REQUIRED("AGREEMENT_REQUIRED", "거래 조건에 동의해주세요.", HttpStatus.BAD_REQUEST),
     SELF_PURCHASE_NOT_ALLOWED("PURCHASE_001", "본인 상품에는 거래 의사를 보낼 수 없습니다.", HttpStatus.BAD_REQUEST),
     PRODUCT_NOT_ON_SALE("PRODUCT_409", "거래 의사를 보낼 수 없는 상품입니다.", HttpStatus.CONFLICT),
     ACTIVE_INTENT_EXISTS("ACTIVE_INTENT_EXISTS", "이미 응답 대기 중인 거래 의사가 있습니다.", HttpStatus.CONFLICT),
+    PURCHASE_REQUEST_EXPIRED("PURCHASE_REQUEST_EXPIRED", "응답 시간이 지나 자동 취소된 요청입니다.", HttpStatus.CONFLICT),
+    PURCHASE_INTENT_NOT_SENT("PURCHASE_INTENT_NOT_SENT", "응답 대기 중인 거래 의사만 거절할 수 있습니다.", HttpStatus.CONFLICT),
     PRIVATE_PRODUCT_ACCESS_DENIED("PRIVATE_403", "비공개 계정입니다. 팔로우 요청 후 확인할 수 있어요.", HttpStatus.FORBIDDEN);
 
     private final String code;
