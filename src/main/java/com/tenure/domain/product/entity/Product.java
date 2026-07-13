@@ -102,6 +102,38 @@ public class Product extends BaseTimeEntity {
         return product;
     }
 
+    public void update(
+            Integer price,
+            Integer shippingFee,
+            FeePolicy feePolicy,
+            String mainImageUrl,
+            String measurements,
+            String conditionFlags,
+            String sellerDescription
+    ) {
+        if (price != null) {
+            this.price = price;
+        }
+        if (shippingFee != null) {
+            this.shippingFee = shippingFee;
+        }
+        if (feePolicy != null) {
+            this.feePolicy = feePolicy;
+        }
+        if (mainImageUrl != null) {
+            this.mainImageUrl = mainImageUrl;
+        }
+        if (measurements != null) {
+            this.measurements = measurements;
+        }
+        if (conditionFlags != null) {
+            this.conditionFlags = conditionFlags;
+        }
+        if (sellerDescription != null) {
+            this.sellerDescription = sellerDescription;
+        }
+    }
+
     public void markSold() {
         if (productStatus != ProductStatus.TRADING) {
             throw new CustomException(ProductErrorCode.PRODUCT_NOT_TRADING);

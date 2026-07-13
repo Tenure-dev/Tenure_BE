@@ -3,6 +3,8 @@ package com.tenure.domain.product.controller;
 import com.tenure.domain.product.dto.ProductCreateRequest;
 import com.tenure.domain.product.dto.ProductCreateResponse;
 import com.tenure.domain.product.dto.ProductDetailResponse;
+import com.tenure.domain.product.dto.ProductUpdateRequest;
+import com.tenure.domain.product.dto.ProductUpdateResponse;
 import com.tenure.domain.product.service.ProductService;
 import com.tenure.global.response.BaseResponse;
 import com.tenure.global.security.CurrentUserProvider;
@@ -17,6 +19,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -183,5 +186,58 @@ public class ProductController {
         Long currentUserId = currentUserProvider.getCurrentUserId();
         ProductDetailResponse response = productService.getProductDetail(productId, currentUserId);
         return BaseResponse.success(response, "조회에 성공했습니다.");
+    }
+
+    @Operation(
+            summary = "Update product",
+            description = "The seller updates an ON_SALE product. attachedOotdIds must belong to the product item and the current seller.",
+            parameters = {
+                    @Parameter(
+                            name = "X-USER-ID",
+                            in = ParameterIn.HEADER,
+                            required = true,
+                            description = "Temporary current user id for Swagger/local testing before JWT is fully connected.",
+                            example = "1"
+                    )
+            },
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    required = true,
+                    content = @Content(
+                            schema = @Schema(implementation = ProductUpdateRequest.class),
+                            examples = @ExampleObject(
+                                    name = "Product update request",
+                                    value = """
+                                            {
+                                              "price": 52000,
+                                              "shippingFee": 0,
+                                              "feePolicy": "SELLER_PAYS",
+                                              "mainImageUrl": "https://image.url/product.jpg",
+                                              "measurements": {
+                                                "shoulder": 45,
+                                                "chest": 55,
+                                                "totalLength": 70
+                                              },
+                                              "conditionFlags": ["STAIN"],
+                                              "sellerDescription": "상태 설명 수정",
+                                              "attachedOotdIds": [1, 2]
+                                            }
+                                            """
+                            )
+                    )
+            )
+    )
+    @ApiResponse(
+            responseCode = "200",
+            description = "Product updated successfully.",
+            content = @Content(schema = @Schema(implementation = ProductUpdateResponse.class))
+    )
+    @PatchMapping("/products/{productId}")
+    public BaseResponse<ProductUpdateResponse> updateProduct(
+            @PathVariable Long productId,
+            @Valid @RequestBody ProductUpdateRequest request
+    ) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        ProductUpdateResponse response = productService.updateProduct(productId, currentUserId, request);
+        return BaseResponse.success(response, "판매 상품을 수정했습니다.");
     }
 }
