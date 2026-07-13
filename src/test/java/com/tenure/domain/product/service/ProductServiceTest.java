@@ -22,6 +22,8 @@ import com.tenure.domain.ootd.repository.OotdRepository;
 import com.tenure.domain.product.dto.ProductCreateRequest;
 import com.tenure.domain.product.dto.ProductCreateResponse;
 import com.tenure.domain.product.dto.ProductDetailResponse;
+import com.tenure.domain.product.dto.ProductUpdateRequest;
+import com.tenure.domain.product.dto.ProductUpdateResponse;
 import com.tenure.domain.product.entity.Product;
 import com.tenure.domain.product.entity.ProductAttachedOotd;
 import com.tenure.domain.product.enums.ProductAction;
@@ -259,6 +261,101 @@ class ProductServiceTest {
                 .isEqualTo(ProductErrorCode.PRIVATE_PRODUCT_ACCESS_DENIED);
     }
 
+    @Test
+    void updateProduct_updatesOnSaleProductAndReplacesAttachedOotds() {
+        User seller = user(CURRENT_USER_ID, UserGrade.BASIC);
+        Item item = item(ITEM_ID, seller, ItemStatus.ON_SALE);
+        Product product = product(200L, item, seller, ProductStatus.ON_SALE);
+        ProductUpdateRequest request = updateRequest(FeePolicy.SELLER_PAYS, 0, List.of(100L, 101L));
+
+        when(productRepository.findByIdForUpdate(200L)).thenReturn(Optional.of(product));
+        when(ootdTagRepository.countValidProductAttachedOotds(
+                eq(ITEM_ID),
+                eq(CURRENT_USER_ID),
+                anyCollection(),
+                eq(OotdPublicationStatus.ACTIVE),
+                eq(TagStatus.CONFIRMED)
+        )).thenReturn(2L);
+        when(ootdRepository.findAllById(request.attachedOotdIds()))
+                .thenReturn(List.of(ootd(100L), ootd(101L)));
+
+        ProductUpdateResponse response = productService.updateProduct(200L, CURRENT_USER_ID, request);
+
+        assertThat(response.productId()).isEqualTo(200L);
+        assertThat(response.status()).isEqualTo(ProductStatus.ON_SALE);
+        assertThat(response.price()).isEqualTo(52000);
+        assertThat(response.shippingFee()).isZero();
+        assertThat(response.feePolicy()).isEqualTo(FeePolicy.SELLER_PAYS);
+        assertThat(response.conditionFlags()).containsExactly("STAIN");
+        assertThat(response.attachedOotdIds()).containsExactly(100L, 101L);
+        assertThat(product.getPrice()).isEqualTo(52000);
+        assertThat(product.getSellerDescription()).isEqualTo("updated description");
+
+        verify(productAttachedOotdRepository).deleteByProductId(200L);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<ProductAttachedOotd>> captor = ArgumentCaptor.forClass(List.class);
+        verify(productAttachedOotdRepository).saveAll(captor.capture());
+        assertThat(captor.getValue()).hasSize(2);
+    }
+
+    @Test
+    void updateProduct_rejectsNonSeller() {
+        User seller = user(2L, UserGrade.BASIC);
+        Item item = item(ITEM_ID, seller, ItemStatus.ON_SALE);
+        Product product = product(200L, item, seller, ProductStatus.ON_SALE);
+
+        when(productRepository.findByIdForUpdate(200L)).thenReturn(Optional.of(product));
+
+        assertThatThrownBy(() -> productService.updateProduct(
+                200L,
+                CURRENT_USER_ID,
+                updateRequest(FeePolicy.SELLER_PAYS, 0, List.of(100L))
+        ))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(ProductErrorCode.PRODUCT_OWNER_ONLY);
+    }
+
+    @Test
+    void updateProduct_rejectsNonOnSaleProduct() {
+        User seller = user(CURRENT_USER_ID, UserGrade.BASIC);
+        Item item = item(ITEM_ID, seller, ItemStatus.ON_SALE);
+        Product product = product(200L, item, seller, ProductStatus.SOLD);
+
+        when(productRepository.findByIdForUpdate(200L)).thenReturn(Optional.of(product));
+
+        assertThatThrownBy(() -> productService.updateProduct(
+                200L,
+                CURRENT_USER_ID,
+                updateRequest(FeePolicy.SELLER_PAYS, 0, List.of(100L))
+        ))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(ProductErrorCode.PRODUCT_ITEM_STATUS_INVALID);
+    }
+
+    @Test
+    void updateProduct_rejectsInvalidAttachedOotd() {
+        User seller = user(CURRENT_USER_ID, UserGrade.BASIC);
+        Item item = item(ITEM_ID, seller, ItemStatus.ON_SALE);
+        Product product = product(200L, item, seller, ProductStatus.ON_SALE);
+        ProductUpdateRequest request = updateRequest(FeePolicy.SELLER_PAYS, 0, List.of(100L, 101L));
+
+        when(productRepository.findByIdForUpdate(200L)).thenReturn(Optional.of(product));
+        when(ootdTagRepository.countValidProductAttachedOotds(
+                eq(ITEM_ID),
+                eq(CURRENT_USER_ID),
+                anyCollection(),
+                eq(OotdPublicationStatus.ACTIVE),
+                eq(TagStatus.CONFIRMED)
+        )).thenReturn(1L);
+
+        assertThatThrownBy(() -> productService.updateProduct(200L, CURRENT_USER_ID, request))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(ProductErrorCode.ATTACHED_OOTD_INVALID);
+    }
+
     private ProductCreateRequest request(FeePolicy feePolicy, int shippingFee, List<Long> attachedOotdIds) {
         return new ProductCreateRequest(
                 50000,
@@ -268,6 +365,19 @@ class ProductServiceTest {
                 Map.of("shoulder", 45, "chest", 55, "totalLength", 70),
                 List.of("NO_DEFECT"),
                 "3회 착용했습니다.",
+                attachedOotdIds
+        );
+    }
+
+    private ProductUpdateRequest updateRequest(FeePolicy feePolicy, int shippingFee, List<Long> attachedOotdIds) {
+        return new ProductUpdateRequest(
+                52000,
+                shippingFee,
+                feePolicy,
+                "https://image.url/product-updated.jpg",
+                Map.of("shoulder", 46, "chest", 56, "totalLength", 71),
+                List.of("STAIN"),
+                "updated description",
                 attachedOotdIds
         );
     }
