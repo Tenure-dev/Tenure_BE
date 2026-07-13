@@ -10,10 +10,13 @@ import com.tenure.domain.item.repository.ItemRepository;
 import com.tenure.domain.product.entity.Product;
 import com.tenure.domain.product.enums.ProductStatus;
 import com.tenure.domain.product.repository.ProductRepository;
+import com.tenure.domain.purchase.dto.PurchaseIntentCancelResponse;
 import com.tenure.domain.purchase.dto.PurchaseIntentCreateRequest;
 import com.tenure.domain.purchase.dto.PurchaseIntentCreateResponse;
 import com.tenure.domain.purchase.dto.PurchaseIntentDetailResponse;
 import com.tenure.domain.purchase.dto.PurchaseIntentDetailResponse.ViewerRole;
+import com.tenure.domain.purchase.dto.PurchaseIntentRejectResponse;
+import com.tenure.domain.purchase.dto.PurchaseIntentReceivedListResponse;
 import com.tenure.domain.purchase.dto.PurchaseIntentSentListResponse;
 import com.tenure.domain.purchase.entity.PurchaseIntent;
 import com.tenure.domain.purchase.enums.PurchaseIntentStatus;
@@ -77,7 +80,7 @@ public class PurchaseIntentService {
         expireSentIntentsIfNeeded(product.getId(), currentUserId);
 
         DeliveryAddress deliveryAddress = deliveryAddressRepository
-                .findByIdAndUserId(request.deliveryAddressId(), currentUserId)
+                .findByIdAndUser_Id(request.deliveryAddressId(), currentUserId)
                 .orElseThrow(() -> new CustomException(PurchaseIntentErrorCode.DELIVERY_ADDRESS_NOT_FOUND));
 
         FeeAmounts amounts = calculateFeeAmounts(product);
@@ -131,6 +134,33 @@ public class PurchaseIntentService {
     }
 
     @Transactional
+    public PurchaseIntentReceivedListResponse getReceivedPurchaseIntents(
+            Long currentUserId,
+            List<PurchaseIntentStatus> statuses,
+            OffsetDateTime cursorCreatedAt,
+            Long cursorIntentId,
+            Integer size
+    ) {
+        validateCursor(cursorCreatedAt, cursorIntentId);
+        int pageSize = normalizeSize(size);
+        LocalDateTime now = LocalDateTime.now();
+        expireSentIntentsForSeller(currentUserId, now);
+
+        List<PurchaseIntentStatus> normalizedStatuses = normalizeStatuses(statuses);
+        List<PurchaseIntent> fetched = purchaseIntentRepository.findReceivedListBySellerWithCursor(
+                currentUserId,
+                normalizedStatuses,
+                cursorCreatedAt == null ? null : cursorCreatedAt.toLocalDateTime(),
+                cursorIntentId,
+                PageRequest.of(0, pageSize + 1)
+        );
+        boolean hasNext = fetched.size() > pageSize;
+        List<PurchaseIntent> pageItems = hasNext ? fetched.subList(0, pageSize) : fetched;
+        Map<Long, Long> tradeIdByIntentId = findTradeIds(pageItems);
+        return PurchaseIntentReceivedListResponse.of(pageItems, tradeIdByIntentId, now, hasNext);
+    }
+
+    @Transactional
     public PurchaseIntentDetailResponse getPurchaseIntentDetail(Long intentId, Long currentUserId) {
         Long productId = purchaseIntentRepository.findProductIdById(intentId)
                 .orElseThrow(() -> new CustomException(PurchaseIntentErrorCode.PURCHASE_INTENT_NOT_FOUND));
@@ -145,6 +175,56 @@ public class PurchaseIntentService {
         LocalDateTime now = LocalDateTime.now();
         purchaseIntentExpirationService.expireIfSentAndExpired(intent, now);
         return PurchaseIntentDetailResponse.from(intent, viewerRole, now);
+    }
+
+    @Transactional(noRollbackFor = CustomException.class)
+    public PurchaseIntentRejectResponse rejectPurchaseIntent(Long intentId, Long currentUserId) {
+        Long productId = purchaseIntentRepository.findProductIdById(intentId)
+                .orElseThrow(() -> new CustomException(PurchaseIntentErrorCode.PURCHASE_INTENT_NOT_FOUND));
+        Product product = productRepository.findByIdForUpdate(productId)
+                .orElseThrow(() -> new CustomException(PurchaseIntentErrorCode.PRODUCT_NOT_FOUND));
+        itemRepository.findByIdForUpdate(product.getItem().getId())
+                .orElseThrow(() -> new CustomException(PurchaseIntentErrorCode.ITEM_NOT_FOUND));
+        PurchaseIntent intent = purchaseIntentRepository.findByIdForUpdate(intentId)
+                .orElseThrow(() -> new CustomException(PurchaseIntentErrorCode.PURCHASE_INTENT_NOT_FOUND));
+
+        validateSeller(intent, currentUserId);
+
+        LocalDateTime now = LocalDateTime.now();
+        if (purchaseIntentExpirationService.expireIfSentAndExpired(intent, now)) {
+            throw new CustomException(PurchaseIntentErrorCode.PURCHASE_REQUEST_EXPIRED);
+        }
+        if (!intent.isSent()) {
+            throw new CustomException(PurchaseIntentErrorCode.PURCHASE_INTENT_NOT_SENT);
+        }
+
+        intent.rejectAndReleaseAuthorization();
+        return PurchaseIntentRejectResponse.from(intent, now);
+    }
+
+    @Transactional(noRollbackFor = CustomException.class)
+    public PurchaseIntentCancelResponse cancelPurchaseIntent(Long intentId, Long currentUserId) {
+        Long productId = purchaseIntentRepository.findProductIdById(intentId)
+                .orElseThrow(() -> new CustomException(PurchaseIntentErrorCode.PURCHASE_INTENT_NOT_FOUND));
+        Product product = productRepository.findByIdForUpdate(productId)
+                .orElseThrow(() -> new CustomException(PurchaseIntentErrorCode.PRODUCT_NOT_FOUND));
+        itemRepository.findByIdForUpdate(product.getItem().getId())
+                .orElseThrow(() -> new CustomException(PurchaseIntentErrorCode.ITEM_NOT_FOUND));
+        PurchaseIntent intent = purchaseIntentRepository.findByIdForUpdate(intentId)
+                .orElseThrow(() -> new CustomException(PurchaseIntentErrorCode.PURCHASE_INTENT_NOT_FOUND));
+
+        validateBuyer(intent, currentUserId);
+
+        LocalDateTime now = LocalDateTime.now();
+        if (purchaseIntentExpirationService.expireIfSentAndExpired(intent, now)) {
+            throw new CustomException(PurchaseIntentErrorCode.PURCHASE_REQUEST_EXPIRED);
+        }
+        if (!intent.isSent()) {
+            throw new CustomException(PurchaseIntentErrorCode.PURCHASE_INTENT_NOT_SENT);
+        }
+
+        intent.cancelAndReleaseAuthorization();
+        return PurchaseIntentCancelResponse.from(intent, now);
     }
 
     private void validateAgreement(Boolean agreement) {
@@ -167,7 +247,7 @@ public class PurchaseIntentService {
             return;
         }
 
-        boolean acceptedFollower = followRelationshipRepository.existsByFollowerIdAndFollowingIdAndStatus(
+        boolean acceptedFollower = followRelationshipRepository.existsByFollower_IdAndFollowing_IdAndStatus(
                 currentUserId,
                 seller.getId(),
                 FollowStatus.ACCEPTED
@@ -263,6 +343,17 @@ public class PurchaseIntentService {
         }
     }
 
+    private void expireSentIntentsForSeller(Long currentUserId, LocalDateTime now) {
+        List<PurchaseIntent> expiredSentIntents = purchaseIntentRepository.findExpiredSentBySellerIdForUpdate(
+                currentUserId,
+                PurchaseIntentStatus.SENT,
+                now
+        );
+        for (PurchaseIntent intent : expiredSentIntents) {
+            purchaseIntentExpirationService.expireIfSentAndExpired(intent, now);
+        }
+    }
+
     private Map<Long, Long> findTradeIds(List<PurchaseIntent> intents) {
         List<Long> acceptedIntentIds = intents.stream()
                 .filter(intent -> intent.getStatus() == PurchaseIntentStatus.ACCEPTED)
@@ -291,6 +382,18 @@ public class PurchaseIntentService {
             return ViewerRole.SELLER;
         }
         throw new CustomException(PurchaseIntentErrorCode.PURCHASE_INTENT_ACCESS_DENIED);
+    }
+
+    private void validateSeller(PurchaseIntent intent, Long currentUserId) {
+        if (!intent.getSeller().getId().equals(currentUserId)) {
+            throw new CustomException(PurchaseIntentErrorCode.PURCHASE_INTENT_ACCESS_DENIED);
+        }
+    }
+
+    private void validateBuyer(PurchaseIntent intent, Long currentUserId) {
+        if (!intent.getBuyer().getId().equals(currentUserId)) {
+            throw new CustomException(PurchaseIntentErrorCode.PURCHASE_INTENT_ACCESS_DENIED);
+        }
     }
 
     private record FeeAmounts(

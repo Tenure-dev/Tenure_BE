@@ -2,7 +2,10 @@ package com.tenure.domain.purchase.controller;
 
 import com.tenure.domain.purchase.dto.PurchaseIntentCreateRequest;
 import com.tenure.domain.purchase.dto.PurchaseIntentCreateResponse;
+import com.tenure.domain.purchase.dto.PurchaseIntentCancelResponse;
 import com.tenure.domain.purchase.dto.PurchaseIntentDetailResponse;
+import com.tenure.domain.purchase.dto.PurchaseIntentRejectResponse;
+import com.tenure.domain.purchase.dto.PurchaseIntentReceivedListResponse;
 import com.tenure.domain.purchase.dto.PurchaseIntentSentListResponse;
 import com.tenure.domain.purchase.enums.PurchaseIntentStatus;
 import com.tenure.domain.purchase.service.PurchaseIntentService;
@@ -149,6 +152,64 @@ public class PurchaseIntentController {
     }
 
     @Operation(
+            summary = "내가 받은 거래 의사 목록 조회",
+            description = "로그인 판매자가 판매중 상품에 대해 받은 거래 의사 목록을 커서 기반으로 조회합니다. SENT 만료 요청은 조회 시 EXPIRED와 RELEASED로 보정합니다.",
+            parameters = {
+                    @Parameter(
+                            name = "X-USER-ID",
+                            in = ParameterIn.HEADER,
+                            required = true,
+                            description = "JWT 적용 전 Swagger 테스트용 현재 사용자 ID. JWT 적용 후에는 SecurityContext 값을 사용합니다.",
+                            example = "1"
+                    ),
+                    @Parameter(
+                            name = "statuses",
+                            description = "조회할 상태 목록. 예: statuses=SENT 또는 statuses=SENT,EXPIRED. 생략 시 전체 상태",
+                            example = "SENT"
+                    ),
+                    @Parameter(
+                            name = "cursorCreatedAt",
+                            description = "다음 페이지 조회용 생성 시각 커서",
+                            example = "2026-07-12T10:00:00+09:00"
+                    ),
+                    @Parameter(
+                            name = "cursorIntentId",
+                            description = "다음 페이지 조회용 거래 의사 ID 커서",
+                            example = "123"
+                    ),
+                    @Parameter(
+                            name = "size",
+                            description = "페이지 크기. 기본 20, 최대 50",
+                            example = "20"
+                    )
+            }
+    )
+    @ApiResponse(
+            responseCode = "200",
+            description = "받은 거래 의사 목록 조회 성공",
+            content = @Content(schema = @Schema(implementation = PurchaseIntentReceivedListResponse.class))
+    )
+    @GetMapping("/purchase-intents/received")
+    public BaseResponse<PurchaseIntentReceivedListResponse> getReceivedPurchaseIntents(
+            @RequestParam(required = false) List<PurchaseIntentStatus> statuses,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+            OffsetDateTime cursorCreatedAt,
+            @RequestParam(required = false) Long cursorIntentId,
+            @RequestParam(required = false) Integer size
+    ) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        PurchaseIntentReceivedListResponse response = purchaseIntentService.getReceivedPurchaseIntents(
+                currentUserId,
+                statuses,
+                cursorCreatedAt,
+                cursorIntentId,
+                size
+        );
+        return BaseResponse.success(response, "조회에 성공했습니다.");
+    }
+
+    @Operation(
             summary = "거래 의사 상세 조회",
             description = "구매자 본인 또는 판매자가 거래 의사 응답 대기 상세를 조회합니다. SENT 상태가 만료된 경우 조회 시점에 EXPIRED와 RELEASED로 갱신합니다.",
             parameters = {
@@ -176,5 +237,65 @@ public class PurchaseIntentController {
                 currentUserId
         );
         return BaseResponse.success(response, "조회에 성공했습니다.");
+    }
+
+    @Operation(
+            summary = "거래 의사 거절",
+            description = "판매자가 응답 대기 중인 거래 의사를 거절하고 결제 승인 상태를 RELEASED로 변경합니다.",
+            parameters = {
+                    @Parameter(
+                            name = "X-USER-ID",
+                            in = ParameterIn.HEADER,
+                            required = true,
+                            description = "JWT 적용 전 Swagger 테스트용 현재 사용자 ID. JWT 적용 후에는 SecurityContext 값을 사용합니다.",
+                            example = "1"
+                    )
+            }
+    )
+    @ApiResponse(
+            responseCode = "200",
+            description = "거래 의사 거절 성공",
+            content = @Content(schema = @Schema(implementation = PurchaseIntentRejectResponse.class))
+    )
+    @PostMapping("/purchase-intents/{intentId}/reject")
+    public BaseResponse<PurchaseIntentRejectResponse> rejectPurchaseIntent(
+            @PathVariable Long intentId
+    ) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        PurchaseIntentRejectResponse response = purchaseIntentService.rejectPurchaseIntent(
+                intentId,
+                currentUserId
+        );
+        return BaseResponse.success(response, "거래 의사를 거절했습니다.");
+    }
+
+    @Operation(
+            summary = "Cancel purchase intent",
+            description = "The buyer cancels a SENT purchase intent and releases the mock payment authorization.",
+            parameters = {
+                    @Parameter(
+                            name = "X-USER-ID",
+                            in = ParameterIn.HEADER,
+                            required = true,
+                            description = "Temporary current user id for Swagger/local testing before JWT is fully connected.",
+                            example = "2"
+                    )
+            }
+    )
+    @ApiResponse(
+            responseCode = "200",
+            description = "Purchase intent canceled successfully.",
+            content = @Content(schema = @Schema(implementation = PurchaseIntentCancelResponse.class))
+    )
+    @PostMapping("/purchase-intents/{intentId}/cancel")
+    public BaseResponse<PurchaseIntentCancelResponse> cancelPurchaseIntent(
+            @PathVariable Long intentId
+    ) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        PurchaseIntentCancelResponse response = purchaseIntentService.cancelPurchaseIntent(
+                intentId,
+                currentUserId
+        );
+        return BaseResponse.success(response, "거래 의사를 취소했습니다.");
     }
 }

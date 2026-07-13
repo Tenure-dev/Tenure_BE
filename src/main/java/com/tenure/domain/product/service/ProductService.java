@@ -15,6 +15,8 @@ import com.tenure.domain.ootd.repository.OotdRepository;
 import com.tenure.domain.product.dto.ProductCreateRequest;
 import com.tenure.domain.product.dto.ProductCreateResponse;
 import com.tenure.domain.product.dto.ProductDetailResponse;
+import com.tenure.domain.product.dto.ProductUpdateRequest;
+import com.tenure.domain.product.dto.ProductUpdateResponse;
 import com.tenure.domain.product.entity.Product;
 import com.tenure.domain.product.entity.ProductAttachedOotd;
 import com.tenure.domain.product.enums.ProductAction;
@@ -117,6 +119,45 @@ public class ProductService {
         );
     }
 
+    @Transactional
+    public ProductUpdateResponse updateProduct(Long productId, Long currentUserId, ProductUpdateRequest request) {
+        Product product = productRepository.findByIdForUpdate(productId)
+                .orElseThrow(() -> new CustomException(ProductErrorCode.PRODUCT_NOT_FOUND));
+        Item item = product.getItem();
+
+        validateProductSeller(product, currentUserId);
+        validateOnSaleProduct(product);
+        validateBasicUserPolicy(product.getSeller(), request);
+
+        List<Long> attachedOotdIds = null;
+        if (request.attachedOotdIds() != null) {
+            validateAttachedOotdIds(item, currentUserId, request.attachedOotdIds());
+            replaceAttachedOotds(product, request.attachedOotdIds());
+            attachedOotdIds = request.attachedOotdIds();
+        }
+
+        product.update(
+                request.price(),
+                request.shippingFee(),
+                request.feePolicy(),
+                request.mainImageUrl(),
+                writeJsonOrNull(request.measurements()),
+                writeJsonOrNull(request.conditionFlags()),
+                request.sellerDescription()
+        );
+
+        if (attachedOotdIds == null) {
+            attachedOotdIds = findAttachedOotdIds(product.getId());
+        }
+
+        return ProductUpdateResponse.of(
+                product,
+                readMapOrEmpty(product.getMeasurements()),
+                readListOrEmpty(product.getConditionFlags()),
+                attachedOotdIds
+        );
+    }
+
     private void validateOwner(Item item, Long currentUserId) {
         if (!item.getOwner().getId().equals(currentUserId)) {
             throw new CustomException(ProductErrorCode.PRODUCT_OWNER_ONLY);
@@ -141,6 +182,18 @@ public class ProductService {
         }
     }
 
+    private void validateBasicUserPolicy(User seller, ProductUpdateRequest request) {
+        if (seller.getGrade() != UserGrade.BASIC) {
+            return;
+        }
+        if (request.feePolicy() != null && request.feePolicy() != FeePolicy.SELLER_PAYS) {
+            throw new CustomException(ProductErrorCode.BASIC_USER_FEE_POLICY_INVALID);
+        }
+        if (request.shippingFee() != null && request.shippingFee() != 0) {
+            throw new CustomException(ProductErrorCode.BASIC_USER_SHIPPING_FEE_INVALID);
+        }
+    }
+
     private BigDecimal resolveProductFeeRate(User seller) {
         if (seller.getGrade() == UserGrade.RECORD) {
             return new BigDecimal("0.0300");
@@ -149,6 +202,9 @@ public class ProductService {
     }
 
     private void validateAttachedOotdIds(Item item, Long currentUserId, List<Long> attachedOotdIds) {
+        if (attachedOotdIds == null || attachedOotdIds.isEmpty()) {
+            throw new CustomException(ProductErrorCode.ATTACHED_OOTD_INVALID);
+        }
         if (new LinkedHashSet<>(attachedOotdIds).size() != attachedOotdIds.size()) {
             throw new CustomException(ProductErrorCode.ATTACHED_OOTD_DUPLICATED);
         }
@@ -163,6 +219,37 @@ public class ProductService {
         if (validCount != attachedOotdIds.size()) {
             throw new CustomException(ProductErrorCode.ATTACHED_OOTD_INVALID);
         }
+    }
+
+    private void validateProductSeller(Product product, Long currentUserId) {
+        if (!product.getSeller().getId().equals(currentUserId)) {
+            throw new CustomException(ProductErrorCode.PRODUCT_OWNER_ONLY);
+        }
+    }
+
+    private void validateOnSaleProduct(Product product) {
+        if (product.getProductStatus() != ProductStatus.ON_SALE) {
+            throw new CustomException(ProductErrorCode.PRODUCT_ITEM_STATUS_INVALID);
+        }
+    }
+
+    private void replaceAttachedOotds(Product product, List<Long> attachedOotdIds) {
+        productAttachedOotdRepository.deleteByProductId(product.getId());
+
+        List<Ootd> ootds = ootdRepository.findAllById(attachedOotdIds);
+        Map<Long, Ootd> ootdById = ootds.stream()
+                .collect(Collectors.toMap(Ootd::getId, Function.identity()));
+        List<ProductAttachedOotd> attachedOotds = attachedOotdIds.stream()
+                .map(ootdById::get)
+                .map(ootd -> ProductAttachedOotd.create(product, ootd))
+                .toList();
+        productAttachedOotdRepository.saveAll(attachedOotds);
+    }
+
+    private List<Long> findAttachedOotdIds(Long productId) {
+        return productAttachedOotdRepository.findByProductIdOrderByOotdCreatedAtDesc(productId).stream()
+                .map(attached -> attached.getOotd().getId())
+                .toList();
     }
 
     private String writeJsonOrNull(Object value) {
@@ -188,7 +275,7 @@ public class ProductService {
             return;
         }
 
-        boolean acceptedFollower = followRelationshipRepository.existsByFollowerIdAndFollowingIdAndStatus(
+        boolean acceptedFollower = followRelationshipRepository.existsByFollower_IdAndFollowing_IdAndStatus(
                 currentUserId,
                 seller.getId(),
                 FollowStatus.ACCEPTED

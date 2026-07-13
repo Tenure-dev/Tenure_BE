@@ -5,7 +5,9 @@ import com.tenure.domain.product.enums.ProductStatus;
 import com.tenure.domain.common.entity.BaseTimeEntity;
 import com.tenure.domain.common.enums.FeePolicy;
 import com.tenure.domain.item.entity.Item;
+import com.tenure.domain.product.exception.ProductErrorCode;
 import com.tenure.domain.user.entity.User;
+import com.tenure.global.exception.CustomException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -98,5 +100,44 @@ public class Product extends BaseTimeEntity {
         product.sellerDescription = sellerDescription;
         product.productStatus = ProductStatus.ON_SALE;
         return product;
+    }
+
+    public void update(
+            Integer price,
+            Integer shippingFee,
+            FeePolicy feePolicy,
+            String mainImageUrl,
+            String measurements,
+            String conditionFlags,
+            String sellerDescription
+    ) {
+        if (price != null) {
+            this.price = price;
+        }
+        if (shippingFee != null) {
+            this.shippingFee = shippingFee;
+        }
+        if (feePolicy != null) {
+            this.feePolicy = feePolicy;
+        }
+        if (mainImageUrl != null) {
+            this.mainImageUrl = mainImageUrl;
+        }
+        if (measurements != null) {
+            this.measurements = measurements;
+        }
+        if (conditionFlags != null) {
+            this.conditionFlags = conditionFlags;
+        }
+        if (sellerDescription != null) {
+            this.sellerDescription = sellerDescription;
+        }
+    }
+
+    public void markSold() {
+        if (productStatus != ProductStatus.TRADING) {
+            throw new CustomException(ProductErrorCode.PRODUCT_NOT_TRADING);
+        }
+        this.productStatus = ProductStatus.SOLD;
     }
 }

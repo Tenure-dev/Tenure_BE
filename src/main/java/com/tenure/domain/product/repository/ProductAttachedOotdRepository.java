@@ -14,6 +14,17 @@ public interface ProductAttachedOotdRepository extends JpaRepository<ProductAtta
             from ProductAttachedOotd attached
             join fetch attached.ootd ootd
             where attached.product.id = :productId
+            order by ootd.createdAt desc
+            """)
+    List<ProductAttachedOotd> findByProductIdOrderByOotdCreatedAtDesc(@Param("productId") Long productId);
+
+    void deleteByProductId(Long productId);
+
+    @Query("""
+            select attached
+            from ProductAttachedOotd attached
+            join fetch attached.ootd ootd
+            where attached.product.id = :productId
               and ootd.publicationStatus = :publicationStatus
             order by ootd.createdAt desc
             """)
