@@ -247,7 +247,7 @@ class ProductServiceTest {
         Product product = product(200L, item, seller, ProductStatus.ON_SALE);
 
         when(productRepository.findDetailById(200L)).thenReturn(Optional.of(product));
-        when(followRelationshipRepository.existsByFollowerIdAndFollowingIdAndStatus(
+        when(followRelationshipRepository.existsByFollower_IdAndFollowing_IdAndStatus(
                 999L,
                 CURRENT_USER_ID,
                 FollowStatus.ACCEPTED

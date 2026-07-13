@@ -3,6 +3,7 @@ package com.tenure.domain.purchase.controller;
 import com.tenure.domain.purchase.dto.PurchaseIntentCreateRequest;
 import com.tenure.domain.purchase.dto.PurchaseIntentCreateResponse;
 import com.tenure.domain.purchase.dto.PurchaseIntentDetailResponse;
+import com.tenure.domain.purchase.dto.PurchaseIntentRejectResponse;
 import com.tenure.domain.purchase.dto.PurchaseIntentReceivedListResponse;
 import com.tenure.domain.purchase.dto.PurchaseIntentSentListResponse;
 import com.tenure.domain.purchase.enums.PurchaseIntentStatus;
@@ -235,5 +236,35 @@ public class PurchaseIntentController {
                 currentUserId
         );
         return BaseResponse.success(response, "조회에 성공했습니다.");
+    }
+
+    @Operation(
+            summary = "거래 의사 거절",
+            description = "판매자가 응답 대기 중인 거래 의사를 거절하고 결제 승인 상태를 RELEASED로 변경합니다.",
+            parameters = {
+                    @Parameter(
+                            name = "X-USER-ID",
+                            in = ParameterIn.HEADER,
+                            required = true,
+                            description = "JWT 적용 전 Swagger 테스트용 현재 사용자 ID. JWT 적용 후에는 SecurityContext 값을 사용합니다.",
+                            example = "1"
+                    )
+            }
+    )
+    @ApiResponse(
+            responseCode = "200",
+            description = "거래 의사 거절 성공",
+            content = @Content(schema = @Schema(implementation = PurchaseIntentRejectResponse.class))
+    )
+    @PostMapping("/purchase-intents/{intentId}/reject")
+    public BaseResponse<PurchaseIntentRejectResponse> rejectPurchaseIntent(
+            @PathVariable Long intentId
+    ) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        PurchaseIntentRejectResponse response = purchaseIntentService.rejectPurchaseIntent(
+                intentId,
+                currentUserId
+        );
+        return BaseResponse.success(response, "거래 의사를 거절했습니다.");
     }
 }

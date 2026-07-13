@@ -188,7 +188,7 @@ public class ProductService {
             return;
         }
 
-        boolean acceptedFollower = followRelationshipRepository.existsByFollowerIdAndFollowingIdAndStatus(
+        boolean acceptedFollower = followRelationshipRepository.existsByFollower_IdAndFollowing_IdAndStatus(
                 currentUserId,
                 seller.getId(),
                 FollowStatus.ACCEPTED

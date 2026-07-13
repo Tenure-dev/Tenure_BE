@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -23,6 +24,7 @@ import com.tenure.domain.purchase.dto.PurchaseIntentCreateResponse;
 import com.tenure.domain.purchase.dto.PurchaseIntentDetailResponse;
 import com.tenure.domain.purchase.dto.PurchaseIntentDetailResponse.DeliveryDisclosureStatus;
 import com.tenure.domain.purchase.dto.PurchaseIntentDetailResponse.ViewerRole;
+import com.tenure.domain.purchase.dto.PurchaseIntentRejectResponse;
 import com.tenure.domain.purchase.dto.PurchaseIntentReceivedListResponse;
 import com.tenure.domain.purchase.dto.PurchaseIntentSentListResponse;
 import com.tenure.domain.purchase.entity.PurchaseIntent;
@@ -46,6 +48,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Pageable;
@@ -108,7 +111,7 @@ class PurchaseIntentServiceTest {
         DeliveryAddress address = address(ADDRESS_ID, buyer);
 
         givenPurchasableProduct(product, item, buyer, List.of());
-        when(deliveryAddressRepository.findByIdAndUserId(ADDRESS_ID, BUYER_ID)).thenReturn(Optional.of(address));
+        when(deliveryAddressRepository.findByIdAndUser_Id(ADDRESS_ID, BUYER_ID)).thenReturn(Optional.of(address));
         when(purchaseIntentRepository.save(any(PurchaseIntent.class))).thenAnswer(invocation -> {
             PurchaseIntent intent = invocation.getArgument(0);
             ReflectionTestUtils.setField(intent, "id", 123L);
@@ -182,7 +185,7 @@ class PurchaseIntentServiceTest {
         PurchaseIntent expiredIntent = existingIntent(777L, product, buyer, seller, LocalDateTime.now().minusMinutes(1));
 
         givenPurchasableProduct(product, item, buyer, List.of(expiredIntent));
-        when(deliveryAddressRepository.findByIdAndUserId(ADDRESS_ID, BUYER_ID)).thenReturn(Optional.of(address));
+        when(deliveryAddressRepository.findByIdAndUser_Id(ADDRESS_ID, BUYER_ID)).thenReturn(Optional.of(address));
         when(purchaseIntentRepository.save(any(PurchaseIntent.class))).thenAnswer(invocation -> {
             PurchaseIntent intent = invocation.getArgument(0);
             ReflectionTestUtils.setField(intent, "id", 124L);
@@ -214,7 +217,7 @@ class PurchaseIntentServiceTest {
         DeliveryAddress address = address(ADDRESS_ID, buyer);
 
         givenPurchasableProduct(product, item, buyer, List.of());
-        when(deliveryAddressRepository.findByIdAndUserId(ADDRESS_ID, BUYER_ID)).thenReturn(Optional.of(address));
+        when(deliveryAddressRepository.findByIdAndUser_Id(ADDRESS_ID, BUYER_ID)).thenReturn(Optional.of(address));
         when(purchaseIntentRepository.save(any(PurchaseIntent.class))).thenAnswer(invocation -> {
             PurchaseIntent intent = invocation.getArgument(0);
             ReflectionTestUtils.setField(intent, "id", 125L);
@@ -499,6 +502,82 @@ class PurchaseIntentServiceTest {
                 .isInstanceOf(CustomException.class)
                 .extracting("errorCode")
                 .isEqualTo(PurchaseIntentErrorCode.PURCHASE_INTENT_ACCESS_DENIED);
+    }
+
+    @Test
+    void rejectPurchaseIntent_rejectsSentIntentAndReleasesAuthorization() {
+        User seller = user(SELLER_ID, UserGrade.BASIC);
+        User buyer = user(BUYER_ID, UserGrade.BASIC);
+        Item item = item(ITEM_ID, seller);
+        Product product = product(PRODUCT_ID, item, seller, FeePolicy.SELLER_PAYS, new BigDecimal("0.0600"));
+        PurchaseIntent intent = existingIntent(123L, product, buyer, seller, LocalDateTime.now().plusHours(2));
+
+        givenIntentDetail(product, item, intent);
+
+        PurchaseIntentRejectResponse response = purchaseIntentService.rejectPurchaseIntent(123L, SELLER_ID);
+
+        assertThat(response.intentId()).isEqualTo(123L);
+        assertThat(response.status()).isEqualTo(PurchaseIntentStatus.REJECTED);
+        assertThat(response.paymentAuthorizationStatus()).isEqualTo(PaymentAuthorizationStatus.RELEASED);
+        assertThat(response.serverTime()).isNotNull();
+        assertThat(intent.getStatus()).isEqualTo(PurchaseIntentStatus.REJECTED);
+        assertThat(intent.getPaymentAuthorizationStatus()).isEqualTo(PaymentAuthorizationStatus.RELEASED);
+
+        InOrder lockOrder = inOrder(productRepository, itemRepository, purchaseIntentRepository);
+        lockOrder.verify(productRepository).findByIdForUpdate(PRODUCT_ID);
+        lockOrder.verify(itemRepository).findByIdForUpdate(ITEM_ID);
+        lockOrder.verify(purchaseIntentRepository).findByIdForUpdate(123L);
+    }
+
+    @Test
+    void rejectPurchaseIntent_rejectsNonSeller() {
+        User seller = user(SELLER_ID, UserGrade.BASIC);
+        User buyer = user(BUYER_ID, UserGrade.BASIC);
+        Item item = item(ITEM_ID, seller);
+        Product product = product(PRODUCT_ID, item, seller, FeePolicy.SELLER_PAYS, new BigDecimal("0.0600"));
+        PurchaseIntent intent = existingIntent(123L, product, buyer, seller, LocalDateTime.now().plusHours(2));
+
+        givenIntentDetail(product, item, intent);
+
+        assertThatThrownBy(() -> purchaseIntentService.rejectPurchaseIntent(123L, BUYER_ID))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(PurchaseIntentErrorCode.PURCHASE_INTENT_ACCESS_DENIED);
+    }
+
+    @Test
+    void rejectPurchaseIntent_rejectsNonSentStatus() {
+        User seller = user(SELLER_ID, UserGrade.BASIC);
+        User buyer = user(BUYER_ID, UserGrade.BASIC);
+        Item item = item(ITEM_ID, seller);
+        Product product = product(PRODUCT_ID, item, seller, FeePolicy.SELLER_PAYS, new BigDecimal("0.0600"));
+        PurchaseIntent intent = existingIntent(123L, product, buyer, seller, LocalDateTime.now().plusHours(2));
+        ReflectionTestUtils.setField(intent, "status", PurchaseIntentStatus.ACCEPTED);
+
+        givenIntentDetail(product, item, intent);
+
+        assertThatThrownBy(() -> purchaseIntentService.rejectPurchaseIntent(123L, SELLER_ID))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(PurchaseIntentErrorCode.PURCHASE_INTENT_NOT_SENT);
+    }
+
+    @Test
+    void rejectPurchaseIntent_expiresPastDeadlineSentIntentBeforeRejecting() {
+        User seller = user(SELLER_ID, UserGrade.BASIC);
+        User buyer = user(BUYER_ID, UserGrade.BASIC);
+        Item item = item(ITEM_ID, seller);
+        Product product = product(PRODUCT_ID, item, seller, FeePolicy.SELLER_PAYS, new BigDecimal("0.0600"));
+        PurchaseIntent intent = existingIntent(123L, product, buyer, seller, LocalDateTime.now().minusMinutes(1));
+
+        givenIntentDetail(product, item, intent);
+
+        assertThatThrownBy(() -> purchaseIntentService.rejectPurchaseIntent(123L, SELLER_ID))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(PurchaseIntentErrorCode.PURCHASE_REQUEST_EXPIRED);
+        assertThat(intent.getStatus()).isEqualTo(PurchaseIntentStatus.EXPIRED);
+        assertThat(intent.getPaymentAuthorizationStatus()).isEqualTo(PaymentAuthorizationStatus.RELEASED);
     }
 
     private void givenPurchasableProduct(

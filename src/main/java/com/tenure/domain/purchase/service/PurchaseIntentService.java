@@ -14,6 +14,7 @@ import com.tenure.domain.purchase.dto.PurchaseIntentCreateRequest;
 import com.tenure.domain.purchase.dto.PurchaseIntentCreateResponse;
 import com.tenure.domain.purchase.dto.PurchaseIntentDetailResponse;
 import com.tenure.domain.purchase.dto.PurchaseIntentDetailResponse.ViewerRole;
+import com.tenure.domain.purchase.dto.PurchaseIntentRejectResponse;
 import com.tenure.domain.purchase.dto.PurchaseIntentReceivedListResponse;
 import com.tenure.domain.purchase.dto.PurchaseIntentSentListResponse;
 import com.tenure.domain.purchase.entity.PurchaseIntent;
@@ -78,7 +79,7 @@ public class PurchaseIntentService {
         expireSentIntentsIfNeeded(product.getId(), currentUserId);
 
         DeliveryAddress deliveryAddress = deliveryAddressRepository
-                .findByIdAndUserId(request.deliveryAddressId(), currentUserId)
+                .findByIdAndUser_Id(request.deliveryAddressId(), currentUserId)
                 .orElseThrow(() -> new CustomException(PurchaseIntentErrorCode.DELIVERY_ADDRESS_NOT_FOUND));
 
         FeeAmounts amounts = calculateFeeAmounts(product);
@@ -175,6 +176,31 @@ public class PurchaseIntentService {
         return PurchaseIntentDetailResponse.from(intent, viewerRole, now);
     }
 
+    @Transactional(noRollbackFor = CustomException.class)
+    public PurchaseIntentRejectResponse rejectPurchaseIntent(Long intentId, Long currentUserId) {
+        Long productId = purchaseIntentRepository.findProductIdById(intentId)
+                .orElseThrow(() -> new CustomException(PurchaseIntentErrorCode.PURCHASE_INTENT_NOT_FOUND));
+        Product product = productRepository.findByIdForUpdate(productId)
+                .orElseThrow(() -> new CustomException(PurchaseIntentErrorCode.PRODUCT_NOT_FOUND));
+        itemRepository.findByIdForUpdate(product.getItem().getId())
+                .orElseThrow(() -> new CustomException(PurchaseIntentErrorCode.ITEM_NOT_FOUND));
+        PurchaseIntent intent = purchaseIntentRepository.findByIdForUpdate(intentId)
+                .orElseThrow(() -> new CustomException(PurchaseIntentErrorCode.PURCHASE_INTENT_NOT_FOUND));
+
+        validateSeller(intent, currentUserId);
+
+        LocalDateTime now = LocalDateTime.now();
+        if (purchaseIntentExpirationService.expireIfSentAndExpired(intent, now)) {
+            throw new CustomException(PurchaseIntentErrorCode.PURCHASE_REQUEST_EXPIRED);
+        }
+        if (!intent.isSent()) {
+            throw new CustomException(PurchaseIntentErrorCode.PURCHASE_INTENT_NOT_SENT);
+        }
+
+        intent.rejectAndReleaseAuthorization();
+        return PurchaseIntentRejectResponse.from(intent, now);
+    }
+
     private void validateAgreement(Boolean agreement) {
         if (!Boolean.TRUE.equals(agreement)) {
             throw new CustomException(PurchaseIntentErrorCode.AGREEMENT_REQUIRED);
@@ -195,7 +221,7 @@ public class PurchaseIntentService {
             return;
         }
 
-        boolean acceptedFollower = followRelationshipRepository.existsByFollowerIdAndFollowingIdAndStatus(
+        boolean acceptedFollower = followRelationshipRepository.existsByFollower_IdAndFollowing_IdAndStatus(
                 currentUserId,
                 seller.getId(),
                 FollowStatus.ACCEPTED
@@ -330,6 +356,12 @@ public class PurchaseIntentService {
             return ViewerRole.SELLER;
         }
         throw new CustomException(PurchaseIntentErrorCode.PURCHASE_INTENT_ACCESS_DENIED);
+    }
+
+    private void validateSeller(PurchaseIntent intent, Long currentUserId) {
+        if (!intent.getSeller().getId().equals(currentUserId)) {
+            throw new CustomException(PurchaseIntentErrorCode.PURCHASE_INTENT_ACCESS_DENIED);
+        }
     }
 
     private record FeeAmounts(
