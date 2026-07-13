@@ -24,6 +24,18 @@ public interface PurchaseOfferRepository extends JpaRepository<PurchaseOffer, Lo
             select offer
             from PurchaseOffer offer
             where offer.item.id = :itemId
+              and offer.proposer.id = :proposerUserId
+            """)
+    Optional<PurchaseOffer> findByItemIdAndProposerIdForUpdate(
+            @Param("itemId") Long itemId,
+            @Param("proposerUserId") Long proposerUserId
+    );
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select offer
+            from PurchaseOffer offer
+            where offer.item.id = :itemId
               and offer.status = :status
             """)
     List<PurchaseOffer> findSentByItemIdForUpdate(

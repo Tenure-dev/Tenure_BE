@@ -1,0 +1,1 @@
+ALTER TABLE trades ADD COLUMN delivered_at TIMESTAMP NULL;
