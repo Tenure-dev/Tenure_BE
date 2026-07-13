@@ -20,7 +20,7 @@ spring:
   sql:
     init:
       platform: postgresql
-      
+
   servlet:
     multipart:
       max-file-size: 10MB
@@ -48,3 +48,10 @@ tenure:
     auto-confirm:
       interval-minutes: 10
       confirm-hours: 72
+  ai:
+    gemini:
+      api-key: ${GEMINI_API_KEY:}
+      endpoint: ${GEMINI_API_ENDPOINT:https://generativelanguage.googleapis.com/v1beta/models}
+      model: ${GEMINI_MODEL:gemini-flash-lite-latest}
+    tag:
+      confidence-threshold: ${AI_TAG_CONFIDENCE_THRESHOLD:0.6}

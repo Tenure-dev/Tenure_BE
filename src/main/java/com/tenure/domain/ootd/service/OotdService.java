@@ -3,6 +3,7 @@ package com.tenure.domain.ootd.service;
 import com.tenure.domain.ootd.dto.OotdCreateResponse;
 import com.tenure.domain.ootd.entity.Ootd;
 import com.tenure.domain.ootd.enums.OotdSource;
+import com.tenure.domain.ootd.event.OotdCreatedEvent;
 import com.tenure.domain.ootd.exception.OotdErrorCode;
 import com.tenure.domain.ootd.repository.OotdRepository;
 import com.tenure.domain.user.entity.User;
@@ -11,12 +12,11 @@ import com.tenure.global.exception.CommonErrorCode;
 import com.tenure.global.exception.CustomException;
 import com.tenure.global.storage.ImageStorageService;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-@Slf4j
 @Service
 @RequiredArgsConstructor
 public class OotdService {
@@ -26,6 +26,7 @@ public class OotdService {
     private final OotdRepository ootdRepository;
     private final UserRepository userRepository;
     private final ImageStorageService imageStorageService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public OotdCreateResponse createOotd(Long currentUserId, MultipartFile image, String source) {
@@ -40,8 +41,7 @@ public class OotdService {
         Ootd ootd = Ootd.create(owner, imageUrl, ootdSource);
         ootdRepository.save(ootd);
 
-        // TODO: AI 연동 시 OOTD_CREATED 이벤트 발행으로 전환하여 비동기 태그 분석 트리거
-        log.info("OOTD_CREATED - ootdId={}, ownerId={}, imageUrl={}", ootd.getId(), owner.getId(), imageUrl);
+        eventPublisher.publishEvent(new OotdCreatedEvent(ootd.getId(), owner.getId(), imageUrl));
 
         return OotdCreateResponse.of(ootd);
     }
