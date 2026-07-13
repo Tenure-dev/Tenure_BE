@@ -14,21 +14,31 @@ import com.tenure.domain.purchase.dto.PurchaseIntentCreateRequest;
 import com.tenure.domain.purchase.dto.PurchaseIntentCreateResponse;
 import com.tenure.domain.purchase.dto.PurchaseIntentDetailResponse;
 import com.tenure.domain.purchase.dto.PurchaseIntentDetailResponse.ViewerRole;
+import com.tenure.domain.purchase.dto.PurchaseIntentSentListResponse;
 import com.tenure.domain.purchase.entity.PurchaseIntent;
 import com.tenure.domain.purchase.enums.PurchaseIntentStatus;
 import com.tenure.domain.purchase.exception.PurchaseIntentErrorCode;
 import com.tenure.domain.purchase.repository.PurchaseIntentRepository;
+import com.tenure.domain.trade.entity.Trade;
+import com.tenure.domain.trade.enums.TradeSourceType;
+import com.tenure.domain.trade.repository.TradeRepository;
 import com.tenure.domain.user.entity.User;
 import com.tenure.domain.user.enums.AccountVisibility;
 import com.tenure.domain.user.repository.UserRepository;
+import com.tenure.global.exception.CommonErrorCode;
 import com.tenure.global.exception.CustomException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -44,6 +54,7 @@ public class PurchaseIntentService {
     private final DeliveryAddressRepository deliveryAddressRepository;
     private final UserRepository userRepository;
     private final FollowRelationshipRepository followRelationshipRepository;
+    private final TradeRepository tradeRepository;
     private final PurchaseIntentExpirationService purchaseIntentExpirationService;
 
     @Transactional
@@ -90,6 +101,50 @@ public class PurchaseIntentService {
 
         purchaseIntentRepository.save(intent);
         return PurchaseIntentCreateResponse.from(intent);
+    }
+
+    @Transactional
+    public PurchaseIntentSentListResponse getSentPurchaseIntents(
+            Long currentUserId,
+            List<PurchaseIntentStatus> statuses,
+            OffsetDateTime cursorCreatedAt,
+            Long cursorIntentId,
+            Integer size
+    ) {
+        validateCursor(cursorCreatedAt, cursorIntentId);
+        int pageSize = normalizeSize(size);
+        LocalDateTime now = LocalDateTime.now();
+        expireSentIntentsForBuyer(currentUserId, now);
+
+        List<PurchaseIntentStatus> normalizedStatuses = normalizeStatuses(statuses);
+        List<PurchaseIntent> fetched = purchaseIntentRepository.findSentListByBuyerWithCursor(
+                currentUserId,
+                normalizedStatuses,
+                cursorCreatedAt == null ? null : cursorCreatedAt.toLocalDateTime(),
+                cursorIntentId,
+                PageRequest.of(0, pageSize + 1)
+        );
+        boolean hasNext = fetched.size() > pageSize;
+        List<PurchaseIntent> pageItems = hasNext ? fetched.subList(0, pageSize) : fetched;
+        Map<Long, Long> tradeIdByIntentId = findTradeIds(pageItems);
+        return PurchaseIntentSentListResponse.of(pageItems, tradeIdByIntentId, now, hasNext);
+    }
+
+    @Transactional
+    public PurchaseIntentDetailResponse getPurchaseIntentDetail(Long intentId, Long currentUserId) {
+        Long productId = purchaseIntentRepository.findProductIdById(intentId)
+                .orElseThrow(() -> new CustomException(PurchaseIntentErrorCode.PURCHASE_INTENT_NOT_FOUND));
+        Product product = productRepository.findByIdForUpdate(productId)
+                .orElseThrow(() -> new CustomException(PurchaseIntentErrorCode.PRODUCT_NOT_FOUND));
+        itemRepository.findByIdForUpdate(product.getItem().getId())
+                .orElseThrow(() -> new CustomException(PurchaseIntentErrorCode.ITEM_NOT_FOUND));
+        PurchaseIntent intent = purchaseIntentRepository.findByIdForUpdate(intentId)
+                .orElseThrow(() -> new CustomException(PurchaseIntentErrorCode.PURCHASE_INTENT_NOT_FOUND));
+
+        ViewerRole viewerRole = resolveViewerRole(intent, currentUserId);
+        LocalDateTime now = LocalDateTime.now();
+        purchaseIntentExpirationService.expireIfSentAndExpired(intent, now);
+        return PurchaseIntentDetailResponse.from(intent, viewerRole, now);
     }
 
     private void validateAgreement(Boolean agreement) {
@@ -174,21 +229,58 @@ public class PurchaseIntentService {
         return "mock_auth_" + UUID.randomUUID();
     }
 
-    @Transactional
-    public PurchaseIntentDetailResponse getPurchaseIntentDetail(Long intentId, Long currentUserId) {
-        Long productId = purchaseIntentRepository.findProductIdById(intentId)
-                .orElseThrow(() -> new CustomException(PurchaseIntentErrorCode.PURCHASE_INTENT_NOT_FOUND));
-        Product product = productRepository.findByIdForUpdate(productId)
-                .orElseThrow(() -> new CustomException(PurchaseIntentErrorCode.PRODUCT_NOT_FOUND));
-        itemRepository.findByIdForUpdate(product.getItem().getId())
-                .orElseThrow(() -> new CustomException(PurchaseIntentErrorCode.ITEM_NOT_FOUND));
-        PurchaseIntent intent = purchaseIntentRepository.findByIdForUpdate(intentId)
-                .orElseThrow(() -> new CustomException(PurchaseIntentErrorCode.PURCHASE_INTENT_NOT_FOUND));
+    private void validateCursor(OffsetDateTime cursorCreatedAt, Long cursorIntentId) {
+        if ((cursorCreatedAt == null) != (cursorIntentId == null)) {
+            throw new CustomException(CommonErrorCode.INVALID_REQUEST);
+        }
+    }
 
-        ViewerRole viewerRole = resolveViewerRole(intent, currentUserId);
-        LocalDateTime now = LocalDateTime.now();
-        purchaseIntentExpirationService.expireIfSentAndExpired(intent, now);
-        return PurchaseIntentDetailResponse.from(intent, viewerRole, now);
+    private int normalizeSize(Integer size) {
+        if (size == null) {
+            return 20;
+        }
+        if (size < 1 || size > 50) {
+            throw new CustomException(CommonErrorCode.INVALID_REQUEST);
+        }
+        return size;
+    }
+
+    private List<PurchaseIntentStatus> normalizeStatuses(List<PurchaseIntentStatus> statuses) {
+        if (statuses == null || statuses.isEmpty()) {
+            return Arrays.asList(PurchaseIntentStatus.values());
+        }
+        return statuses;
+    }
+
+    private void expireSentIntentsForBuyer(Long currentUserId, LocalDateTime now) {
+        List<PurchaseIntent> expiredSentIntents = purchaseIntentRepository.findExpiredSentByBuyerIdForUpdate(
+                currentUserId,
+                PurchaseIntentStatus.SENT,
+                now
+        );
+        for (PurchaseIntent intent : expiredSentIntents) {
+            purchaseIntentExpirationService.expireIfSentAndExpired(intent, now);
+        }
+    }
+
+    private Map<Long, Long> findTradeIds(List<PurchaseIntent> intents) {
+        List<Long> acceptedIntentIds = intents.stream()
+                .filter(intent -> intent.getStatus() == PurchaseIntentStatus.ACCEPTED)
+                .map(PurchaseIntent::getId)
+                .toList();
+        if (acceptedIntentIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        return tradeRepository.findAllBySourceTypeAndSourceIdIn(
+                        TradeSourceType.PURCHASE_INTENT,
+                        acceptedIntentIds
+                ).stream()
+                .filter(trade -> trade.getSourceId() != null)
+                .collect(Collectors.toMap(
+                        Trade::getSourceId,
+                        Trade::getId,
+                        (left, right) -> left
+                ));
     }
 
     private ViewerRole resolveViewerRole(PurchaseIntent intent, Long currentUserId) {

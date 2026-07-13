@@ -3,8 +3,11 @@ package com.tenure.domain.purchase.repository;
 import com.tenure.domain.purchase.entity.PurchaseIntent;
 import com.tenure.domain.purchase.enums.PurchaseIntentStatus;
 import jakarta.persistence.LockModeType;
+import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -43,5 +46,45 @@ public interface PurchaseIntentRepository extends JpaRepository<PurchaseIntent, 
             @Param("productId") Long productId,
             @Param("buyerUserId") Long buyerUserId,
             @Param("status") PurchaseIntentStatus status
+    );
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select intent
+            from PurchaseIntent intent
+            join fetch intent.product product
+            join fetch product.item item
+            join fetch intent.seller seller
+            where intent.buyer.id = :buyerUserId
+              and intent.status = :status
+              and intent.expiresAt <= :now
+            """)
+    List<PurchaseIntent> findExpiredSentByBuyerIdForUpdate(
+            @Param("buyerUserId") Long buyerUserId,
+            @Param("status") PurchaseIntentStatus status,
+            @Param("now") LocalDateTime now
+    );
+
+    @Query("""
+            select intent
+            from PurchaseIntent intent
+            join fetch intent.product product
+            join fetch product.item item
+            join fetch intent.seller seller
+            where intent.buyer.id = :buyerUserId
+              and intent.status in :statuses
+              and (
+                    :cursorCreatedAt is null
+                    or intent.createdAt < :cursorCreatedAt
+                    or (intent.createdAt = :cursorCreatedAt and intent.id < :cursorIntentId)
+                  )
+            order by intent.createdAt desc, intent.id desc
+            """)
+    List<PurchaseIntent> findSentListByBuyerWithCursor(
+            @Param("buyerUserId") Long buyerUserId,
+            @Param("statuses") Collection<PurchaseIntentStatus> statuses,
+            @Param("cursorCreatedAt") LocalDateTime cursorCreatedAt,
+            @Param("cursorIntentId") Long cursorIntentId,
+            Pageable pageable
     );
 }
