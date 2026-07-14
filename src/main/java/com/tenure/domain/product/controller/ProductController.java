@@ -2,6 +2,7 @@ package com.tenure.domain.product.controller;
 
 import com.tenure.domain.product.dto.ProductCreateRequest;
 import com.tenure.domain.product.dto.ProductCreateResponse;
+import com.tenure.domain.product.dto.ProductDeleteResponse;
 import com.tenure.domain.product.dto.ProductDetailResponse;
 import com.tenure.domain.product.dto.ProductUpdateRequest;
 import com.tenure.domain.product.dto.ProductUpdateResponse;
@@ -18,6 +19,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -239,5 +241,30 @@ public class ProductController {
         Long currentUserId = currentUserProvider.getCurrentUserId();
         ProductUpdateResponse response = productService.updateProduct(productId, currentUserId, request);
         return BaseResponse.success(response, "판매 상품을 수정했습니다.");
+    }
+
+    @Operation(
+            summary = "Delete product posting",
+            description = "The seller hides an ON_SALE product posting and reverts the item to OWNED. The product and item rows are not deleted.",
+            parameters = {
+                    @Parameter(
+                            name = "X-USER-ID",
+                            in = ParameterIn.HEADER,
+                            required = true,
+                            description = "Temporary current user id for Swagger/local testing before JWT is fully connected.",
+                            example = "1"
+                    )
+            }
+    )
+    @ApiResponse(
+            responseCode = "200",
+            description = "Product posting deleted successfully.",
+            content = @Content(schema = @Schema(implementation = ProductDeleteResponse.class))
+    )
+    @DeleteMapping("/products/{productId}")
+    public BaseResponse<ProductDeleteResponse> deleteProduct(@PathVariable Long productId) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        ProductDeleteResponse response = productService.deleteProduct(productId, currentUserId);
+        return BaseResponse.success(response, "판매 게시를 삭제했습니다.");
     }
 }
