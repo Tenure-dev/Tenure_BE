@@ -10,6 +10,10 @@ import com.tenure.domain.item.repository.ItemRepository;
 import com.tenure.domain.user.entity.User;
 import com.tenure.domain.user.repository.UserRepository;
 import com.tenure.global.exception.CustomException;
+import com.tenure.domain.item.dto.ItemListResponse;
+import com.tenure.domain.item.enums.ItemStatus;
+import com.tenure.global.response.PageResponse;
+import org.springframework.data.domain.Pageable;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,6 +49,26 @@ public class ItemService {
 
         Item savedItem = itemRepository.save(item);
         return ItemCreateResponse.of(savedItem); //저장 결과 응답DTO로 돌려줌
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<ItemListResponse> getMyItems(
+            Long currentUserId,
+            String query,
+            ItemStatus itemStatus,
+            Pageable pageable
+    ) {
+        return PageResponse.from(
+                itemRepository.findMyItems(currentUserId, normalizeQuery(query), itemStatus, pageable),
+                ItemListResponse::from
+        );
+    }
+
+    private String normalizeQuery(String query) {
+        if (query == null || query.isBlank()) {
+            return "";
+        }
+        return query.trim();
     }
 
     private User findUser(Long userId) {
