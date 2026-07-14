@@ -3,6 +3,7 @@ package com.tenure.domain.tag.controller;
 import com.tenure.domain.tag.dto.request.OotdTagCreateRequest;
 import com.tenure.domain.tag.dto.response.OotdTagResponse;
 import com.tenure.domain.tag.dto.request.OotdTagUpdateRequest;
+import com.tenure.domain.tag.dto.response.OotdTagConfirmResponse;
 import com.tenure.domain.tag.service.OotdTagService;
 import com.tenure.global.response.BaseResponse;
 import com.tenure.global.security.CurrentUserProvider;
@@ -30,8 +31,8 @@ public class OotdTagController {
     private final CurrentUserProvider currentUserProvider;
 
     @Operation(
-            summary = "OOTD 태그 등록/확정",
-            description = "OOTD 작성자가 직접 착장 영역(bbox)에 아이템을 태그로 등록/확정합니다. "
+            summary = "OOTD 태그 등록",
+            description = "OOTD 작성자가 직접 착장 영역(bbox)에 아이템을 태그로 등록합니다. "
                     + "직접 등록하는 태그는 항상 CONFIRMED 상태로 저장됩니다.",
             parameters = {
                     @Parameter(
@@ -82,5 +83,30 @@ public class OotdTagController {
         Long currentUserId = currentUserProvider.getCurrentUserId();
         OotdTagResponse response = ootdTagService.updateTag(tagId, currentUserId, request);
         return BaseResponse.success(response, "태그가 수정되었습니다.");
+    }
+
+    @Operation(
+            summary = "OOTD 태그 확인완료",
+            description = "OOTD에 달린 태그들을 최종 확인완료(CONFIRMED) 처리합니다. "
+                    + "태그 상태를 CONFIRMED로 변경하고, tagConfirmedAt을 기록하며, reviewRequired를 해제합니다. "
+                    + "OOTD가 보관(ARCHIVED) 상태였다면 ACTIVE로 복구합니다.",
+            parameters = {
+                    @Parameter(
+                            name = "X-USER-ID",
+                            in = ParameterIn.HEADER,
+                            required = true,
+                            description = "JWT 적용 전 Swagger 테스트용 현재 사용자 ID. JWT 적용 후에는 SecurityContext 값을 사용합니다.",
+                            example = "1"
+                    )
+            }
+    )
+    @ApiResponse(responseCode = "200", description = "확인완료 처리 성공")
+    @ApiResponse(responseCode = "403", description = "본인이 게시한 OOTD가 아님")
+    @ApiResponse(responseCode = "404", description = "존재하지 않는 OOTD, 또는 확인완료할 태그가 없음")
+    @PostMapping("/{ootdId}/tags/confirm")
+    public BaseResponse<OotdTagConfirmResponse> confirmTags(@PathVariable Long ootdId) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        OotdTagConfirmResponse response = ootdTagService.confirmTags(ootdId, currentUserId);
+        return BaseResponse.success(response, "태그가 확인완료 처리되었습니다.");
     }
 }

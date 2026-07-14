@@ -8,6 +8,7 @@ import com.tenure.domain.ootd.repository.OotdRepository;
 import com.tenure.domain.tag.dto.request.OotdTagCreateRequest;
 import com.tenure.domain.tag.dto.response.OotdTagResponse;
 import com.tenure.domain.tag.dto.request.OotdTagUpdateRequest;
+import com.tenure.domain.tag.dto.response.OotdTagConfirmResponse;
 import com.tenure.domain.tag.entity.OotdTag;
 import com.tenure.domain.tag.enums.TagStatus;
 import com.tenure.domain.tag.exception.TagErrorCode;
@@ -101,6 +102,23 @@ public class OotdTagService {
         );
 
         return OotdTagResponse.of(tag);
+    }
+
+    @Transactional
+    public OotdTagConfirmResponse confirmTags(Long ootdId, Long currentUserId) {
+        Ootd ootd = ootdRepository.findById(ootdId)
+                .orElseThrow(() -> new CustomException(TagErrorCode.OOTD_NOT_FOUND));
+        validateOwner(ootd, currentUserId);
+
+        List<OotdTag> tags = ootdTagRepository.findAllByOotdId(ootdId);
+        if (tags.isEmpty()) {
+            throw new CustomException(TagErrorCode.TAG_NOT_FOUND);
+        }
+
+        tags.forEach(OotdTag::confirm);
+        ootd.confirmTags();
+
+        return OotdTagConfirmResponse.of(ootd);
     }
 
     private boolean meetsConfidenceThreshold(AiTagResult result) {

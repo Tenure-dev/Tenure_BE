@@ -78,4 +78,14 @@ public class Ootd extends BaseTimeEntity {
         ootd.source = source;
         return ootd;
     }
+
+    public void confirmTags() {
+        this.tagStatus = OotdTagStatus.CONFIRMED;
+        this.tagConfirmedAt = LocalDateTime.now();
+        this.reviewRequired = false;
+        if (this.publicationStatus == OotdPublicationStatus.ARCHIVED) {
+            this.publicationStatus = OotdPublicationStatus.ACTIVE;
+            this.archivedAt = null;
+        }
+    }
 }
