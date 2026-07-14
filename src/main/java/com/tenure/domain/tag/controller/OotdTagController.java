@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @Tag(name = "OotdTag", description = "OOTD 태그 API")
 @RestController
-@RequestMapping("/api/ootds")
+@RequestMapping("/ootds")
 @RequiredArgsConstructor
 public class OotdTagController {
 
