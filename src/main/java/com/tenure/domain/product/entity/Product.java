@@ -134,6 +134,10 @@ public class Product extends BaseTimeEntity {
         }
     }
 
+    public void markExternalSold() {
+        this.productStatus = ProductStatus.SOLD;
+    }
+
     public void hide() {
         this.productStatus = ProductStatus.HIDDEN;
     }
