@@ -249,6 +249,38 @@ class OotdTagServiceTest {
     }
 
     @Test
+    void generateMockAiTags_savesAutoUnconfirmedTagsWithHighConfidence() {
+        User owner = user(OWNER_ID);
+        Ootd ootd = ootd(OOTD_ID, owner);
+
+        when(ootdRepository.findById(OOTD_ID)).thenReturn(Optional.of(ootd));
+
+        List<OotdTagResponse> response = ootdTagService.generateMockAiTags(OOTD_ID);
+
+        assertThat(response).isNotEmpty();
+        assertThat(response).allSatisfy(tag -> {
+            assertThat(tag.source()).isEqualTo(TagSource.AI);
+            assertThat(tag.status()).isEqualTo(TagStatus.AUTO_UNCONFIRMED);
+        });
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<OotdTag>> captor = ArgumentCaptor.forClass(List.class);
+        verify(ootdTagRepository).saveAll(captor.capture());
+        assertThat(captor.getValue()).allSatisfy(tag ->
+                assertThat(tag.getConfidence()).isGreaterThanOrEqualTo(BigDecimal.valueOf(0.85)));
+    }
+
+    @Test
+    void generateMockAiTags_rejectsMissingOotd() {
+        when(ootdRepository.findById(OOTD_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> ootdTagService.generateMockAiTags(OOTD_ID))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(TagErrorCode.OOTD_NOT_FOUND);
+    }
+
+    @Test
     void saveAiTags_filtersOutResultsBelowConfidenceThreshold() {
         User owner = user(OWNER_ID);
         Ootd ootd = ootd(OOTD_ID, owner);
