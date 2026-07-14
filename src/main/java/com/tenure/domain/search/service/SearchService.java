@@ -47,7 +47,7 @@ public class SearchService {
                 .findByUserTopKeywords(currentUserId, 3);
 
         //종합 응답 dto 변환
-        return SearchRecentResponse.from(recentKeyword, recentUser);
+        return SearchRecentResponse.from(recentUser, recentKeyword);
 
     }
 }

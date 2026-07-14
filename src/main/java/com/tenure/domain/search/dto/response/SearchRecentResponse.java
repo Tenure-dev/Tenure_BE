@@ -10,10 +10,10 @@ import java.util.List;
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
 public class SearchRecentResponse {
 
-    private List<RecentKeywordResponse> recentKeywords;
     private List<RecentUserResponse> recentUsers;
+    private List<RecentKeywordResponse> recentKeywords;
 
-    public static SearchRecentResponse from(List<RecentKeywordResponse> keywords, List<RecentUserResponse> users) {
-        return new SearchRecentResponse(keywords, users);
+    public static SearchRecentResponse from(List<RecentUserResponse> users, List<RecentKeywordResponse> keywords) {
+        return new SearchRecentResponse(users, keywords);
     }
 }
