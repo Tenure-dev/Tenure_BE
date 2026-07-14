@@ -3,6 +3,7 @@ package com.tenure.domain.search.repository;
 import com.tenure.domain.search.dto.response.RecentKeywordResponse;
 import com.tenure.domain.search.entity.RecentSearchKeyword;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -22,4 +23,10 @@ public interface RecentSearchKeywordRepository extends JpaRepository<RecentSearc
             "group by r.keyword " +
             "order by max(r.createdAt) desc limit :count")
     List<RecentKeywordResponse> findByUserTopKeywords(@Param("currentUserId") Long currentUserId, @Param("count") int count);
+
+
+    @Modifying(clearAutomatically = true)
+    @Query("delete from RecentSearchKeyword r " +
+            "where r.user.id = :currentUserId and r.keyword = :keyword")
+    void deleteRecentSearchKeywordByKeyword(@Param("currentUserId") Long currentUserId, @Param("keyword") String keyword);
 }

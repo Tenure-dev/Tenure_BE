@@ -4,8 +4,11 @@ import com.tenure.domain.search.dto.response.RecentKeywordResponse;
 import com.tenure.domain.search.dto.response.RecentUserResponse;
 import com.tenure.domain.search.dto.response.SearchRecentResponse;
 import com.tenure.domain.search.dto.response.SearchSuggestionResponse;
+import com.tenure.domain.search.entity.RecentSearchKeyword;
+import com.tenure.domain.search.exception.SearchErrorCode;
 import com.tenure.domain.search.repository.RecentSearchKeywordRepository;
 import com.tenure.domain.search.repository.RecentViewUserRepository;
+import com.tenure.global.exception.CustomException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -48,6 +51,28 @@ public class SearchService {
 
         //종합 응답 dto 변환
         return SearchRecentResponse.from(recentUser, recentKeyword);
+
+    }
+
+    @Transactional
+    public void deleteRecentKeyword(Long currentUserId, Long keywordId) {
+
+        log.info("[최근 검색어 삭제 api] currentUserId = {}", currentUserId);
+        RecentSearchKeyword recentSearchKeyword = recentSearchKeywordRepository.findById(keywordId)
+                .orElseThrow(() -> {
+                    log.warn("[최근 검색어 삭제 api] 검색어를 찾을수 없습니다. keywordId = {}", keywordId);
+                    return new CustomException(SearchErrorCode.KEYWORD_NOT_FOUND);
+                });
+        log.debug("[최근 검색어 삭제 api] keyword = {}", recentSearchKeyword.getKeyword());
+
+        if(!recentSearchKeyword.getUser().getId().equals(currentUserId)) {
+            log.warn("[최근 검색어 삭제 api] 본인의 검색 기록만 지울 수 있습니다. currentUserId = {}", currentUserId);
+            throw new CustomException(SearchErrorCode.KEYWORD_FORBIDDEN);
+        }
+
+        recentSearchKeywordRepository
+                .deleteRecentSearchKeywordByKeyword(currentUserId, recentSearchKeyword.getKeyword());
+        log.info("[최근 검색어 삭제 api] keyword 삭제 완료");
 
     }
 }

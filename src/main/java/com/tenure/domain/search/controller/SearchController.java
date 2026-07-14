@@ -11,9 +11,7 @@ import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @Tag(name = "Search", description = "검색 API")
 @RequiredArgsConstructor
@@ -42,8 +40,24 @@ public class SearchController {
             })
     @GetMapping("/recent")
     public BaseResponse<SearchRecentResponse> getSearchRecent() {
-        SearchRecentResponse recentSearch = searchService.getRecent(currentUserProvider.getCurrentUserId());
+        SearchRecentResponse recentSearch = searchService
+                .getRecent(currentUserProvider.getCurrentUserId());
 
         return BaseResponse.success(recentSearch);
+    }
+
+    @Operation(
+            summary = "최근 검색어 삭제",
+            description = "내 최근 검색어를 삭제합니다. 동일 키워드의 검색 기록이 모두 삭제됩니다.",
+            parameters = {
+                    @Parameter(name = "X-USER-ID", in = ParameterIn.HEADER, required = true,
+                            description = "JWT 적용 전 Swagger 테스트용 현재 사용자 ID", example = "1")
+            })
+    @DeleteMapping("/recent-keywords/{keywordId}")
+    public BaseResponse<Void> deleteKeyword(@PathVariable Long keywordId) {
+
+        searchService.deleteRecentKeyword(currentUserProvider.getCurrentUserId(), keywordId);
+
+        return BaseResponse.success(null);
     }
 }
