@@ -84,8 +84,6 @@ public class OotdTagService {
 
     @Transactional
     public OotdTagResponse updateTag(Long tagId, Long currentUserId, OotdTagUpdateRequest request) {
-        validateStatus(request.status());
-
         OotdTag tag = ootdTagRepository.findById(tagId)
                 .orElseThrow(() -> new CustomException(TagErrorCode.TAG_NOT_FOUND));
         validateOwner(tag.getOotd(), currentUserId);
@@ -93,7 +91,7 @@ public class OotdTagService {
         Item item = itemRepository.findById(request.itemId())
                 .orElseThrow(() -> new CustomException(TagErrorCode.ITEM_NOT_FOUND));
 
-        tag.confirm(
+        tag.updateContent(
                 item,
                 request.labelText(),
                 request.bbox().x(),

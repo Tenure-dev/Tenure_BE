@@ -59,7 +59,7 @@ public class OotdTagController {
 
     @Operation(
             summary = "OOTD 태그 수정",
-            description = "AI가 만든 태그(AUTO_UNCONFIRMED)에 아이템을 연결해 CONFIRMED로 확정하거나, 기존 태그 내용을 수정합니다.",
+            description = "기존 태그(AI 태그 포함)의 연결 아이템, bbox, 라벨을 수정합니다. status(확정 여부)는 이 API에서 다루지 않습니다.",
             parameters = {
                     @Parameter(
                             name = "X-USER-ID",
@@ -70,8 +70,8 @@ public class OotdTagController {
                     )
             }
     )
-    @ApiResponse(responseCode = "200", description = "태그 확정/수정 성공")
-    @ApiResponse(responseCode = "400", description = "필수 파라미터 누락, status가 CONFIRMED가 아님, 또는 bbox 범위 이상")
+    @ApiResponse(responseCode = "200", description = "태그 수정 성공")
+    @ApiResponse(responseCode = "400", description = "필수 파라미터 누락 또는 bbox 범위 이상")
     @ApiResponse(responseCode = "403", description = "본인이 게시한 OOTD가 아님")
     @ApiResponse(responseCode = "404", description = "존재하지 않는 태그 또는 아이템")
     @PatchMapping("/tags/{tagId}")

@@ -129,7 +129,7 @@ class OotdTagServiceTest {
     }
 
     @Test
-    void updateTag_confirmsAiTagWithItem() {
+    void updateTag_updatesContentWithoutChangingStatus() {
         User owner = user(OWNER_ID);
         Ootd ootd = ootd(OOTD_ID, owner);
         Item item = item(ITEM_ID);
@@ -138,12 +138,12 @@ class OotdTagServiceTest {
         when(ootdTagRepository.findById(TAG_ID)).thenReturn(Optional.of(aiTag));
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
 
-        OotdTagResponse response = ootdTagService.updateTag(TAG_ID, OWNER_ID, updateRequest(ITEM_ID, "CONFIRMED"));
+        OotdTagResponse response = ootdTagService.updateTag(TAG_ID, OWNER_ID, updateRequest(ITEM_ID));
 
         assertThat(response.itemId()).isEqualTo(ITEM_ID);
-        assertThat(response.status()).isEqualTo(TagStatus.CONFIRMED);
+        assertThat(response.labelText()).isEqualTo("블루종 자켓");
         assertThat(response.source()).isEqualTo(TagSource.AI);
-        assertThat(aiTag.getStatus()).isEqualTo(TagStatus.CONFIRMED);
+        assertThat(aiTag.getStatus()).isEqualTo(TagStatus.AUTO_UNCONFIRMED);
         assertThat(aiTag.getItem()).isEqualTo(item);
     }
 
@@ -151,7 +151,7 @@ class OotdTagServiceTest {
     void updateTag_rejectsMissingTag() {
         when(ootdTagRepository.findById(TAG_ID)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> ootdTagService.updateTag(TAG_ID, OWNER_ID, updateRequest(ITEM_ID, "CONFIRMED")))
+        assertThatThrownBy(() -> ootdTagService.updateTag(TAG_ID, OWNER_ID, updateRequest(ITEM_ID)))
                 .isInstanceOf(CustomException.class)
                 .extracting("errorCode")
                 .isEqualTo(TagErrorCode.TAG_NOT_FOUND);
@@ -166,7 +166,7 @@ class OotdTagServiceTest {
         when(ootdTagRepository.findById(TAG_ID)).thenReturn(Optional.of(aiTag));
 
         Long strangerId = 999L;
-        assertThatThrownBy(() -> ootdTagService.updateTag(TAG_ID, strangerId, updateRequest(ITEM_ID, "CONFIRMED")))
+        assertThatThrownBy(() -> ootdTagService.updateTag(TAG_ID, strangerId, updateRequest(ITEM_ID)))
                 .isInstanceOf(CustomException.class)
                 .extracting("errorCode")
                 .isEqualTo(TagErrorCode.TAG_OWNER_ONLY);
@@ -181,18 +181,10 @@ class OotdTagServiceTest {
         when(ootdTagRepository.findById(TAG_ID)).thenReturn(Optional.of(aiTag));
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> ootdTagService.updateTag(TAG_ID, OWNER_ID, updateRequest(ITEM_ID, "CONFIRMED")))
+        assertThatThrownBy(() -> ootdTagService.updateTag(TAG_ID, OWNER_ID, updateRequest(ITEM_ID)))
                 .isInstanceOf(CustomException.class)
                 .extracting("errorCode")
                 .isEqualTo(TagErrorCode.ITEM_NOT_FOUND);
-    }
-
-    @Test
-    void updateTag_rejectsNonConfirmedStatus() {
-        assertThatThrownBy(() -> ootdTagService.updateTag(TAG_ID, OWNER_ID, updateRequest(ITEM_ID, "AUTO_UNCONFIRMED")))
-                .isInstanceOf(CustomException.class)
-                .extracting("errorCode")
-                .isEqualTo(TagErrorCode.TAG_STATUS_INVALID);
     }
 
     @Test
@@ -270,12 +262,11 @@ class OotdTagServiceTest {
         );
     }
 
-    private OotdTagUpdateRequest updateRequest(Long itemId, String status) {
+    private OotdTagUpdateRequest updateRequest(Long itemId) {
         return new OotdTagUpdateRequest(
                 itemId,
                 new BboxRequest(BigDecimal.valueOf(0.1), BigDecimal.valueOf(0.2), BigDecimal.valueOf(0.3), BigDecimal.valueOf(0.4)),
-                "블루종 자켓",
-                status
+                "블루종 자켓"
         );
     }
 

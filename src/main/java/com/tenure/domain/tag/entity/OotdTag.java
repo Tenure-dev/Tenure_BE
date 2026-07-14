@@ -111,7 +111,7 @@ public class OotdTag extends BaseTimeEntity {
         return tag;
     }
 
-    public void confirm(
+    public void updateContent(
             Item item,
             String labelText,
             BigDecimal bboxX,
@@ -125,6 +125,5 @@ public class OotdTag extends BaseTimeEntity {
         this.bboxY = bboxY;
         this.bboxWidth = bboxWidth;
         this.bboxHeight = bboxHeight;
-        this.status = TagStatus.CONFIRMED;
     }
 }
