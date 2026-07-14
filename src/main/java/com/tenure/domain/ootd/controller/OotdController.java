@@ -1,6 +1,10 @@
 package com.tenure.domain.ootd.controller;
 
 import com.tenure.domain.ootd.dto.OotdCreateResponse;
+import com.tenure.domain.ootd.dto.OotdMyPostsResponse;
+import com.tenure.domain.ootd.dto.OotdRelatedResponse;
+import com.tenure.domain.ootd.service.OotdMyPostService;
+import com.tenure.domain.ootd.service.OotdRelatedService;
 import com.tenure.domain.ootd.service.OotdService;
 import com.tenure.global.response.BaseResponse;
 import com.tenure.global.security.CurrentUserProvider;
@@ -10,8 +14,12 @@ import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -25,7 +33,70 @@ import org.springframework.web.multipart.MultipartFile;
 public class OotdController {
 
     private final OotdService ootdService;
+    private final OotdRelatedService ootdRelatedService;
+    private final OotdMyPostService ootdMyPostService;
     private final CurrentUserProvider currentUserProvider;
+
+    @Operation(
+            summary = "My OOTD posts",
+            description = "Returns my OOTD posts as a flat latest list for my page monthly gallery. Includes active and archived posts.",
+            parameters = {
+                    @Parameter(
+                            name = "X-USER-ID",
+                            in = ParameterIn.HEADER,
+                            required = true,
+                            description = "Temporary current user id for Swagger/local testing before JWT is fully connected.",
+                            example = "1"
+                    )
+            }
+    )
+    @ApiResponse(
+            responseCode = "200",
+            description = "My OOTD posts returned successfully.",
+            content = @Content(schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = OotdMyPostsResponse.class))
+    )
+    @GetMapping("/me")
+    public BaseResponse<OotdMyPostsResponse> getMyPosts(
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+            LocalDateTime cursorCreatedAt,
+            @RequestParam(required = false) Long cursorId,
+            @RequestParam(defaultValue = "20") Integer size
+    ) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        OotdMyPostsResponse response = ootdMyPostService.getMyPosts(
+                currentUserId,
+                cursorCreatedAt,
+                cursorId,
+                size
+        );
+        return BaseResponse.success(response, "내 게시물 목록을 조회했습니다.");
+    }
+
+    @Operation(
+            summary = "Related OOTDs",
+            description = "Returns simple MVP related OOTD sections: similarMood, sameItems, and recommended.",
+            parameters = {
+                    @Parameter(
+                            name = "X-USER-ID",
+                            in = ParameterIn.HEADER,
+                            required = true,
+                            description = "Temporary current user id for Swagger/local testing before JWT is fully connected.",
+                            example = "1"
+                    )
+            }
+    )
+    @ApiResponse(
+            responseCode = "200",
+            description = "Related OOTDs returned successfully.",
+            content = @Content(schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = OotdRelatedResponse.class))
+    )
+    @GetMapping("/{ootdId}/related")
+    public BaseResponse<OotdRelatedResponse> getRelatedOotds(@PathVariable Long ootdId) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        OotdRelatedResponse response = ootdRelatedService.getRelatedOotds(currentUserId, ootdId);
+        return BaseResponse.success(response, "관련 OOTD를 조회했습니다.");
+    }
 
     @Operation(
             summary = "OOTD 게시",
