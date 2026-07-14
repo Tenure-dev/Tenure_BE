@@ -50,10 +50,10 @@ public class User extends BaseTimeEntity {
 
     @Column(name = "profile_image_url", length = 500)
     private String profileImageUrl;
-
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private UserGender gender;
+
 
     @Column(name = "height_cm", nullable = false)
     private Integer heightCm;
