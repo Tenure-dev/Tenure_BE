@@ -3,6 +3,7 @@ package com.tenure.domain.product.controller;
 import com.tenure.domain.product.dto.ProductCreateRequest;
 import com.tenure.domain.product.dto.ProductCreateResponse;
 import com.tenure.domain.product.dto.ProductDetailResponse;
+import com.tenure.domain.product.dto.ProductExternalCompleteResponse;
 import com.tenure.domain.product.dto.ProductUpdateRequest;
 import com.tenure.domain.product.dto.ProductUpdateResponse;
 import com.tenure.domain.product.service.ProductService;
@@ -239,5 +240,30 @@ public class ProductController {
         Long currentUserId = currentUserProvider.getCurrentUserId();
         ProductUpdateResponse response = productService.updateProduct(productId, currentUserId, request);
         return BaseResponse.success(response, "판매 상품을 수정했습니다.");
+    }
+
+    @Operation(
+            summary = "Complete product externally",
+            description = "The seller marks an ON_SALE product as sold outside Tenure. The product and item become SOLD, pending intents/offers are canceled, and no trade or item transfer is created.",
+            parameters = {
+                    @Parameter(
+                            name = "X-USER-ID",
+                            in = ParameterIn.HEADER,
+                            required = true,
+                            description = "Temporary current user id for Swagger/local testing before JWT is fully connected.",
+                            example = "1"
+                    )
+            }
+    )
+    @ApiResponse(
+            responseCode = "200",
+            description = "Product completed externally.",
+            content = @Content(schema = @Schema(implementation = ProductExternalCompleteResponse.class))
+    )
+    @PostMapping("/products/{productId}/complete-external")
+    public BaseResponse<ProductExternalCompleteResponse> completeExternalProduct(@PathVariable Long productId) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        ProductExternalCompleteResponse response = productService.completeExternalProduct(productId, currentUserId);
+        return BaseResponse.success(response, "외부 판매 완료로 변경했습니다.");
     }
 }

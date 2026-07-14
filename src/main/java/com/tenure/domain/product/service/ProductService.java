@@ -15,6 +15,7 @@ import com.tenure.domain.ootd.repository.OotdRepository;
 import com.tenure.domain.product.dto.ProductCreateRequest;
 import com.tenure.domain.product.dto.ProductCreateResponse;
 import com.tenure.domain.product.dto.ProductDetailResponse;
+import com.tenure.domain.product.dto.ProductExternalCompleteResponse;
 import com.tenure.domain.product.dto.ProductUpdateRequest;
 import com.tenure.domain.product.dto.ProductUpdateResponse;
 import com.tenure.domain.product.entity.Product;
@@ -25,6 +26,12 @@ import com.tenure.domain.product.enums.ProductViewerMode;
 import com.tenure.domain.product.exception.ProductErrorCode;
 import com.tenure.domain.product.repository.ProductAttachedOotdRepository;
 import com.tenure.domain.product.repository.ProductRepository;
+import com.tenure.domain.purchase.entity.PurchaseIntent;
+import com.tenure.domain.purchase.entity.PurchaseOffer;
+import com.tenure.domain.purchase.enums.PurchaseIntentStatus;
+import com.tenure.domain.purchase.enums.PurchaseOfferStatus;
+import com.tenure.domain.purchase.repository.PurchaseIntentRepository;
+import com.tenure.domain.purchase.repository.PurchaseOfferRepository;
 import com.tenure.domain.tag.enums.TagStatus;
 import com.tenure.domain.tag.repository.OotdTagRepository;
 import com.tenure.domain.user.entity.User;
@@ -53,6 +60,8 @@ public class ProductService {
     private final OotdRepository ootdRepository;
     private final OotdTagRepository ootdTagRepository;
     private final FollowRelationshipRepository followRelationshipRepository;
+    private final PurchaseIntentRepository purchaseIntentRepository;
+    private final PurchaseOfferRepository purchaseOfferRepository;
     private final ObjectMapper objectMapper;
 
     @Transactional
@@ -155,6 +164,39 @@ public class ProductService {
                 readMapOrEmpty(product.getMeasurements()),
                 readListOrEmpty(product.getConditionFlags()),
                 attachedOotdIds
+        );
+    }
+
+    @Transactional
+    public ProductExternalCompleteResponse completeExternalProduct(Long productId, Long currentUserId) {
+        Product product = productRepository.findByIdForUpdate(productId)
+                .orElseThrow(() -> new CustomException(ProductErrorCode.PRODUCT_NOT_FOUND));
+        Item item = itemRepository.findByIdForUpdate(product.getItem().getId())
+                .orElseThrow(() -> new CustomException(ProductErrorCode.ITEM_NOT_FOUND));
+
+        validateProductSeller(product, currentUserId);
+        validateOnSaleProduct(product);
+
+        List<PurchaseIntent> sentIntents = purchaseIntentRepository.findSentByProductIdForUpdate(
+                product.getId(),
+                PurchaseIntentStatus.SENT
+        );
+        sentIntents.forEach(PurchaseIntent::cancelAndReleaseAuthorization);
+
+        List<PurchaseOffer> sentOffers = purchaseOfferRepository.findSentByItemIdForUpdate(
+                item.getId(),
+                PurchaseOfferStatus.SENT
+        );
+        sentOffers.forEach(PurchaseOffer::cancelAndReleaseAuthorization);
+
+        product.markExternalSold();
+        item.markSold();
+
+        return ProductExternalCompleteResponse.of(
+                product,
+                item,
+                sentIntents.size(),
+                sentOffers.size()
         );
     }
 

@@ -5,11 +5,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tenure.domain.common.enums.FeePolicy;
+import com.tenure.domain.common.enums.PaymentAuthorizationStatus;
 import com.tenure.domain.follow.enums.FollowStatus;
 import com.tenure.domain.follow.repository.FollowRelationshipRepository;
 import com.tenure.domain.item.entity.Category;
@@ -22,6 +24,7 @@ import com.tenure.domain.ootd.repository.OotdRepository;
 import com.tenure.domain.product.dto.ProductCreateRequest;
 import com.tenure.domain.product.dto.ProductCreateResponse;
 import com.tenure.domain.product.dto.ProductDetailResponse;
+import com.tenure.domain.product.dto.ProductExternalCompleteResponse;
 import com.tenure.domain.product.dto.ProductUpdateRequest;
 import com.tenure.domain.product.dto.ProductUpdateResponse;
 import com.tenure.domain.product.entity.Product;
@@ -32,6 +35,12 @@ import com.tenure.domain.product.enums.ProductViewerMode;
 import com.tenure.domain.product.exception.ProductErrorCode;
 import com.tenure.domain.product.repository.ProductAttachedOotdRepository;
 import com.tenure.domain.product.repository.ProductRepository;
+import com.tenure.domain.purchase.entity.PurchaseIntent;
+import com.tenure.domain.purchase.entity.PurchaseOffer;
+import com.tenure.domain.purchase.enums.PurchaseIntentStatus;
+import com.tenure.domain.purchase.enums.PurchaseOfferStatus;
+import com.tenure.domain.purchase.repository.PurchaseIntentRepository;
+import com.tenure.domain.purchase.repository.PurchaseOfferRepository;
 import com.tenure.domain.tag.enums.TagStatus;
 import com.tenure.domain.tag.repository.OotdTagRepository;
 import com.tenure.domain.user.entity.User;
@@ -48,6 +57,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -76,6 +86,12 @@ class ProductServiceTest {
     @Mock
     private FollowRelationshipRepository followRelationshipRepository;
 
+    @Mock
+    private PurchaseIntentRepository purchaseIntentRepository;
+
+    @Mock
+    private PurchaseOfferRepository purchaseOfferRepository;
+
     private ProductService productService;
 
     @BeforeEach
@@ -87,6 +103,8 @@ class ProductServiceTest {
                 ootdRepository,
                 ootdTagRepository,
                 followRelationshipRepository,
+                purchaseIntentRepository,
+                purchaseOfferRepository,
                 new ObjectMapper()
         );
     }
@@ -356,6 +374,78 @@ class ProductServiceTest {
                 .isEqualTo(ProductErrorCode.ATTACHED_OOTD_INVALID);
     }
 
+    @Test
+    void completeExternalProduct_marksProductAndItemSoldAndCancelsPendingRequests() {
+        User seller = user(CURRENT_USER_ID, UserGrade.BASIC);
+        Item item = item(ITEM_ID, seller, ItemStatus.ON_SALE);
+        Product product = product(200L, item, seller, ProductStatus.ON_SALE);
+        PurchaseIntent intent = purchaseIntent(300L);
+        PurchaseOffer offer = purchaseOffer(400L);
+
+        when(productRepository.findByIdForUpdate(200L)).thenReturn(Optional.of(product));
+        when(itemRepository.findByIdForUpdate(ITEM_ID)).thenReturn(Optional.of(item));
+        when(purchaseIntentRepository.findSentByProductIdForUpdate(200L, PurchaseIntentStatus.SENT))
+                .thenReturn(List.of(intent));
+        when(purchaseOfferRepository.findSentByItemIdForUpdate(ITEM_ID, PurchaseOfferStatus.SENT))
+                .thenReturn(List.of(offer));
+
+        ProductExternalCompleteResponse response = productService.completeExternalProduct(200L, CURRENT_USER_ID);
+
+        assertThat(response.productId()).isEqualTo(200L);
+        assertThat(response.itemId()).isEqualTo(ITEM_ID);
+        assertThat(response.productStatus()).isEqualTo(ProductStatus.SOLD);
+        assertThat(response.itemStatus()).isEqualTo(ItemStatus.SOLD);
+        assertThat(response.canceledIntentCount()).isOne();
+        assertThat(response.canceledOfferCount()).isOne();
+        assertThat(product.getProductStatus()).isEqualTo(ProductStatus.SOLD);
+        assertThat(item.getItemStatus()).isEqualTo(ItemStatus.SOLD);
+        assertThat(intent.getStatus()).isEqualTo(PurchaseIntentStatus.CANCELED);
+        assertThat(intent.getPaymentAuthorizationStatus()).isEqualTo(PaymentAuthorizationStatus.RELEASED);
+        assertThat(offer.getStatus()).isEqualTo(PurchaseOfferStatus.CANCELED);
+        assertThat(offer.getPaymentAuthorizationStatus()).isEqualTo(PaymentAuthorizationStatus.RELEASED);
+
+        InOrder inOrder = inOrder(
+                productRepository,
+                itemRepository,
+                purchaseIntentRepository,
+                purchaseOfferRepository
+        );
+        inOrder.verify(productRepository).findByIdForUpdate(200L);
+        inOrder.verify(itemRepository).findByIdForUpdate(ITEM_ID);
+        inOrder.verify(purchaseIntentRepository).findSentByProductIdForUpdate(200L, PurchaseIntentStatus.SENT);
+        inOrder.verify(purchaseOfferRepository).findSentByItemIdForUpdate(ITEM_ID, PurchaseOfferStatus.SENT);
+    }
+
+    @Test
+    void completeExternalProduct_rejectsNonSeller() {
+        User seller = user(2L, UserGrade.BASIC);
+        Item item = item(ITEM_ID, seller, ItemStatus.ON_SALE);
+        Product product = product(200L, item, seller, ProductStatus.ON_SALE);
+
+        when(productRepository.findByIdForUpdate(200L)).thenReturn(Optional.of(product));
+        when(itemRepository.findByIdForUpdate(ITEM_ID)).thenReturn(Optional.of(item));
+
+        assertThatThrownBy(() -> productService.completeExternalProduct(200L, CURRENT_USER_ID))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(ProductErrorCode.PRODUCT_OWNER_ONLY);
+    }
+
+    @Test
+    void completeExternalProduct_rejectsNonOnSaleProduct() {
+        User seller = user(CURRENT_USER_ID, UserGrade.BASIC);
+        Item item = item(ITEM_ID, seller, ItemStatus.ON_SALE);
+        Product product = product(200L, item, seller, ProductStatus.SOLD);
+
+        when(productRepository.findByIdForUpdate(200L)).thenReturn(Optional.of(product));
+        when(itemRepository.findByIdForUpdate(ITEM_ID)).thenReturn(Optional.of(item));
+
+        assertThatThrownBy(() -> productService.completeExternalProduct(200L, CURRENT_USER_ID))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(ProductErrorCode.PRODUCT_ITEM_STATUS_INVALID);
+    }
+
     private ProductCreateRequest request(FeePolicy feePolicy, int shippingFee, List<Long> attachedOotdIds) {
         return new ProductCreateRequest(
                 50000,
@@ -435,6 +525,22 @@ class ProductServiceTest {
         ReflectionTestUtils.setField(product, "id", id);
         ReflectionTestUtils.setField(product, "productStatus", status);
         return product;
+    }
+
+    private PurchaseIntent purchaseIntent(Long id) {
+        PurchaseIntent intent = instantiate(PurchaseIntent.class);
+        ReflectionTestUtils.setField(intent, "id", id);
+        ReflectionTestUtils.setField(intent, "status", PurchaseIntentStatus.SENT);
+        ReflectionTestUtils.setField(intent, "paymentAuthorizationStatus", PaymentAuthorizationStatus.AUTHORIZED);
+        return intent;
+    }
+
+    private PurchaseOffer purchaseOffer(Long id) {
+        PurchaseOffer offer = instantiate(PurchaseOffer.class);
+        ReflectionTestUtils.setField(offer, "id", id);
+        ReflectionTestUtils.setField(offer, "status", PurchaseOfferStatus.SENT);
+        ReflectionTestUtils.setField(offer, "paymentAuthorizationStatus", PaymentAuthorizationStatus.AUTHORIZED);
+        return offer;
     }
 
     private ProductAttachedOotd attachedOotd(Product product, Ootd ootd) {
