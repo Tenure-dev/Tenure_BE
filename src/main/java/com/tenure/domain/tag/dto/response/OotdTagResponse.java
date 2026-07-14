@@ -1,4 +1,4 @@
-package com.tenure.domain.tag.dto;
+package com.tenure.domain.tag.dto.response;
 
 import com.tenure.domain.tag.entity.OotdTag;
 import com.tenure.domain.tag.enums.TagSource;

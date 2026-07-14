@@ -110,4 +110,21 @@ public class OotdTag extends BaseTimeEntity {
         tag.status = TagStatus.CONFIRMED;
         return tag;
     }
+
+    public void confirm(
+            Item item,
+            String labelText,
+            BigDecimal bboxX,
+            BigDecimal bboxY,
+            BigDecimal bboxWidth,
+            BigDecimal bboxHeight
+    ) {
+        this.item = item;
+        this.labelText = labelText;
+        this.bboxX = bboxX;
+        this.bboxY = bboxY;
+        this.bboxWidth = bboxWidth;
+        this.bboxHeight = bboxHeight;
+        this.status = TagStatus.CONFIRMED;
+    }
 }
