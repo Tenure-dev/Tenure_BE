@@ -138,6 +138,10 @@ public class Product extends BaseTimeEntity {
         this.productStatus = ProductStatus.SOLD;
     }
 
+    public void hide() {
+        this.productStatus = ProductStatus.HIDDEN;
+    }
+
     public void markSold() {
         if (productStatus != ProductStatus.TRADING) {
             throw new CustomException(ProductErrorCode.PRODUCT_NOT_TRADING);

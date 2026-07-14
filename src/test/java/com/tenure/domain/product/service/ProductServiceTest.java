@@ -23,6 +23,7 @@ import com.tenure.domain.ootd.enums.OotdPublicationStatus;
 import com.tenure.domain.ootd.repository.OotdRepository;
 import com.tenure.domain.product.dto.ProductCreateRequest;
 import com.tenure.domain.product.dto.ProductCreateResponse;
+import com.tenure.domain.product.dto.ProductDeleteResponse;
 import com.tenure.domain.product.dto.ProductDetailResponse;
 import com.tenure.domain.product.dto.ProductExternalCompleteResponse;
 import com.tenure.domain.product.dto.ProductUpdateRequest;
@@ -441,6 +442,52 @@ class ProductServiceTest {
         when(itemRepository.findByIdForUpdate(ITEM_ID)).thenReturn(Optional.of(item));
 
         assertThatThrownBy(() -> productService.completeExternalProduct(200L, CURRENT_USER_ID))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(ProductErrorCode.PRODUCT_ITEM_STATUS_INVALID);
+    }
+
+    @Test
+    void deleteProduct_hidesOnSaleProductAndRevertsItemToOwned() {
+        User seller = user(CURRENT_USER_ID, UserGrade.BASIC);
+        Item item = item(ITEM_ID, seller, ItemStatus.ON_SALE);
+        Product product = product(200L, item, seller, ProductStatus.ON_SALE);
+
+        when(productRepository.findByIdForUpdate(200L)).thenReturn(Optional.of(product));
+
+        ProductDeleteResponse response = productService.deleteProduct(200L, CURRENT_USER_ID);
+
+        assertThat(response.productId()).isEqualTo(200L);
+        assertThat(response.itemId()).isEqualTo(ITEM_ID);
+        assertThat(response.productStatus()).isEqualTo(ProductStatus.HIDDEN);
+        assertThat(response.itemStatus()).isEqualTo(ItemStatus.OWNED);
+        assertThat(product.getProductStatus()).isEqualTo(ProductStatus.HIDDEN);
+        assertThat(item.getItemStatus()).isEqualTo(ItemStatus.OWNED);
+    }
+
+    @Test
+    void deleteProduct_rejectsNonSeller() {
+        User seller = user(2L, UserGrade.BASIC);
+        Item item = item(ITEM_ID, seller, ItemStatus.ON_SALE);
+        Product product = product(200L, item, seller, ProductStatus.ON_SALE);
+
+        when(productRepository.findByIdForUpdate(200L)).thenReturn(Optional.of(product));
+
+        assertThatThrownBy(() -> productService.deleteProduct(200L, CURRENT_USER_ID))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(ProductErrorCode.PRODUCT_OWNER_ONLY);
+    }
+
+    @Test
+    void deleteProduct_rejectsNonOnSaleProduct() {
+        User seller = user(CURRENT_USER_ID, UserGrade.BASIC);
+        Item item = item(ITEM_ID, seller, ItemStatus.ON_SALE);
+        Product product = product(200L, item, seller, ProductStatus.SOLD);
+
+        when(productRepository.findByIdForUpdate(200L)).thenReturn(Optional.of(product));
+
+        assertThatThrownBy(() -> productService.deleteProduct(200L, CURRENT_USER_ID))
                 .isInstanceOf(CustomException.class)
                 .extracting("errorCode")
                 .isEqualTo(ProductErrorCode.PRODUCT_ITEM_STATUS_INVALID);

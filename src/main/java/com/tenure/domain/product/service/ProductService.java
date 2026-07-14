@@ -14,6 +14,7 @@ import com.tenure.domain.ootd.enums.OotdPublicationStatus;
 import com.tenure.domain.ootd.repository.OotdRepository;
 import com.tenure.domain.product.dto.ProductCreateRequest;
 import com.tenure.domain.product.dto.ProductCreateResponse;
+import com.tenure.domain.product.dto.ProductDeleteResponse;
 import com.tenure.domain.product.dto.ProductDetailResponse;
 import com.tenure.domain.product.dto.ProductExternalCompleteResponse;
 import com.tenure.domain.product.dto.ProductUpdateRequest;
@@ -198,6 +199,21 @@ public class ProductService {
                 sentIntents.size(),
                 sentOffers.size()
         );
+    }
+
+    @Transactional
+    public ProductDeleteResponse deleteProduct(Long productId, Long currentUserId) {
+        Product product = productRepository.findByIdForUpdate(productId)
+                .orElseThrow(() -> new CustomException(ProductErrorCode.PRODUCT_NOT_FOUND));
+        Item item = product.getItem();
+
+        validateProductSeller(product, currentUserId);
+        validateOnSaleProduct(product);
+
+        product.hide();
+        item.markOwned();
+
+        return ProductDeleteResponse.of(product, item);
     }
 
     private void validateOwner(Item item, Long currentUserId) {
