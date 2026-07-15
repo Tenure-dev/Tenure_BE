@@ -110,6 +110,10 @@ public class Item extends BaseTimeEntity {
         this.itemStatus = ItemStatus.ON_SALE;
     }
 
+    public void changePurchaseOfferEnabled(Boolean purchaseOfferEnabled) {
+        this.purchaseOfferEnabled = purchaseOfferEnabled;
+    }
+
     public void markSold() {
         this.itemStatus = ItemStatus.SOLD;
     }
