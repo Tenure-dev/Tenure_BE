@@ -18,6 +18,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.tenure.domain.ootd.enums.OotdPublicationStatus;
+import com.tenure.domain.product.enums.ProductStatus;
+import com.tenure.domain.product.repository.ProductRepository;
+import com.tenure.domain.tag.enums.TagStatus;
+import com.tenure.domain.tag.repository.OotdTagRepository;
 
 @Service
 @RequiredArgsConstructor
@@ -25,6 +30,8 @@ public class ItemService {
 
     private static final int LARGE_CATEGORY_DEPTH = 1; //상위 카테고리 depth
     private static final int SMALL_CATEGORY_DEPTH = 2; //상세 카테고리 depth
+    private final OotdTagRepository ootdTagRepository;
+    private final ProductRepository productRepository;
 
     private final ItemRepository itemRepository; //새 Item 저장
     private final CategoryRepository categoryRepository; //categoryLarge/categorySmall로 Category 찾기
@@ -96,7 +103,7 @@ public class ItemService {
     @Transactional(readOnly = true)
     public ItemDetailResponse getItemDetail(Long currentUserId, Long itemId) {
         Item item = findItem(itemId); //itemId로 아이템 찾고
-        validateItemOwner(item, currentUserId); // 현재 사용자가 소유자인지 확인
+        validateItemAccess(item, currentUserId); // 현재 사용자가 소유자인지 확인
 
         return ItemDetailResponse.from(item); // 상세 응답 DTO로 바꿔서 돌려준다
     }
@@ -106,9 +113,40 @@ public class ItemService {
                 .orElseThrow(() -> new CustomException(ItemErrorCode.ITEM_NOT_FOUND));
     }
 
+    private void validateItemAccess(Item item, Long currentUserId) {
+        if (item.getOwner().getId().equals(currentUserId)) {
+            return;
+        }
+
+        if (isTaggedInVisibleOotd(item.getId())) {
+            return;
+        }
+
+        if (isOnSaleProduct(item.getId())) {
+            return;
+        }
+
+        throw new CustomException(ItemErrorCode.ITEM_ACCESS_DENIED);
+    }
+
     private void validateItemOwner(Item item, Long currentUserId) {
         if (!item.getOwner().getId().equals(currentUserId)) {
             throw new CustomException(ItemErrorCode.ITEM_ACCESS_DENIED);
         }
+    }
+
+    private boolean isTaggedInVisibleOotd(Long itemId) {
+        return ootdTagRepository.existsVisibleTagByItemId(
+                itemId,
+                OotdPublicationStatus.ACTIVE,
+                TagStatus.CONFIRMED
+        );
+    }
+
+    private boolean isOnSaleProduct(Long itemId) {
+        return productRepository.existsByItemIdAndProductStatus(
+                itemId,
+                ProductStatus.ON_SALE
+        );
     }
 }
