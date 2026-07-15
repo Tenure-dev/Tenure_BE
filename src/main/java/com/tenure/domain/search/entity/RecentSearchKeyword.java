@@ -40,4 +40,11 @@ public class RecentSearchKeyword {
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
     }
+
+    public static RecentSearchKeyword of(User user, String keyword) {
+        RecentSearchKeyword r = new RecentSearchKeyword();
+        r.user = user;
+        r.keyword = keyword;
+        return r;
+    }
 }

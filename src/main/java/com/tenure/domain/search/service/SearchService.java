@@ -11,6 +11,7 @@ import com.tenure.domain.search.enums.SearchSortType;
 import com.tenure.domain.search.exception.SearchErrorCode;
 import com.tenure.domain.search.repository.RecentSearchKeywordRepository;
 import com.tenure.domain.search.repository.RecentViewUserRepository;
+import com.tenure.domain.user.entity.User;
 import com.tenure.domain.user.enums.UserGender;
 import com.tenure.domain.user.repository.UserRepository;
 import com.tenure.global.exception.CustomException;
@@ -39,19 +40,13 @@ public class SearchService {
 
     //추천 검색어
     public SearchSuggestionResponse getSuggestions() {
-        log.info("[추천 검색어 api 호출]");
-        List<String> topKeywords = recentSearchKeywordRepository.findTopKeywords(10);
-
-        log.debug("[추천 검색어 api 호출] 조회 {}개", topKeywords.size());
-
-        return SearchSuggestionResponse.from(topKeywords);
-
+            return null;
     }
 
     //최근 검색 and 최근 본 사용자 조회
     public SearchRecentResponse getRecent(Long currentUserId) {
 
-        log.info("[최근 검색 / 최근 본 사용자 조회] currentUserId = {}", currentUserId);
+        log.info("[최근 검색 / 최근 본 사용자 조회 / 추천 검색어 ] currentUserId = {}", currentUserId);
 
         //최근 본 사용자 4건 조회
         List<RecentUserResponse> recentUser = recentViewUserRepository
@@ -61,8 +56,11 @@ public class SearchService {
         List<RecentKeywordResponse> recentKeyword = recentSearchKeywordRepository
                 .findByUserTopKeywords(currentUserId, 3);
 
+        //추천 검색어 TOP 10 조회
+        List<String> suggestions = recentSearchKeywordRepository.findTopKeywords(10);
+
         //종합 응답 dto 변환
-        return SearchRecentResponse.from(recentUser, recentKeyword);
+        return SearchRecentResponse.from(recentUser, recentKeyword, suggestions);
 
     }
 
@@ -108,7 +106,9 @@ public class SearchService {
 
 
     // ootd 검색(공개된 ootd, 카테고리조건, 제품 명 or 브랜드 명에서 키워드 검색)
+    @Transactional
     public SearchOotdCursorResponse searchOotds(
+            Long currentUserId,
             String keyword, UserGender gender,
             Integer heightMin, Integer heightMax,
             Integer weightMin, Integer weightMax,
@@ -122,6 +122,12 @@ public class SearchService {
 
         // 키워드가 빈칸으로 들어오는경우
         if (keyword == null || keyword.isBlank()) keyword = "";
+
+        // 유효한 검색어면 최근 검색어 저장
+        if (!keyword.isBlank()) {
+            User user = userRepository.getReferenceById(currentUserId);
+            recentSearchKeywordRepository.save(RecentSearchKeyword.of(user, keyword));
+        }
 
         if (categoryIds != null && categoryIds.isEmpty()) {
             categoryIds = null;
@@ -174,6 +180,7 @@ public class SearchService {
     }
 
     //유저 검색
+    @Transactional
     public SearchUserCursorResponse searchUser(Long currentUserId, String keyword, Long cursorId, int size) {
 
         log.info("[유저 검색 api] keyword = {}", keyword);
@@ -182,6 +189,10 @@ public class SearchService {
             log.debug("[유저 검색 api] 검색어 없음 → 빈 결과 반환");
             return SearchUserCursorResponse.empty();
         }
+
+        // 최근 검색어 저장
+        User user = userRepository.getReferenceById(currentUserId);
+        recentSearchKeywordRepository.save(RecentSearchKeyword.of(user, keyword));
 
         if (cursorId == null) cursorId = Long.MAX_VALUE;
 
@@ -200,4 +211,5 @@ public class SearchService {
         log.info("[유저 검색 api] 유저 검색 완료");
         return SearchUserCursorResponse.from(searchUsers, followingIds);
     }
+
 }

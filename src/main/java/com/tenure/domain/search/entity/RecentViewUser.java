@@ -44,4 +44,15 @@ public class RecentViewUser {
     protected void onUpdate() {
         this.lastViewedAt = LocalDateTime.now();
     }
+
+    public static RecentViewUser of(User viewer, User viewed) {
+        RecentViewUser r = new RecentViewUser();
+        r.viewer = viewer;
+        r.viewed = viewed;
+        return r;
+    }
+
+    public void touch() {
+        this.lastViewedAt = LocalDateTime.now();
+    }
 }
