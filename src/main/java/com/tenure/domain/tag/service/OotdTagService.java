@@ -5,8 +5,9 @@ import com.tenure.domain.item.repository.ItemRepository;
 import com.tenure.domain.ootd.ai.AiTagResult;
 import com.tenure.domain.ootd.entity.Ootd;
 import com.tenure.domain.ootd.repository.OotdRepository;
-import com.tenure.domain.tag.dto.OotdTagCreateRequest;
-import com.tenure.domain.tag.dto.OotdTagResponse;
+import com.tenure.domain.tag.dto.request.OotdTagCreateRequest;
+import com.tenure.domain.tag.dto.response.OotdTagResponse;
+import com.tenure.domain.tag.dto.request.OotdTagUpdateRequest;
 import com.tenure.domain.tag.entity.OotdTag;
 import com.tenure.domain.tag.enums.TagStatus;
 import com.tenure.domain.tag.exception.TagErrorCode;
@@ -77,6 +78,27 @@ public class OotdTagService {
                 request.bbox().height()
         );
         ootdTagRepository.save(tag);
+
+        return OotdTagResponse.of(tag);
+    }
+
+    @Transactional
+    public OotdTagResponse updateTag(Long tagId, Long currentUserId, OotdTagUpdateRequest request) {
+        OotdTag tag = ootdTagRepository.findById(tagId)
+                .orElseThrow(() -> new CustomException(TagErrorCode.TAG_NOT_FOUND));
+        validateOwner(tag.getOotd(), currentUserId);
+
+        Item item = itemRepository.findById(request.itemId())
+                .orElseThrow(() -> new CustomException(TagErrorCode.ITEM_NOT_FOUND));
+
+        tag.updateContent(
+                item,
+                request.labelText(),
+                request.bbox().x(),
+                request.bbox().y(),
+                request.bbox().width(),
+                request.bbox().height()
+        );
 
         return OotdTagResponse.of(tag);
     }
