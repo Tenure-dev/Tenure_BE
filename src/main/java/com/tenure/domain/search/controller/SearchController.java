@@ -4,6 +4,7 @@ import com.tenure.domain.item.enums.ItemStatus;
 import com.tenure.domain.search.dto.response.SearchOotdCursorResponse;
 import com.tenure.domain.search.dto.response.SearchRecentResponse;
 import com.tenure.domain.search.dto.response.SearchSuggestionResponse;
+import com.tenure.domain.search.dto.response.SearchUserCursorResponse;
 import com.tenure.domain.search.enums.SearchSortType;
 import com.tenure.domain.search.service.SearchService;
 import com.tenure.domain.user.enums.UserGender;
@@ -120,4 +121,24 @@ public class SearchController {
 
         return BaseResponse.success(searchOotdCursorResponse);
     }
+
+    @Operation(
+            summary = "유저 검색",
+            description = "username으로 사용자를 검색합니다. keyword는 필수이며 prefix 방식으로 검색됩니다.",
+            parameters = {
+                    @Parameter(name = "X-USER-ID", in = ParameterIn.HEADER, required = true,
+                            description = "JWT 적용 전 Swagger 테스트용 현재 사용자 ID", example = "1")
+            })
+    @GetMapping("/users")
+    public BaseResponse<SearchUserCursorResponse> searchUser(
+            @RequestParam String keyword,
+            @RequestParam(required = false) Long cursorId,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        SearchUserCursorResponse searchUserCursorResponse = searchService.
+                searchUser(currentUserProvider.getCurrentUserId(), keyword, cursorId, size);
+
+        return BaseResponse.success(searchUserCursorResponse);
+    }
+
 }

@@ -1,5 +1,6 @@
 package com.tenure.domain.search.service;
 
+import com.tenure.domain.follow.repository.FollowRelationshipRepository;
 import com.tenure.domain.item.enums.ItemStatus;
 import com.tenure.domain.ootd.entity.Ootd;
 import com.tenure.domain.ootd.repository.OotdRepository;
@@ -11,6 +12,7 @@ import com.tenure.domain.search.exception.SearchErrorCode;
 import com.tenure.domain.search.repository.RecentSearchKeywordRepository;
 import com.tenure.domain.search.repository.RecentViewUserRepository;
 import com.tenure.domain.user.enums.UserGender;
+import com.tenure.domain.user.repository.UserRepository;
 import com.tenure.global.exception.CustomException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,6 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.List;
 
 @Service
@@ -31,6 +34,8 @@ public class SearchService {
     private final RecentSearchKeywordRepository recentSearchKeywordRepository;
     private final RecentViewUserRepository recentViewUserRepository;
     private final OotdRepository ootdRepository;
+    private final FollowRelationshipRepository followRelationshipRepository;
+    private final UserRepository userRepository;
 
     //추천 검색어
     public SearchSuggestionResponse getSuggestions() {
@@ -166,5 +171,33 @@ public class SearchService {
         log.debug("[OOTD 검색] 조회 {}건, hasNext = {}", ootds.getNumberOfElements(), ootds.hasNext());
 
         return SearchOotdCursorResponse.from(ootds, sort, count);
+    }
+
+    //유저 검색
+    public SearchUserCursorResponse searchUser(Long currentUserId, String keyword, Long cursorId, int size) {
+
+        log.info("[유저 검색 api] keyword = {}", keyword);
+
+        if (keyword == null || keyword.isBlank()) {
+            log.debug("[유저 검색 api] 검색어 없음 → 빈 결과 반환");
+            return SearchUserCursorResponse.empty();
+        }
+
+        if (cursorId == null) cursorId = Long.MAX_VALUE;
+
+        PageRequest pageRequest = PageRequest.of(0, size);
+        Slice<SearchUserQueryDto> searchUsers = userRepository.searchUsers(keyword, cursorId, pageRequest);
+
+        log.debug("[유저 검색 api] 조회 {}건, hasNext = {}", searchUsers.getNumberOfElements(), searchUsers.hasNext());
+
+        List<Long> targetIds = searchUsers.getContent()
+                .stream().map(SearchUserQueryDto::getId).toList();
+
+        //내가 팔로우 한 유저의 id
+        //팔로우 한 유저가 없다면 그냥 빈 set 반환
+        HashSet<Long> followingIds = targetIds.isEmpty() ? new HashSet<>() : new HashSet<>(followRelationshipRepository.findFollowingIds(currentUserId, targetIds));
+
+        log.info("[유저 검색 api] 유저 검색 완료");
+        return SearchUserCursorResponse.from(searchUsers, followingIds);
     }
 }
