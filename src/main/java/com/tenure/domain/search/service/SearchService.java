@@ -5,6 +5,7 @@ import com.tenure.domain.search.dto.response.RecentUserResponse;
 import com.tenure.domain.search.dto.response.SearchRecentResponse;
 import com.tenure.domain.search.dto.response.SearchSuggestionResponse;
 import com.tenure.domain.search.entity.RecentSearchKeyword;
+import com.tenure.domain.search.entity.RecentViewUser;
 import com.tenure.domain.search.exception.SearchErrorCode;
 import com.tenure.domain.search.repository.RecentSearchKeywordRepository;
 import com.tenure.domain.search.repository.RecentViewUserRepository;
@@ -66,13 +67,30 @@ public class SearchService {
         log.debug("[최근 검색어 삭제 api] keyword = {}", recentSearchKeyword.getKeyword());
 
         if(!recentSearchKeyword.getUser().getId().equals(currentUserId)) {
-            log.warn("[최근 검색어 삭제 api] 본인의 검색 기록만 지울 수 있습니다. currentUserId = {}", currentUserId);
+            log.warn("[최근 검색어 삭제 api] 삭제 권한이 없습니다. currentUserId = {}", currentUserId);
             throw new CustomException(SearchErrorCode.KEYWORD_FORBIDDEN);
         }
 
         recentSearchKeywordRepository
                 .deleteRecentSearchKeywordByKeyword(currentUserId, recentSearchKeyword.getKeyword());
         log.info("[최근 검색어 삭제 api] keyword 삭제 완료");
+    }
+
+    @Transactional
+    public void deleteRecentUser(Long currentUserId, Long recentViewedUserId) {
+
+        log.debug("[최근 본 사용자 삭제 api] currentUserId = {}, recentViewedUserId = {}", currentUserId, recentViewedUserId);
+        RecentViewUser recentViewUser = recentViewUserRepository.findByViewed_Id(currentUserId, recentViewedUserId)
+                .orElseThrow(() -> {
+                    log.warn("[최근 본 사용자 삭제 api] 최근 사용자를 찾을 수 업습니다. recentViewedUserId = {}", recentViewedUserId);
+                    return new CustomException(SearchErrorCode.RECENT_USER_NOT_FOUND);
+                });
+        // findByViewed_Id의 실행으로 currentUserId와 recentViewUser.viewer.id가 같음 -> 별도의 권한 검증 필요 X
+
+        log.debug("[최근 본 사용자 삭제 api] 최근 본 사용자 id = {}", recentViewedUserId);
+
+        recentViewUserRepository.deleteRecentViewedUser(currentUserId, recentViewedUserId);
+        log.info("[최근 본 사용자 api] 최근 본 사용자 삭제 완료.");
 
     }
 }
