@@ -2,6 +2,7 @@ package com.tenure.domain.item.controller;
 
 import com.tenure.domain.item.dto.ItemCreateRequest;
 import com.tenure.domain.item.dto.ItemCreateResponse;
+import com.tenure.domain.item.dto.ItemDetailResponse;
 import com.tenure.domain.item.dto.ItemListResponse;
 import com.tenure.domain.item.enums.ItemStatus;
 import com.tenure.domain.item.service.ItemService;
@@ -75,5 +76,26 @@ public class ItemController {
         );
 
         return BaseResponse.success(response, "내 아이템 목록 조회에 성공했습니다.");
+    }
+
+    //아이템 상세 조회
+    @Operation(
+            summary = "아이템 상세 조회",
+            description = "itemId 기준으로 아이템 상세 정보를 조회합니다."
+    )
+    @Parameter(
+            name = "X-USER-ID",
+            description = "개발용 사용자 ID 헤더",
+            in = ParameterIn.HEADER,
+            example = "1"
+    )
+    @GetMapping("/items/{itemId}")
+    public BaseResponse<ItemDetailResponse> getItemDetail(
+            @PathVariable Long itemId
+    ) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        ItemDetailResponse response = itemService.getItemDetail(currentUserId, itemId);
+
+        return BaseResponse.success(response, "아이템 상세 조회에 성공했습니다.");
     }
 }
