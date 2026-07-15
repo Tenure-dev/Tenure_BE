@@ -129,5 +129,6 @@ public class OotdTag extends BaseTimeEntity {
         this.bboxY = bboxY;
         this.bboxWidth = bboxWidth;
         this.bboxHeight = bboxHeight;
+        this.status = TagStatus.CONFIRMED;
     }
 }
