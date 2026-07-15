@@ -142,6 +142,12 @@ class TradeServiceTest {
         assertThat(response.settlementAmount()).isNull();
         assertThat(response.buyerServiceFee()).isEqualTo(0);
         assertThat(response.sellerServiceFee()).isNull();
+        assertThat(response.deliveryReceiverName()).isEqualTo("Buyer");
+        assertThat(response.deliveryPhone()).isEqualTo("010-1234-5678");
+        assertThat(response.deliveryAddressLine1()).isEqualTo("Seoul Gangnam");
+        assertThat(response.deliveryAddressLine2()).isEqualTo("101");
+        assertThat(response.deliveryPostalCode()).isEqualTo("12345");
+        assertThat(response.deliveryRequestNote()).isEqualTo("Leave at door");
     }
 
     @Test
@@ -158,6 +164,8 @@ class TradeServiceTest {
         assertThat(response.paymentAmount()).isNull();
         assertThat(response.sellerServiceFee()).isEqualTo(2400);
         assertThat(response.buyerServiceFee()).isNull();
+        assertThat(response.deliveryReceiverName()).isEqualTo("Buyer");
+        assertThat(response.deliveryAddressLine1()).isEqualTo("Seoul Gangnam");
     }
 
     @Test
@@ -526,6 +534,12 @@ class TradeServiceTest {
         ReflectionTestUtils.setField(trade, "paymentAmount", 43000);
         ReflectionTestUtils.setField(trade, "settlementAmount", 40600);
         ReflectionTestUtils.setField(trade, "status", status);
+        ReflectionTestUtils.setField(trade, "deliveryReceiverName", "Buyer");
+        ReflectionTestUtils.setField(trade, "deliveryPhone", "010-1234-5678");
+        ReflectionTestUtils.setField(trade, "deliveryAddressLine1", "Seoul Gangnam");
+        ReflectionTestUtils.setField(trade, "deliveryAddressLine2", "101");
+        ReflectionTestUtils.setField(trade, "deliveryPostalCode", "12345");
+        ReflectionTestUtils.setField(trade, "deliveryRequestNote", "Leave at door");
         return trade;
     }
 

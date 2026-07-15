@@ -12,6 +12,8 @@ import org.springframework.data.repository.query.Param;
 
 public interface OotdTagRepository extends JpaRepository<OotdTag, Long> {
 
+    List<OotdTag> findAllByOotdId(Long ootdId);
+
     @Query("""
             select count(distinct ootd.id)
             from OotdTag tag
@@ -26,6 +28,20 @@ public interface OotdTagRepository extends JpaRepository<OotdTag, Long> {
             @Param("itemId") Long itemId,
             @Param("ownerUserId") Long ownerUserId,
             @Param("ootdIds") Collection<Long> ootdIds,
+            @Param("publicationStatus") OotdPublicationStatus publicationStatus,
+            @Param("tagStatus") TagStatus tagStatus
+    );
+
+    @Query("""
+            select count(tag) > 0
+            from OotdTag tag
+            join tag.ootd ootd
+            where tag.item.id = :itemId
+              and ootd.publicationStatus = :publicationStatus
+              and tag.status = :tagStatus
+            """)
+    boolean existsVisibleTagByItemId(
+            @Param("itemId") Long itemId,
             @Param("publicationStatus") OotdPublicationStatus publicationStatus,
             @Param("tagStatus") TagStatus tagStatus
     );

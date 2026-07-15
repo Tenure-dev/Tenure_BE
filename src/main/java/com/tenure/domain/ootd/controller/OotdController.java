@@ -24,7 +24,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 @Tag(name = "Ootd", description = "Ootd 등록/태그 API")
 @RestController
-@RequestMapping("/api/ootds")
+@RequestMapping("/ootds")
 @RequiredArgsConstructor
 public class OotdController {
 
