@@ -1,20 +1,25 @@
 package com.tenure.domain.search.service;
 
-import com.tenure.domain.search.dto.response.RecentKeywordResponse;
-import com.tenure.domain.search.dto.response.RecentUserResponse;
-import com.tenure.domain.search.dto.response.SearchRecentResponse;
-import com.tenure.domain.search.dto.response.SearchSuggestionResponse;
+import com.tenure.domain.item.enums.ItemStatus;
+import com.tenure.domain.ootd.entity.Ootd;
+import com.tenure.domain.ootd.repository.OotdRepository;
+import com.tenure.domain.search.dto.response.*;
 import com.tenure.domain.search.entity.RecentSearchKeyword;
 import com.tenure.domain.search.entity.RecentViewUser;
+import com.tenure.domain.search.enums.SearchSortType;
 import com.tenure.domain.search.exception.SearchErrorCode;
 import com.tenure.domain.search.repository.RecentSearchKeywordRepository;
 import com.tenure.domain.search.repository.RecentViewUserRepository;
+import com.tenure.domain.user.enums.UserGender;
 import com.tenure.global.exception.CustomException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -25,6 +30,7 @@ public class SearchService {
 
     private final RecentSearchKeywordRepository recentSearchKeywordRepository;
     private final RecentViewUserRepository recentViewUserRepository;
+    private final OotdRepository ootdRepository;
 
     //추천 검색어
     public SearchSuggestionResponse getSuggestions() {
@@ -54,6 +60,7 @@ public class SearchService {
         return SearchRecentResponse.from(recentUser, recentKeyword);
 
     }
+
 
     @Transactional
     public void deleteRecentKeyword(Long currentUserId, Long keywordId) {
@@ -92,5 +99,72 @@ public class SearchService {
         recentViewUserRepository.deleteRecentViewedUser(currentUserId, recentViewedUserId);
         log.info("[최근 본 사용자 api] 최근 본 사용자 삭제 완료.");
 
+    }
+
+
+    // ootd 검색(공개된 ootd, 카테고리조건, 제품 명 or 브랜드 명에서 키워드 검색)
+    public SearchOotdCursorResponse searchOotds(
+            String keyword, UserGender gender,
+            Integer heightMin, Integer heightMax,
+            Integer weightMin, Integer weightMax,
+            List<Long> categoryIds, ItemStatus itemStatus, SearchSortType sort,
+            LocalDateTime cursor, Long cursorId,   // LATEST용
+            Integer cursorValue,    // HEART/SAVE/VIEW용
+            int size
+    ) {
+
+        log.info("[OOTD 검색 api 호출] keyword = {}", keyword);
+
+        // 키워드가 빈칸으로 들어오는경우
+        if (keyword == null || keyword.isBlank()) keyword = "";
+
+        if (categoryIds != null && categoryIds.isEmpty()) {
+            categoryIds = null;
+        }
+
+        if (keyword.isBlank() && (categoryIds == null || categoryIds.isEmpty())) {
+            log.warn("[OOTD 검색 api] 검색어 또는 카테고리를 선택해주세요");
+            throw new CustomException(SearchErrorCode.KEYWORD_OR_CATEGORY_REQUIRED);
+        }
+
+
+        log.debug("[OOTD 검색] gender = {}, heightMin = {}, heightMax = {}, weightMin = {}, weightMax = {}, categoryIds = {}, itemStatus = {}, cursor = {}, cursorId = {}",
+                gender, heightMin, heightMax, weightMin, weightMax, categoryIds, itemStatus, cursor, cursorId);
+
+        PageRequest pageRequest = PageRequest.of(0, size);
+
+        Slice<Ootd> ootds = null;
+
+        // 추천 기준이 명확치 않아 일단 최신순으로 처리
+        // 정렬기준: 최신 순, 추천 순
+        if(sort.equals(SearchSortType.LATEST) || sort.equals(SearchSortType.RECOMMEND)) {
+
+            if(cursor == null) cursor = LocalDateTime.now();
+            if(cursorId == null) cursorId = Long.MAX_VALUE;
+
+            //repository 조회 후 최신순 정렬
+            ootds = ootdRepository
+                    .searchOotdsByLatest(keyword, gender, heightMin, heightMax,
+                            weightMin, weightMax, categoryIds,
+                            itemStatus, cursor, cursorId, pageRequest);
+
+        } else { // 정렬 기준: 조회수 순, 좋아요 순,
+            if(cursorValue == null) cursorValue = Integer.MAX_VALUE;
+            if(cursorId == null) cursorId = Long.MAX_VALUE;
+
+            //repository 조회 후 조회수 or 좋아요 정렬
+            ootds = ootdRepository.searchOotdsByCount(keyword, gender, heightMin, heightMax,
+                    weightMin, weightMax, categoryIds,
+                    itemStatus, sort.name(), cursorValue, cursorId, pageRequest);
+        }
+
+        //검색 total count 조회
+        Long count = ootdRepository.searchOotdsTotalCount(keyword, gender, heightMin, heightMax,
+                weightMin, weightMax, categoryIds, itemStatus);
+        log.debug("[OOTD 검색] 전체 조회 결과(total count) = {}건", count);
+
+        log.debug("[OOTD 검색] 조회 {}건, hasNext = {}", ootds.getNumberOfElements(), ootds.hasNext());
+
+        return SearchOotdCursorResponse.from(ootds, sort, count);
     }
 }
