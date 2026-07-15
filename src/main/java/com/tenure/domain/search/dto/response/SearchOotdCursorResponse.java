@@ -1,6 +1,5 @@
 package com.tenure.domain.search.dto.response;
 
-import com.tenure.domain.notification.dto.response.NotificationResponse;
 import com.tenure.domain.ootd.entity.Ootd;
 import com.tenure.domain.search.enums.SearchSortType;
 import lombok.AccessLevel;

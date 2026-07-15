@@ -116,12 +116,15 @@ public class SearchService {
         log.info("[OOTD 검색 api 호출] keyword = {}", keyword);
 
         // 키워드가 빈칸으로 들어오는경우
-        if (keyword != null && keyword.isBlank()) {
-            keyword = null;
-        }
+        if (keyword == null || keyword.isBlank()) keyword = "";
 
         if (categoryIds != null && categoryIds.isEmpty()) {
             categoryIds = null;
+        }
+
+        if (keyword.isBlank() && (categoryIds == null || categoryIds.isEmpty())) {
+            log.warn("[OOTD 검색 api] 검색어 또는 카테고리를 선택해주세요");
+            throw new CustomException(SearchErrorCode.KEYWORD_OR_CATEGORY_REQUIRED);
         }
 
 
