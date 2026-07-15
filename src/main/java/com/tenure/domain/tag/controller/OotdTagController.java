@@ -13,6 +13,7 @@ import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -108,5 +109,18 @@ public class OotdTagController {
         Long currentUserId = currentUserProvider.getCurrentUserId();
         OotdTagConfirmResponse response = ootdTagService.confirmTags(ootdId, currentUserId);
         return BaseResponse.success(response, "태그가 확인완료 처리되었습니다.");
+    }
+
+    @Operation(
+            summary = "[Mock] AI 태그 생성 시뮬레이션",
+            description = "실제 AI 분석 서버 연동 전, 비동기 처리 및 태그 확인완료/수정 플로우 테스트를 위해 "
+                    + "가짜 AI 태그(source=AI, status=AUTO_UNCONFIRMED, 신뢰도 0.85 이상)를 생성합니다."
+    )
+    @ApiResponse(responseCode = "200", description = "Mock 태그 생성 성공")
+    @ApiResponse(responseCode = "404", description = "존재하지 않는 OOTD")
+    @PostMapping("/{ootdId}/ai-tags/mock")
+    public BaseResponse<List<OotdTagResponse>> generateMockAiTags(@PathVariable Long ootdId) {
+        List<OotdTagResponse> response = ootdTagService.generateMockAiTags(ootdId);
+        return BaseResponse.success(response, "Mock AI 태그가 생성되었습니다.");
     }
 }

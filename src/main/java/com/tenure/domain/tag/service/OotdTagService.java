@@ -16,7 +16,10 @@ import com.tenure.domain.tag.repository.OotdTagRepository;
 import com.tenure.global.config.AiTagProperties;
 import com.tenure.global.exception.CustomException;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
+import java.util.Random;
+import java.util.stream.IntStream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -26,6 +29,11 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class OotdTagService {
+
+    private static final List<String> MOCK_LABELS = List.of(
+            "가디건", "청바지", "운동화", "니트 스웨터", "코트", "원피스", "스카프"
+    );
+    private static final Random MOCK_RANDOM = new Random();
 
     private final OotdRepository ootdRepository;
     private final ItemRepository itemRepository;
@@ -119,6 +127,41 @@ public class OotdTagService {
         ootd.confirmTags();
 
         return OotdTagConfirmResponse.of(ootd);
+    }
+
+    @Transactional
+    public List<OotdTagResponse> generateMockAiTags(Long ootdId) {
+        Ootd ootd = ootdRepository.findById(ootdId)
+                .orElseThrow(() -> new CustomException(TagErrorCode.OOTD_NOT_FOUND));
+
+        List<OotdTag> tags = createMockTags(ootd);
+        ootdTagRepository.saveAll(tags);
+        log.info("Mock AI 태그 생성 완료 - ootdId={}, 생성된 태그 수={}", ootdId, tags.size());
+
+        return tags.stream().map(OotdTagResponse::of).toList();
+    }
+
+    private List<OotdTag> createMockTags(Ootd ootd) {
+        int count = MOCK_RANDOM.nextInt(2, 4);
+        return IntStream.range(0, count)
+                .mapToObj(i -> OotdTag.createAiTag(
+                        ootd,
+                        MOCK_LABELS.get(MOCK_RANDOM.nextInt(MOCK_LABELS.size())),
+                        randomBboxValue(0.0, 0.5),
+                        randomBboxValue(0.0, 0.5),
+                        randomBboxValue(0.2, 0.5),
+                        randomBboxValue(0.2, 0.5),
+                        randomConfidence()
+                ))
+                .toList();
+    }
+
+    private BigDecimal randomBboxValue(double origin, double bound) {
+        return BigDecimal.valueOf(MOCK_RANDOM.nextDouble(origin, bound)).setScale(5, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal randomConfidence() {
+        return BigDecimal.valueOf(MOCK_RANDOM.nextDouble(0.85, 0.99)).setScale(4, RoundingMode.HALF_UP);
     }
 
     private boolean meetsConfidenceThreshold(AiTagResult result) {
