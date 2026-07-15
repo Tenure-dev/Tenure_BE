@@ -31,8 +31,11 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class PurchaseOfferAcceptService {
 
-    private static final Set<TradeStatus> FINAL_TRADE_STATUSES =
-            EnumSet.of(TradeStatus.SETTLED, TradeStatus.COMPLETED, TradeStatus.TRANSFERRED);
+    // 이 가드의 기준은 "거래가 FSM상 종결됐는가"가 아니라 "아이템이 새 거래 가능 상태로 풀려났는가"다.
+    // 아이템이 풀리는 시점은 소유권 이전(TRANSFERRED)뿐이다. SETTLED/COMPLETED까지 제외하면 구매확정 자동
+    // 연쇄(PURCHASE_CONFIRMED -> SETTLED -> COMPLETED) 이후에도 Item 상태 전이가 없어 아이템이 여전히
+    // OWNED로 남고, 그 상태에서 새 offer 생성·수락이 통과해 같은 아이템에 Trade가 중복 생성될 수 있다.
+    private static final Set<TradeStatus> ITEM_RELEASING_STATUSES = EnumSet.of(TradeStatus.TRANSFERRED);
 
     private final ItemRepository itemRepository;
     private final PurchaseOfferRepository purchaseOfferRepository;
@@ -79,7 +82,7 @@ public class PurchaseOfferAcceptService {
     }
 
     private void validateNoActiveTrade(Long itemId) {
-        if (tradeRepository.existsByItemIdAndStatusNotIn(itemId, FINAL_TRADE_STATUSES)) {
+        if (tradeRepository.existsByItemIdAndStatusNotIn(itemId, ITEM_RELEASING_STATUSES)) {
             throw new CustomException(TradeErrorCode.TRADE_ALREADY_EXISTS_FOR_ITEM);
         }
     }
@@ -96,7 +99,10 @@ public class PurchaseOfferAcceptService {
                 offer.getTotalPaymentAmount(),
                 offer.getProposerShippingFee(),
                 offer.getProposerServiceFee(),
-                0,
+                // 현재 수수료 모델(제안자 전액 부담)에서는 이 식이 항상 0이지만, 스냅샷 간 항등식이지
+                // 정책 재계산이 아니다. 수수료 모델이 owner 차감형으로 바뀌어도 생성 시점 스냅샷만으로
+                // 자동으로 올바른 값이 되므로, 0 하드코딩과 달리 그 경우 조용히 틀리지 않는다.
+                (offer.getOfferPrice() + offer.getProposerShippingFee()) - offer.getOwnerSettlementAmount(),
                 offer.getOwnerSettlementAmount(),
                 offer.getPaymentMethodId(),
                 offer.getPaymentAuthorizationId(),

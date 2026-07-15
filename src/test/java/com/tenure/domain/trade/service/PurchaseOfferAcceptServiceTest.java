@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.tenure.domain.address.entity.DeliveryAddress;
@@ -28,12 +29,14 @@ import com.tenure.global.exception.CustomException;
 import java.lang.reflect.Constructor;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -93,6 +96,8 @@ class PurchaseOfferAcceptServiceTest {
         assertThat(response.viewerMode()).isEqualTo(TradeViewerMode.SELLER);
         assertThat(response.itemPrice()).isEqualTo(360000);
         assertThat(response.shippingFee()).isEqualTo(5000);
+        // sellerServiceFee = (offerPrice + proposerShippingFee) - ownerSettlementAmount
+        //                  = (360000 + 5000) - 365000 = 0 (파생식 기준, 하드코딩 아님)
         assertThat(response.sellerServiceFee()).isEqualTo(0);
         assertThat(response.settlementAmount()).isEqualTo(365000);
         assertThat(response.productId()).isNull();
@@ -183,6 +188,9 @@ class PurchaseOfferAcceptServiceTest {
 
     @Test
     void acceptPurchaseOffer_rejectsWhenActiveTradeExists() {
+        // 이 가드는 "종결 상태가 아닌 거래"가 아니라 "아이템을 아직 풀어주지 않은 거래"를 막아야 한다.
+        // 제외 대상이 TRANSFERRED 하나뿐이라는 것을 인자로 직접 검증해, COMPLETED 상태의 거래가
+        // 이미 존재하는 경우에도(=TRANSFERRED로 아직 전이되지 않았으므로) 이 가드에 걸리는 것을 보장한다.
         setUpService();
         User owner = user(OWNER_ID);
         User proposer = user(PROPOSER_ID);
@@ -198,6 +206,40 @@ class PurchaseOfferAcceptServiceTest {
                 .isEqualTo(TradeErrorCode.TRADE_ALREADY_EXISTS_FOR_ITEM);
 
         assertThat(offer.getStatus()).isEqualTo(PurchaseOfferStatus.SENT);
+
+        ArgumentCaptor<Collection<TradeStatus>> statusesCaptor = ArgumentCaptor.forClass(Collection.class);
+        verify(tradeRepository).existsByItemIdAndStatusNotIn(eq(ITEM_ID), statusesCaptor.capture());
+        assertThat(statusesCaptor.getValue()).containsExactly(TradeStatus.TRANSFERRED);
+    }
+
+    @Test
+    void acceptPurchaseOffer_allowsAcceptWhenOnlyTransferredTradeExists() {
+        // 같은 아이템에 이미 TRANSFERRED(소유권 이전 완료) 거래만 있는 경우는 아이템이 다시 풀린 상태이므로
+        // 활성 거래 가드에 걸리지 않고 정상적으로 새 수락이 진행돼야 한다.
+        setUpService();
+        User owner = user(OWNER_ID);
+        User proposer = user(PROPOSER_ID);
+        Item item = item(ITEM_ID, owner);
+        PurchaseOffer offer = existingOffer(OFFER_ID, item, proposer, owner, LocalDateTime.now().plusHours(2));
+
+        givenOfferDetail(item, offer);
+        when(tradeRepository.existsByItemIdAndStatusNotIn(eq(ITEM_ID), any())).thenReturn(false);
+        when(purchaseOfferRepository.findSentByItemIdForUpdate(ITEM_ID, PurchaseOfferStatus.SENT))
+                .thenReturn(List.of(offer));
+        when(tradeRepository.save(any(Trade.class))).thenAnswer(invocation -> {
+            Trade trade = invocation.getArgument(0);
+            ReflectionTestUtils.setField(trade, "id", 901L);
+            return trade;
+        });
+
+        TradeDetailResponse response = purchaseOfferAcceptService.acceptPurchaseOffer(OFFER_ID, OWNER_ID);
+
+        assertThat(response.tradeId()).isEqualTo(901L);
+        assertThat(offer.getStatus()).isEqualTo(PurchaseOfferStatus.ACCEPTED);
+
+        ArgumentCaptor<Collection<TradeStatus>> statusesCaptor = ArgumentCaptor.forClass(Collection.class);
+        verify(tradeRepository).existsByItemIdAndStatusNotIn(eq(ITEM_ID), statusesCaptor.capture());
+        assertThat(statusesCaptor.getValue()).containsExactly(TradeStatus.TRANSFERRED);
     }
 
     @Test
