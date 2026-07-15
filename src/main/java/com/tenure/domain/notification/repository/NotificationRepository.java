@@ -5,6 +5,7 @@ import com.tenure.domain.notification.enums.NotificationCategory;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -28,10 +29,10 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
             @Param("cursorId") Long cursorId,
             Pageable pageable);
 
-    // 전체 읽음 수정
-    // readAt = null (읽지 않은 알림들) 모두 조회
-    @Query("select n from Notification n " +
-            "where n.receiver.id = :currentUserId " +
-            "and n.readAt is NULL")
-    List<Notification> findNotRead(@Param("currentUserId") Long currentUserId);
+
+    // 전체 읽음 수정(안읽은 알림 일괄 업데이트)
+    @Modifying(clearAutomatically = true)
+    @Query("update Notification n set n.readAt = :now " +
+            "where n.receiver.id = :currentUserId and n.readAt is null")
+    int markAllRead(@Param("currentUserId") Long currentUserId, @Param("now") LocalDateTime now);
 }
