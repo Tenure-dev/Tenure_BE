@@ -125,4 +125,6 @@ public interface TradeRepository extends JpaRepository<Trade, Long> {
             @Param("sourceType") TradeSourceType sourceType,
             @Param("sourceIds") Collection<Long> sourceIds
     );
+
+    boolean existsByItemIdAndStatusNotIn(Long itemId, Collection<TradeStatus> statuses);
 }
