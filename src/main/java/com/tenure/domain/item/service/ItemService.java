@@ -4,12 +4,19 @@ import com.tenure.domain.item.dto.ItemCreateRequest;
 import com.tenure.domain.item.dto.ItemCreateResponse;
 import com.tenure.domain.item.dto.ItemDetailResponse;
 import com.tenure.domain.item.dto.ItemListResponse;
+import com.tenure.domain.item.dto.ItemOfferSettingRequest;
+import com.tenure.domain.item.dto.ItemOfferSettingResponse;
 import com.tenure.domain.item.entity.Category;
 import com.tenure.domain.item.entity.Item;
 import com.tenure.domain.item.enums.ItemStatus;
 import com.tenure.domain.item.exception.ItemErrorCode;
 import com.tenure.domain.item.repository.CategoryRepository;
 import com.tenure.domain.item.repository.ItemRepository;
+import com.tenure.domain.ootd.enums.OotdPublicationStatus;
+import com.tenure.domain.product.enums.ProductStatus;
+import com.tenure.domain.product.repository.ProductRepository;
+import com.tenure.domain.tag.enums.TagStatus;
+import com.tenure.domain.tag.repository.OotdTagRepository;
 import com.tenure.domain.user.entity.User;
 import com.tenure.domain.user.repository.UserRepository;
 import com.tenure.global.exception.CustomException;
@@ -18,11 +25,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.tenure.domain.ootd.enums.OotdPublicationStatus;
-import com.tenure.domain.product.enums.ProductStatus;
-import com.tenure.domain.product.repository.ProductRepository;
-import com.tenure.domain.tag.enums.TagStatus;
-import com.tenure.domain.tag.repository.OotdTagRepository;
 
 @Service
 @RequiredArgsConstructor
@@ -148,5 +150,19 @@ public class ItemService {
                 itemId,
                 ProductStatus.ON_SALE
         );
+    }
+
+    @Transactional
+    public ItemOfferSettingResponse updatePurchaseOfferSetting(
+            Long currentUserId,
+            Long itemId,
+            ItemOfferSettingRequest request
+    ) {
+        Item item = findItem(itemId);
+        validateItemOwner(item, currentUserId);
+
+        item.changePurchaseOfferEnabled(request.purchaseOfferEnabled());
+
+        return ItemOfferSettingResponse.from(item);
     }
 }

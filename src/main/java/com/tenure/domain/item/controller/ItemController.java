@@ -1,9 +1,6 @@
 package com.tenure.domain.item.controller;
 
-import com.tenure.domain.item.dto.ItemCreateRequest;
-import com.tenure.domain.item.dto.ItemCreateResponse;
-import com.tenure.domain.item.dto.ItemDetailResponse;
-import com.tenure.domain.item.dto.ItemListResponse;
+import com.tenure.domain.item.dto.*;
 import com.tenure.domain.item.enums.ItemStatus;
 import com.tenure.domain.item.service.ItemService;
 import com.tenure.global.response.BaseResponse;
@@ -97,5 +94,31 @@ public class ItemController {
         ItemDetailResponse response = itemService.getItemDetail(currentUserId, itemId);
 
         return BaseResponse.success(response, "아이템 상세 조회에 성공했습니다.");
+    }
+
+    //구매제안 허용 설정
+    @Operation(
+            summary = "구매 제안 허용 설정",
+            description = "로그인 사용자의 보유 아이템에 대해 구매 제안 허용 여부를 변경합니다."
+    )
+    @Parameter(
+            name = "X-USER-ID",
+            description = "개발용 사용자 ID 헤더",
+            in = ParameterIn.HEADER,
+            example = "1"
+    )
+    @PatchMapping("/items/{itemId}/offer-setting")
+    public BaseResponse<ItemOfferSettingResponse> updatePurchaseOfferSetting(
+            @PathVariable Long itemId,
+            @Valid @RequestBody ItemOfferSettingRequest request
+    ) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        ItemOfferSettingResponse response = itemService.updatePurchaseOfferSetting(
+                currentUserId,
+                itemId,
+                request
+        );
+
+        return BaseResponse.success(response, "구매 제안 허용 설정을 변경했습니다.");
     }
 }
