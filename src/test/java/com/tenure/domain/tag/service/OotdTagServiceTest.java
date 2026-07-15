@@ -12,11 +12,14 @@ import com.tenure.domain.item.entity.Item;
 import com.tenure.domain.item.repository.ItemRepository;
 import com.tenure.domain.ootd.ai.AiTagResult;
 import com.tenure.domain.ootd.entity.Ootd;
+import com.tenure.domain.ootd.enums.OotdPublicationStatus;
+import com.tenure.domain.ootd.enums.OotdTagStatus;
 import com.tenure.domain.ootd.repository.OotdRepository;
 import com.tenure.domain.tag.dto.request.OotdTagCreateRequest;
 import com.tenure.domain.tag.dto.request.OotdTagCreateRequest.BboxRequest;
 import com.tenure.domain.tag.dto.response.OotdTagResponse;
 import com.tenure.domain.tag.dto.request.OotdTagUpdateRequest;
+import com.tenure.domain.tag.dto.response.OotdTagConfirmResponse;
 import com.tenure.domain.tag.entity.OotdTag;
 import com.tenure.domain.tag.enums.TagSource;
 import com.tenure.domain.tag.enums.TagStatus;
@@ -185,6 +188,64 @@ class OotdTagServiceTest {
                 .isInstanceOf(CustomException.class)
                 .extracting("errorCode")
                 .isEqualTo(TagErrorCode.ITEM_NOT_FOUND);
+    }
+
+    @Test
+    void confirmTags_confirmsAllTagsAndRestoresArchivedOotd() {
+        User owner = user(OWNER_ID);
+        Ootd ootd = ootd(OOTD_ID, owner);
+        ReflectionTestUtils.setField(ootd, "publicationStatus", OotdPublicationStatus.ARCHIVED);
+        ReflectionTestUtils.setField(ootd, "reviewRequired", true);
+        OotdTag aiTag = aiTag(TAG_ID, ootd);
+
+        when(ootdRepository.findById(OOTD_ID)).thenReturn(Optional.of(ootd));
+        when(ootdTagRepository.findAllByOotdId(OOTD_ID)).thenReturn(List.of(aiTag));
+
+        OotdTagConfirmResponse response = ootdTagService.confirmTags(OOTD_ID, OWNER_ID);
+
+        assertThat(response.tagStatus()).isEqualTo(OotdTagStatus.CONFIRMED);
+        assertThat(response.tagConfirmedAt()).isNotNull();
+        assertThat(response.reviewRequired()).isFalse();
+        assertThat(response.publicationStatus()).isEqualTo(OotdPublicationStatus.ACTIVE);
+        assertThat(aiTag.getStatus()).isEqualTo(TagStatus.CONFIRMED);
+    }
+
+    @Test
+    void confirmTags_rejectsMissingOotd() {
+        when(ootdRepository.findById(OOTD_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> ootdTagService.confirmTags(OOTD_ID, OWNER_ID))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(TagErrorCode.OOTD_NOT_FOUND);
+    }
+
+    @Test
+    void confirmTags_rejectsNonOwner() {
+        User owner = user(OWNER_ID);
+        Ootd ootd = ootd(OOTD_ID, owner);
+
+        when(ootdRepository.findById(OOTD_ID)).thenReturn(Optional.of(ootd));
+
+        Long strangerId = 999L;
+        assertThatThrownBy(() -> ootdTagService.confirmTags(OOTD_ID, strangerId))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(TagErrorCode.TAG_OWNER_ONLY);
+    }
+
+    @Test
+    void confirmTags_rejectsWhenNoTagsExist() {
+        User owner = user(OWNER_ID);
+        Ootd ootd = ootd(OOTD_ID, owner);
+
+        when(ootdRepository.findById(OOTD_ID)).thenReturn(Optional.of(ootd));
+        when(ootdTagRepository.findAllByOotdId(OOTD_ID)).thenReturn(List.of());
+
+        assertThatThrownBy(() -> ootdTagService.confirmTags(OOTD_ID, OWNER_ID))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(TagErrorCode.TAG_NOT_FOUND);
     }
 
     @Test
