@@ -3,6 +3,7 @@ package com.tenure.domain.search.service;
 import com.tenure.domain.follow.repository.FollowRelationshipRepository;
 import com.tenure.domain.item.enums.ItemStatus;
 import com.tenure.domain.ootd.entity.Ootd;
+import com.tenure.domain.ootd.enums.OotdPublicationStatus;
 import com.tenure.domain.ootd.repository.OotdRepository;
 import com.tenure.domain.search.dto.response.*;
 import com.tenure.domain.search.entity.RecentSearchKeyword;
@@ -10,7 +11,12 @@ import com.tenure.domain.search.entity.RecentViewUser;
 import com.tenure.domain.search.enums.SearchSortType;
 import com.tenure.domain.search.exception.SearchErrorCode;
 import com.tenure.domain.search.repository.RecentSearchKeywordRepository;
+import com.tenure.domain.search.repository.RecentViewOotdRepository;
 import com.tenure.domain.search.repository.RecentViewUserRepository;
+import com.tenure.domain.tag.entity.OotdTag;
+import com.tenure.domain.tag.enums.TagStatus;
+import com.tenure.domain.tag.repository.OotdTagRepository;
+import org.springframework.data.domain.Pageable;
 import com.tenure.domain.user.entity.User;
 import com.tenure.domain.user.enums.UserGender;
 import com.tenure.domain.user.repository.UserRepository;
@@ -23,8 +29,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.HashSet;
-import java.util.List;
+import java.util.*;
+import java.util.function.BiFunction;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional(readOnly = true)
@@ -34,14 +41,11 @@ public class SearchService {
 
     private final RecentSearchKeywordRepository recentSearchKeywordRepository;
     private final RecentViewUserRepository recentViewUserRepository;
+    private final RecentViewOotdRepository recentViewOotdRepository;
     private final OotdRepository ootdRepository;
+    private final OotdTagRepository ootdTagRepository;
     private final FollowRelationshipRepository followRelationshipRepository;
     private final UserRepository userRepository;
-
-    //추천 검색어
-    public SearchSuggestionResponse getSuggestions() {
-            return null;
-    }
 
     //최근 검색 and 최근 본 사용자 조회
     public SearchRecentResponse getRecent(Long currentUserId) {
@@ -113,8 +117,8 @@ public class SearchService {
             Integer heightMin, Integer heightMax,
             Integer weightMin, Integer weightMax,
             List<Long> categoryIds, ItemStatus itemStatus, SearchSortType sort,
-            LocalDateTime cursor, Long cursorId,   // LATEST용
-            Integer cursorValue,    // HEART/SAVE/VIEW용
+            LocalDateTime cursor, Long cursorId,
+            Integer cursorValue,
             int size
     ) {
 
@@ -212,4 +216,176 @@ public class SearchService {
         return SearchUserCursorResponse.from(searchUsers, followingIds);
     }
 
+    // 검색 홈 — 4개 섹션 통합 초기 로딩
+    public SearchHomeResponse getHome(Long currentUserId) {
+        log.info("[검색 홈 api] currentUserId = {}", currentUserId);
+
+        //방금 본 게시물과 유사 게시물
+        SearchHomeSimilarOotdCursorResponse similarOotds = getSimilarOotds(currentUserId, 1, Long.MAX_VALUE, 10);
+        //7일간 인기 스타일( 좋아요 -> 저장 -> 아이디 순)
+        SearchHomePopularOotdCursorResponse popularOotds = getPopularOotds(Integer.MAX_VALUE, Integer.MAX_VALUE, Long.MAX_VALUE, currentUserId, 10);
+        //새로운 ootd(생성일 순 desc)
+        SearchHomeNewOotdCursorResponse newOotds = getNewOotds(LocalDateTime.now(), Long.MAX_VALUE, currentUserId, 10);
+        //인기 사용자
+        SearchHomePopularUserCursorResponse popularUsers = getPopularUsers(Long.MAX_VALUE, Long.MAX_VALUE, currentUserId, 10);
+
+        return SearchHomeResponse.of(similarOotds, popularOotds, newOotds, popularUsers);
+    }
+
+    // 검색 홈 — 유사 OOTD 더보기 (워터폴: 우선순위 1→2→3 순으로 size 채울 때까지 조회)
+    public SearchHomeSimilarOotdCursorResponse getSimilarOotds(
+            Long currentUserId, int cursorPriority, Long cursorId, int size) {
+
+        if (cursorId == null) cursorId = Long.MAX_VALUE;
+
+        log.info("[유사 OOTD] currentUserId = {}, cursorPriority = {}, cursorId = {}", currentUserId, cursorPriority, cursorId);
+
+        // 가장 최근에 본 OOTD id 조회
+        Optional<Long> latestOotdId = recentViewOotdRepository.findLatestViewedOotdId(currentUserId);
+        if (latestOotdId.isEmpty()) {
+            log.debug("[유사 OOTD] 최근 본 OOTD 없음 → 빈 결과 반환");
+            return SearchHomeSimilarOotdCursorResponse.empty();
+        }
+
+        Long sourceOotdId = latestOotdId.get();
+        log.debug("[유사 OOTD] sourceOotdId = {}", sourceOotdId);
+
+        // 최근 본 OOTD에 달린 CONFIRMED 태그에서 아이템 정보 추출
+        List<OotdTag> tags = ootdTagRepository.findConfirmedItemTagsByOotdId(sourceOotdId, TagStatus.CONFIRMED);
+        if (tags.isEmpty()) {
+            log.debug("[유사 OOTD] 태그 없음 → 빈 결과 반환");
+            return SearchHomeSimilarOotdCursorResponse.empty();
+        }
+
+        // 아이템 id 목록 (우선순위 1 기준)
+        List<Long> itemIds = tags.stream()
+                .map(t -> t.getItem().getId())
+                .distinct().toList();
+
+        // 아이템의 상세 카테고리 id 목록 (우선순위 2 기준)
+        List<Long> categoryIds = tags.stream()
+                .filter(t -> t.getItem().getCategory() != null)
+                .map(t -> t.getItem().getCategory().getId())
+                .distinct().toList();
+
+        // 아이템의 상위 카테고리 id 목록 (우선순위 3 기준)
+        List<Long> parentCategoryIds = tags.stream()
+                .filter(t -> t.getItem().getCategory() != null && t.getItem().getCategory().getParent() != null)
+                .map(t -> t.getItem().getCategory().getParent().getId())
+                .distinct().toList();
+
+        log.debug("[유사 OOTD] itemIds={}건, categoryIds={}건, parentCategoryIds={}건",
+                itemIds.size(), categoryIds.size(), parentCategoryIds.size());
+
+        List<Ootd> result = new ArrayList<>();
+        int lastPriority = cursorPriority;
+
+        // 우선순위 1: 같은 아이템 — size 채워지면 우선순위 2, 3 생략
+        if (cursorPriority <= 1 && result.size() < size) {
+            Long p1Cursor = (cursorPriority == 1) ? cursorId : Long.MAX_VALUE;
+            Slice<Ootd> p1 = ootdTagRepository.findSimilarOotdsByItemIds(
+                    itemIds, sourceOotdId, p1Cursor, currentUserId,
+                    OotdPublicationStatus.ACTIVE, TagStatus.CONFIRMED,
+                    PageRequest.of(0, size - result.size()));
+            result.addAll(p1.getContent());
+            lastPriority = 1;
+            log.debug("[유사 OOTD] priority=1 조회 {}건, hasNext={}", p1.getNumberOfElements(), p1.hasNext());
+            if (p1.hasNext()) {
+                return SearchHomeSimilarOotdCursorResponse.from(result, true, 1);
+            }
+        }
+
+        // 우선순위 2: 같은 상세 카테고리 — 상세 카테고리 없으면 생략
+        if (cursorPriority <= 2 && result.size() < size && !categoryIds.isEmpty()) {
+            Long p2Cursor = (cursorPriority == 2) ? cursorId : Long.MAX_VALUE;
+            Slice<Ootd> p2 = ootdTagRepository.findSimilarOotdsByCategoryIds(
+                    categoryIds, buildExcludeIds(result, sourceOotdId), p2Cursor, currentUserId,
+                    OotdPublicationStatus.ACTIVE, TagStatus.CONFIRMED,
+                    PageRequest.of(0, size - result.size()));
+            result.addAll(p2.getContent());
+            lastPriority = 2;
+            log.debug("[유사 OOTD] priority=2 조회 {}건, hasNext={}", p2.getNumberOfElements(), p2.hasNext());
+            if (p2.hasNext()) {
+                return SearchHomeSimilarOotdCursorResponse.from(result, true, 2);
+            }
+        }
+
+        // 우선순위 3: 같은 상위 카테고리 — 상위 카테고리 없으면 생략
+        if (cursorPriority <= 3 && result.size() < size && !parentCategoryIds.isEmpty()) {
+            Long p3Cursor = (cursorPriority == 3) ? cursorId : Long.MAX_VALUE;
+            Slice<Ootd> p3 = ootdTagRepository.findSimilarOotdsByParentCategoryIds(
+                    parentCategoryIds, buildExcludeIds(result, sourceOotdId), p3Cursor, currentUserId,
+                    OotdPublicationStatus.ACTIVE, TagStatus.CONFIRMED,
+                    PageRequest.of(0, size - result.size()));
+            result.addAll(p3.getContent());
+            lastPriority = 3;
+            log.debug("[유사 OOTD] priority=3 조회 {}건, hasNext={}", p3.getNumberOfElements(), p3.hasNext());
+            if (p3.hasNext()) {
+                return SearchHomeSimilarOotdCursorResponse.from(result, true, 3);
+            }
+        }
+
+        log.debug("[유사 OOTD] 최종 {}건, hasNext=false", result.size());
+        return SearchHomeSimilarOotdCursorResponse.from(result, false, lastPriority);
+    }
+
+    // 검색 홈 — 인기 스타일 더보기
+    public SearchHomePopularOotdCursorResponse getPopularOotds(
+            Integer cursorValue, Integer cursorSaveValue, Long cursorId, Long currentUserId, int size) {
+
+        if (cursorValue == null) cursorValue = Integer.MAX_VALUE;
+        if (cursorSaveValue == null) cursorSaveValue = Integer.MAX_VALUE;
+        if (cursorId == null) cursorId = Long.MAX_VALUE;
+
+        log.debug("[인기 스타일] cursorValue = {}, cursorId = {}", cursorValue, cursorId);
+
+        //최근 7일간의 인기 스타일을 가지고옴
+        LocalDateTime from = LocalDateTime.now().minusDays(7);
+        PageRequest pageRequest = PageRequest.of(0, size);
+
+        //하트 순 7일치 조회
+        Slice<Ootd> slice = ootdRepository
+                .findPopularOotds(from, cursorValue, cursorSaveValue, cursorId, currentUserId, pageRequest);
+
+        log.debug("[인기 스타일] 조회 {}건, hasNext = {}", slice.getNumberOfElements(), slice.hasNext());
+        return SearchHomePopularOotdCursorResponse.from(slice);
+    }
+
+    // 검색 홈 — 새로 올라온 OOTD 더보기
+    public SearchHomeNewOotdCursorResponse getNewOotds(LocalDateTime cursor, Long cursorId, Long currentUserId, int size) {
+
+        if (cursor == null) cursor = LocalDateTime.now();
+        if (cursorId == null) cursorId = Long.MAX_VALUE;
+
+        log.debug("[새 OOTD] cursor = {}, cursorId = {}", cursor, cursorId);
+
+        PageRequest pageRequest = PageRequest.of(0, size);
+        Slice<Ootd> slice = ootdRepository.findNewOotds(cursor, cursorId, currentUserId, pageRequest);
+
+        log.debug("[새 OOTD] 조회 {}건, hasNext = {}", slice.getNumberOfElements(), slice.hasNext());
+        return SearchHomeNewOotdCursorResponse.from(slice);
+    }
+
+    // 검색 홈 — 인기 사용자 더보기
+    public SearchHomePopularUserCursorResponse getPopularUsers(
+            Long cursorFollowerCount, Long cursorId, Long currentUserId, int size) {
+
+        if (cursorFollowerCount == null) cursorFollowerCount = Long.MAX_VALUE;
+        if (cursorId == null) cursorId = Long.MAX_VALUE;
+
+        log.debug("[인기 사용자] cursorFollowerCount = {}, cursorId = {}", cursorFollowerCount, cursorId);
+
+        PageRequest pageRequest = PageRequest.of(0, size);
+        Slice<SearchUserQueryDto> slice = userRepository
+                .findPopularUsers(cursorFollowerCount, cursorId, currentUserId, pageRequest);
+
+        log.debug("[인기 사용자] 조회 {}건, hasNext = {}", slice.getNumberOfElements(), slice.hasNext());
+        return SearchHomePopularUserCursorResponse.from(slice);
+    }
+
+    private Set<Long> buildExcludeIds(List<Ootd> result, Long sourceOotdId) {
+        Set<Long> excludeIds = result.stream().map(Ootd::getId).collect(Collectors.toSet());
+        excludeIds.add(sourceOotdId);
+        return excludeIds;
+    }
 }
