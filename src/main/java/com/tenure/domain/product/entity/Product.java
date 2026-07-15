@@ -148,4 +148,11 @@ public class Product extends BaseTimeEntity {
         }
         this.productStatus = ProductStatus.SOLD;
     }
+
+    public void startTrading() {
+        if (productStatus != ProductStatus.ON_SALE) {
+            throw new CustomException(ProductErrorCode.PRODUCT_NOT_ON_SALE);
+        }
+        this.productStatus = ProductStatus.TRADING;
+    }
 }
