@@ -71,6 +71,24 @@ public record TradeDetailResponse(
         @Schema(description = "정산액. 역할에 따라 노출 (SELLER 뷰에서만 값 존재)", example = "48500")
         Integer settlementAmount,
 
+        @Schema(description = "수령인 이름", example = "홍길동")
+        String deliveryReceiverName,
+
+        @Schema(description = "수령인 연락처", example = "010-1234-5678")
+        String deliveryPhone,
+
+        @Schema(description = "배송지 주소", example = "서울시 강남구")
+        String deliveryAddressLine1,
+
+        @Schema(description = "배송지 상세 주소", example = "101동 101호")
+        String deliveryAddressLine2,
+
+        @Schema(description = "우편번호", example = "12345")
+        String deliveryPostalCode,
+
+        @Schema(description = "배송 요청사항", example = "문 앞에 놓아주세요")
+        String deliveryRequestNote,
+
         @Schema(description = "거래 생성 시각", example = "2026-07-10T12:00:00")
         LocalDateTime createdAt,
 
@@ -100,6 +118,12 @@ public record TradeDetailResponse(
                 isBuyerView ? trade.getPaymentAmount() : null,
                 isBuyerView ? null : trade.getSellerServiceFee(),
                 isBuyerView ? null : trade.getSettlementAmount(),
+                trade.getDeliveryReceiverName(),
+                trade.getDeliveryPhone(),
+                trade.getDeliveryAddressLine1(),
+                trade.getDeliveryAddressLine2(),
+                trade.getDeliveryPostalCode(),
+                trade.getDeliveryRequestNote(),
                 trade.getCreatedAt(),
                 trade.getUpdatedAt()
         );

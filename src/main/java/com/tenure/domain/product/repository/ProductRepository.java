@@ -1,13 +1,14 @@
 package com.tenure.domain.product.repository;
 
 import com.tenure.domain.product.entity.Product;
-import java.util.Optional;
+import com.tenure.domain.product.enums.ProductStatus;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-import jakarta.persistence.LockModeType;
+import java.util.Optional;
 
 public interface ProductRepository extends JpaRepository<Product, Long> {
 
@@ -26,4 +27,6 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select product from Product product where product.id = :productId")
     Optional<Product> findByIdForUpdate(@Param("productId") Long productId);
+
+    boolean existsByItemIdAndProductStatus(Long itemId, ProductStatus productStatus);
 }

@@ -71,11 +71,24 @@ public class Ootd extends BaseTimeEntity {
     @Column(name = "save_count", nullable = false)
     private Integer saveCount = 0;
 
+    @Column(name = "view_count", nullable = false)
+    private Integer viewCount = 0;
+
     public static Ootd create(User owner, String imageUrl, OotdSource source) {
         Ootd ootd = new Ootd();
         ootd.owner = owner;
         ootd.imageUrl = imageUrl;
         ootd.source = source;
         return ootd;
+    }
+
+    public void confirmTags() {
+        this.tagStatus = OotdTagStatus.CONFIRMED;
+        this.tagConfirmedAt = LocalDateTime.now();
+        this.reviewRequired = false;
+        if (this.publicationStatus == OotdPublicationStatus.ARCHIVED) {
+            this.publicationStatus = OotdPublicationStatus.ACTIVE;
+            this.archivedAt = null;
+        }
     }
 }

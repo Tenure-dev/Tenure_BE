@@ -10,7 +10,13 @@ import java.time.LocalDateTime;
 
 @Getter
 @Entity
-@Table(name = "recent_viewed_users")
+@Table(
+        name = "recent_viewed_users",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_recent_viewed_users_viewer_viewed",
+                columnNames = {"viewer_user_id", "viewed_user_id"}
+        )
+)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class RecentViewUser {
 
@@ -26,11 +32,16 @@ public class RecentViewUser {
     @JoinColumn(name = "viewed_user_id", nullable = false)
     private User viewed;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
+    @Column(name = "last_viewed_at", nullable = false)
+    private LocalDateTime lastViewedAt;
 
     @PrePersist
     protected void onCreate() {
-        this.createdAt = LocalDateTime.now();
+        this.lastViewedAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        this.lastViewedAt = LocalDateTime.now();
     }
 }
