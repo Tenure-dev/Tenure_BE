@@ -121,4 +121,30 @@ public class ItemController {
 
         return BaseResponse.success(response, "구매 제안 허용 설정을 변경했습니다.");
     }
+
+    //아이템 수정
+    @Operation(
+            summary = "아이템 수정",
+            description = "로그인 사용자의 보유 아이템 정보를 수정합니다."
+    )
+    @Parameter(
+            name = "X-USER-ID",
+            description = "개발용 사용자 ID 헤더",
+            in = ParameterIn.HEADER,
+            example = "1"
+    )
+    @PatchMapping("/items/{itemId}")
+    public BaseResponse<ItemUpdateResponse> updateItem(
+            @PathVariable Long itemId,
+            @Valid @RequestBody ItemUpdateRequest request
+    ) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        ItemUpdateResponse response = itemService.updateItem(
+                currentUserId,
+                itemId,
+                request
+        );
+
+        return BaseResponse.success(response, "아이템 수정에 성공했습니다.");
+    }
 }

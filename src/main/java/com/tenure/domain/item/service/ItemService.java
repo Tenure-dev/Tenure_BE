@@ -25,6 +25,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.tenure.domain.item.dto.ItemUpdateRequest;
+import com.tenure.domain.item.dto.ItemUpdateResponse;
 
 @Service
 @RequiredArgsConstructor
@@ -164,5 +166,31 @@ public class ItemService {
         item.changePurchaseOfferEnabled(request.purchaseOfferEnabled());
 
         return ItemOfferSettingResponse.from(item);
+    }
+
+    @Transactional
+    public ItemUpdateResponse updateItem(
+            Long currentUserId,
+            Long itemId,
+            ItemUpdateRequest request
+    ) {
+        Item item = findItem(itemId);
+        validateItemOwner(item, currentUserId);
+
+        Category largeCategory = findLargeCategory(request.categoryLarge());
+        Category smallCategory = findSmallCategory(request.categorySmall(), largeCategory);
+
+        item.updateInfo(
+                smallCategory,
+                request.brandName(),
+                request.itemName(),
+                request.wearingTarget(),
+                request.sizeSystem(),
+                request.sizeValue(),
+                request.firstOwnedAt(),
+                request.representativeImageUrl()
+        );
+
+        return ItemUpdateResponse.from(item);
     }
 }
