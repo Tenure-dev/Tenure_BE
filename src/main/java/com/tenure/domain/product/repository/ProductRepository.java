@@ -34,7 +34,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     boolean existsByItemIdAndProductStatus(Long itemId, ProductStatus productStatus);
 
 
-
+    //해당 아이템의 가장 최근 상태를 가지고 옴
     @Query("select p from Product p " +
             "where p.item.id = :itemId " +
             "and p.productStatus in :status " +
