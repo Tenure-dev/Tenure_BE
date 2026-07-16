@@ -1,16 +1,12 @@
 package com.tenure.domain.item.service;
 
-import com.tenure.domain.item.dto.ItemCreateRequest;
-import com.tenure.domain.item.dto.ItemCreateResponse;
-import com.tenure.domain.item.dto.ItemDetailResponse;
-import com.tenure.domain.item.dto.ItemListResponse;
-import com.tenure.domain.item.dto.ItemOfferSettingRequest;
-import com.tenure.domain.item.dto.ItemOfferSettingResponse;
+import com.tenure.domain.item.dto.*;
 import com.tenure.domain.item.entity.Category;
 import com.tenure.domain.item.entity.Item;
 import com.tenure.domain.item.enums.ItemStatus;
 import com.tenure.domain.item.exception.ItemErrorCode;
 import com.tenure.domain.item.repository.CategoryRepository;
+import com.tenure.domain.item.repository.ItemHistoryRepository;
 import com.tenure.domain.item.repository.ItemRepository;
 import com.tenure.domain.ootd.enums.OotdPublicationStatus;
 import com.tenure.domain.product.enums.ProductStatus;
@@ -25,8 +21,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.tenure.domain.item.dto.ItemUpdateRequest;
-import com.tenure.domain.item.dto.ItemUpdateResponse;
 
 @Service
 @RequiredArgsConstructor
@@ -40,6 +34,7 @@ public class ItemService {
     private final ItemRepository itemRepository; //새 Item 저장
     private final CategoryRepository categoryRepository; //categoryLarge/categorySmall로 Category 찾기
     private final UserRepository userRepository; //currentUserID로 User 찾기
+    private final ItemHistoryRepository itemHistoryRepository;
 
     @Transactional
     public ItemCreateResponse createItem(Long currentUserId, ItemCreateRequest request) {
@@ -192,5 +187,20 @@ public class ItemService {
         );
 
         return ItemUpdateResponse.from(item);
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<ItemHistoryResponse> getItemHistories(
+            Long currentUserId,
+            Long itemId,
+            Pageable pageable
+    ) {
+        Item item = findItem(itemId);
+        validateItemAccess(item, currentUserId);
+
+        return PageResponse.from(
+                itemHistoryRepository.findByItemIdOrderByCreatedAtDesc(itemId, pageable),
+                ItemHistoryResponse::from
+        );
     }
 }

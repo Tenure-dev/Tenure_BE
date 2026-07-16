@@ -16,6 +16,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.web.bind.annotation.*;
 
+
 @Tag(name = "Item", description = "아이템 API")
 @RestController
 @RequiredArgsConstructor
@@ -146,5 +147,34 @@ public class ItemController {
         );
 
         return BaseResponse.success(response, "아이템 수정에 성공했습니다.");
+    }
+
+    // 아이템 히스토리 조회
+    @Operation(
+            summary = "아이템 히스토리 조회",
+            description = "itemId 기준으로 아이템 히스토리 목록을 조회합니다."
+    )
+    @Parameter(
+            name = "X-USER-ID",
+            description = "개발용 사용자 ID 헤더",
+            in = ParameterIn.HEADER,
+            example = "1"
+    )
+    @GetMapping("/items/{itemId}/histories")
+    public BaseResponse<PageResponse<ItemHistoryResponse>> getItemHistories(
+            @PathVariable Long itemId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        Pageable pageable = PageRequest.of(page, size);
+
+        PageResponse<ItemHistoryResponse> response = itemService.getItemHistories(
+                currentUserId,
+                itemId,
+                pageable
+        );
+
+        return BaseResponse.success(response, "아이템 히스토리 조회에 성공했습니다.");
     }
 }
