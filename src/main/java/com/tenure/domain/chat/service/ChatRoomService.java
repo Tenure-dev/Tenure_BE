@@ -14,10 +14,12 @@ import com.tenure.domain.product.exception.ProductErrorCode;
 import com.tenure.domain.product.repository.ProductRepository;
 import com.tenure.domain.user.entity.User;
 import com.tenure.domain.user.exception.UserErrorCode;
+import com.tenure.domain.user.repository.UserBlockRepository;
 import com.tenure.domain.user.repository.UserRepository;
 import com.tenure.global.exception.CustomException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,6 +38,7 @@ public class ChatRoomService {
     private final UserRepository userRepository;
     private final ProductRepository productRepository;
     private final ChatRoomMemberRepository chatRoomMemberRepository;
+    private final UserBlockRepository userBlockRepository;
 
     @Transactional
     public ChatRoomResponse findOrCreateChatRoom(Long buyerId, Long itemId) {
@@ -68,21 +71,38 @@ public class ChatRoomService {
             throw new CustomException(ChatErrorCode.CHAT_CREATION_NOT_ALLOWED);
         }
 
+        if(userBlockRepository.isBlocked(buyerId, owner.getId()) || userBlockRepository.isBlocked(owner.getId(), buyerId)) {
+            log.warn("[채팅방 생성 / 조회] 차단된 사용자와는 채팅 할 수 없습니다.");
+            throw new CustomException(ChatErrorCode.CHAT_BLOCKED);
+        }
+
 
         //product 중에서 해당 아이템이 판매중이거나 거래중인 항목을 찾음
-        Product product = productRepository.findByItemIdAndProductStatus(itemId, List.of(ON_SALE, TRADING))
+        Product product = productRepository.findByItemIdAndProductStatusIn(itemId, List.of(ON_SALE, TRADING))
                 .orElseThrow(() -> {
                     log.warn("[채팅방 생성/조회] 해당 상품은 판매중이거나 거래중이 아닙니다. itemId = {}", itemId);
                     return new CustomException(ProductErrorCode.PRODUCT_NOT_ON_SALE);
                 });
 
-        //체팅방을 조회 / 없으면 새로 만든 후 저장
-        ChatRoom chatRoom = chatRoomRepository.findByItemIdAndSellerIdAndBuyerId(itemId, owner.getId(), buyerId)
-                .orElseGet(() -> createChatRoom(item, buyer, owner));
+
+        ChatRoom  chatRoom;
+
+        // 사용자가 동시에 채팅방 생성을 할 경우 방지
+        try {
+            //체팅방을 조회 / 없으면 새로 만든 후 저장
+            chatRoom = chatRoomRepository.findByItemIdAndSellerIdAndBuyerId(itemId, owner.getId(), buyerId)
+                    .orElseGet(() -> createChatRoom(item, buyer, owner));
+        } catch (DataIntegrityViolationException e) {
+            chatRoom = chatRoomRepository.findByItemIdAndSellerIdAndBuyerId(itemId, owner.getId(), buyerId)
+                    .orElseThrow(() -> {
+                        log.warn("[채팅방 생성/조회] 채팅방을 찾을 수 없습니다. itemId = {}, ownerId = {}, buyerId = {}", itemId, owner.getId(), buyerId );
+                        return new CustomException(ChatErrorCode.CHAT_ROOM_NOT_FOUND);
+                    });
+        }
+
+
 
         return ChatRoomResponse.from(chatRoom, owner, item, product);
-
-
     }
 
     //채팅방 생성 매서드

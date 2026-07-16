@@ -8,8 +8,6 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -32,14 +30,5 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     Optional<Product> findByIdForUpdate(@Param("productId") Long productId);
 
     boolean existsByItemIdAndProductStatus(Long itemId, ProductStatus productStatus);
-
-
-    //해당 아이템의 가장 최근 상태를 가지고 옴
-    @Query("select p from Product p " +
-            "where p.item.id = :itemId " +
-            "and p.productStatus in :status " +
-            "order by p.createdAt desc " +
-            "limit 1")
-    Optional<Product> findByItemIdAndProductStatus(@Param("itemId") Long itemId,
-                                                   @Param("statuses") List<ProductStatus> status);
+    Optional<Product> findByItemIdAndProductStatusIn(Long itemId, List<ProductStatus> status);
 }
