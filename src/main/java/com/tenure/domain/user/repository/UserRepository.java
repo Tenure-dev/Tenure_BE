@@ -27,5 +27,27 @@ public interface UserRepository extends JpaRepository<User, Long> {
             @Param("cursorId") Long cursorId,
             Pageable request);
 
+    // 검색 홈 — 인기 사용자 (팔로워 수 내림차순, 커서 방식)
+    @Query("select new com.tenure.domain.search.dto.response.SearchUserQueryDto(" +
+            "u.id, u.username, u.profileImageUrl, " +
+            "(select count(uf) from FollowRelationship uf " +
+            "where uf.following.id = u.id and uf.status = com.tenure.domain.follow.enums.FollowStatus.ACCEPTED), " +
+            "0L) " +
+            "from User u " +
+            "where not exists (select 1 from UserBlock block " +
+            "   where (block.blocker.id = :currentUserId and block.blocked.id = u.id) " +
+            "      or (block.blocker.id = u.id and block.blocked.id = :currentUserId)) " +
+            "and ((select count(uf2) from FollowRelationship uf2 " +
+            "       where uf2.following.id = u.id and uf2.status = com.tenure.domain.follow.enums.FollowStatus.ACCEPTED) < :cursorFollowerCount " +
+            "   or ((select count(uf3) from FollowRelationship uf3 " +
+            "        where uf3.following.id = u.id and uf3.status = com.tenure.domain.follow.enums.FollowStatus.ACCEPTED) = :cursorFollowerCount " +
+            "       and u.id < :cursorId)) " +
+            "order by (select count(uf4) from FollowRelationship uf4 " +
+            "          where uf4.following.id = u.id and uf4.status = com.tenure.domain.follow.enums.FollowStatus.ACCEPTED) desc, u.id desc")
+    Slice<SearchUserQueryDto> findPopularUsers(
+            @Param("cursorFollowerCount") Long cursorFollowerCount,
+            @Param("cursorId") Long cursorId,
+            @Param("currentUserId") Long currentUserId,
+            Pageable pageable);
 
 }

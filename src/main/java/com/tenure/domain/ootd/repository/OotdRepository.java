@@ -216,6 +216,49 @@ public interface OotdRepository extends JpaRepository<Ootd, Long> {
             Pageable pageable
     );
 
+    // 검색 홈 — 인기 스타일 (7일 이내, heartCount 내림차순)
+    @Query("""
+            select o from Ootd o
+            join fetch o.owner owner
+            where o.publicationStatus = com.tenure.domain.ootd.enums.OotdPublicationStatus.ACTIVE
+              and o.createdAt >= :from
+              and (o.heartCount < :cursorValue
+                   or (o.heartCount = :cursorValue and o.saveCount < :cursorSaveValue)
+                   or (o.heartCount = :cursorValue and o.saveCount = :cursorSaveValue and o.id < :cursorId))
+              and not exists (
+                    select 1 from UserBlock block
+                    where (block.blocker.id = :currentUserId and block.blocked.id = owner.id)
+                       or (block.blocker.id = owner.id and block.blocked.id = :currentUserId))
+            order by o.heartCount desc, o.saveCount desc, o.id desc
+            """)
+    Slice<Ootd> findPopularOotds(
+            @Param("from") LocalDateTime from,
+            @Param("cursorValue") Integer cursorValue,
+            @Param("cursorSaveValue") Integer cursorSaveValue,
+            @Param("cursorId") Long cursorId,
+            @Param("currentUserId") Long currentUserId,
+            Pageable pageable
+    );
+
+    // 검색 홈 — 새로 올라온 OOTD (createdAt 내림차순)
+    @Query("""
+            select o from Ootd o
+            join fetch o.owner owner
+            where o.publicationStatus = com.tenure.domain.ootd.enums.OotdPublicationStatus.ACTIVE
+              and (o.createdAt < :cursor or (o.createdAt = :cursor and o.id < :cursorId))
+              and not exists (
+                    select 1 from UserBlock block
+                    where (block.blocker.id = :currentUserId and block.blocked.id = owner.id)
+                       or (block.blocker.id = owner.id and block.blocked.id = :currentUserId))
+            order by o.createdAt desc, o.id desc
+            """)
+    Slice<Ootd> findNewOotds(
+            @Param("cursor") LocalDateTime cursor,
+            @Param("cursorId") Long cursorId,
+            @Param("currentUserId") Long currentUserId,
+            Pageable pageable
+    );
+
     @Query("""
             select ootd
             from Ootd ootd

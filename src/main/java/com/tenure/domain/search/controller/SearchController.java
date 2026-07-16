@@ -1,10 +1,7 @@
 package com.tenure.domain.search.controller;
 
 import com.tenure.domain.item.enums.ItemStatus;
-import com.tenure.domain.search.dto.response.SearchOotdCursorResponse;
-import com.tenure.domain.search.dto.response.SearchRecentResponse;
-import com.tenure.domain.search.dto.response.SearchSuggestionResponse;
-import com.tenure.domain.search.dto.response.SearchUserCursorResponse;
+import com.tenure.domain.search.dto.response.*;
 import com.tenure.domain.search.enums.SearchSortType;
 import com.tenure.domain.search.service.SearchService;
 import com.tenure.domain.user.enums.UserGender;
@@ -31,18 +28,9 @@ public class SearchController {
     private final SearchService searchService;
     private final CurrentUserProvider currentUserProvider;
 
-
-    @Operation(summary = "검색 홈 추천 조회", description = "전체 사용자 기준 가장 많이 검색된 키워드 TOP 10을 반환합니다.")
-    @GetMapping("/suggestions")
-    public BaseResponse<SearchSuggestionResponse> getSuggestions() {
-        SearchSuggestionResponse suggestions = searchService.getSuggestions();
-
-        return BaseResponse.success(suggestions);
-    }
-
     @Operation(
             summary = "최근 검색어 및 최근 본 사용자 조회",
-            description = "내 최근 검색어 TOP 3과 최근 본 사용자 TOP 4을 반환합니다.",
+            description = "내 최근 검색어 TOP 3, 최근 본 사용자 TOP 4, 추천 검색어 TOP 10을 반환합니다.",
             parameters = {
                     @Parameter(name = "X-USER-ID", in = ParameterIn.HEADER, required = true,
                             description = "JWT 적용 전 Swagger 테스트용 현재 사용자 ID", example = "1")
@@ -62,12 +50,9 @@ public class SearchController {
                     @Parameter(name = "X-USER-ID", in = ParameterIn.HEADER, required = true,
                             description = "JWT 적용 전 Swagger 테스트용 현재 사용자 ID", example = "1")
             })
-
     @DeleteMapping("/recent-keywords/{keywordId}")
     public BaseResponse<Void> deleteRecentKeyword(@PathVariable Long keywordId) {
-
         searchService.deleteRecentKeyword(currentUserProvider.getCurrentUserId(), keywordId);
-
         return BaseResponse.success(null);
     }
 
@@ -80,11 +65,8 @@ public class SearchController {
             })
     @DeleteMapping("/recent-users/{userId}")
     public BaseResponse<Void> deleteRecentUser(@PathVariable Long userId) {
-
         searchService.deleteRecentUser(currentUserProvider.getCurrentUserId(), userId);
-
         return BaseResponse.success(null);
-
     }
 
     @Operation(
@@ -106,7 +88,7 @@ public class SearchController {
             @RequestParam(required = false) Integer weightMax,
             @RequestParam(required = false) List<Long> categoryIds,
             @RequestParam(required = false) ItemStatus itemStatus,
-            @RequestParam(defaultValue = "LATEST") SearchSortType sort, //기본 값: '최신순'
+            @RequestParam(defaultValue = "LATEST") SearchSortType sort,
             @RequestParam(required = false) LocalDateTime cursor,
             @RequestParam(required = false) Long cursorId,
             @RequestParam(required = false) Integer cursorValue,
@@ -114,8 +96,9 @@ public class SearchController {
     {
         log.info("[OOTD 검색 api 호출] keyword = {}, sort = {}", keyword, sort);
 
-        SearchOotdCursorResponse searchOotdCursorResponse = searchService.
-                searchOotds(keyword, gender, heightMin, heightMax,
+        SearchOotdCursorResponse searchOotdCursorResponse = searchService
+                .searchOotds(currentUserProvider.getCurrentUserId(),
+                        keyword, gender, heightMin, heightMax,
                         weightMin, weightMax, categoryIds, itemStatus, sort,
                         cursor, cursorId, cursorValue, size);
 
@@ -135,10 +118,99 @@ public class SearchController {
             @RequestParam(required = false) Long cursorId,
             @RequestParam(defaultValue = "20") int size
     ) {
-        SearchUserCursorResponse searchUserCursorResponse = searchService.
-                searchUser(currentUserProvider.getCurrentUserId(), keyword, cursorId, size);
+        SearchUserCursorResponse searchUserCursorResponse = searchService
+                .searchUser(currentUserProvider.getCurrentUserId(), keyword, cursorId, size);
 
         return BaseResponse.success(searchUserCursorResponse);
     }
 
+    @Operation(
+            summary = "검색 홈 조회",
+            description = "검색 홈 화면의 4개 섹션(유사 OOTD, 인기 스타일, 새 OOTD, 인기 사용자) 데이터를 반환합니다.",
+            parameters = {
+                    @Parameter(name = "X-USER-ID", in = ParameterIn.HEADER, required = true,
+                            description = "JWT 적용 전 Swagger 테스트용 현재 사용자 ID", example = "1")
+            })
+    @GetMapping("/home")
+    public BaseResponse<SearchHomeResponse> getHome() {
+        SearchHomeResponse response = searchService.getHome(currentUserProvider.getCurrentUserId());
+        return BaseResponse.success(response);
+    }
+
+    @Operation(
+            summary = "유사 OOTD 더보기",
+            description = "방금 보신 OOTD와 유사한 게시물을 추가로 조회합니다. " +
+                    "cursorPriority: 1=같은아이템, 2=같은상세카테고리, 3=같은상위카테고리",
+            parameters = {
+                    @Parameter(name = "X-USER-ID", in = ParameterIn.HEADER, required = true,
+                            description = "JWT 적용 전 Swagger 테스트용 현재 사용자 ID", example = "1")
+            })
+    @GetMapping("/home/similar-ootds")
+    public BaseResponse<SearchHomeSimilarOotdCursorResponse> getSimilarOotds(
+            @RequestParam(defaultValue = "1") int cursorPriority,
+            @RequestParam(required = false) Long cursorId,
+            @RequestParam(defaultValue = "10") int size
+    ) {
+
+        SearchHomeSimilarOotdCursorResponse response = searchService
+                .getSimilarOotds(currentUserProvider.getCurrentUserId(), cursorPriority, cursorId, size);
+        return BaseResponse.success(response);
+    }
+
+    @Operation(
+            summary = "인기 스타일 더보기",
+            description = "최근 7일 이내 좋아요 수 기준 인기 OOTD를 추가로 조회합니다.",
+            parameters = {
+                    @Parameter(name = "X-USER-ID", in = ParameterIn.HEADER, required = true,
+                            description = "JWT 적용 전 Swagger 테스트용 현재 사용자 ID", example = "1")
+            })
+    @GetMapping("/home/popular-ootds")
+    public BaseResponse<SearchHomePopularOotdCursorResponse> getPopularOotds(
+            @RequestParam(required = false) Integer cursorValue,
+            @RequestParam(required = false) Integer cursorSaveValue,
+            @RequestParam(required = false) Long cursorId,
+            @RequestParam(defaultValue = "10") int size
+    ) {
+
+        SearchHomePopularOotdCursorResponse response = searchService
+                .getPopularOotds(cursorValue, cursorSaveValue, cursorId, currentUserProvider.getCurrentUserId(), size);
+        return BaseResponse.success(response);
+    }
+
+    @Operation(
+            summary = "새로 올라온 OOTD 더보기",
+            description = "최신 공개 OOTD를 추가로 조회합니다.",
+            parameters = {
+                    @Parameter(name = "X-USER-ID", in = ParameterIn.HEADER, required = true,
+                            description = "JWT 적용 전 Swagger 테스트용 현재 사용자 ID", example = "1")
+            })
+    @GetMapping("/home/new-ootds")
+    public BaseResponse<SearchHomeNewOotdCursorResponse> getNewOotds(
+            @RequestParam(required = false) LocalDateTime cursor,
+            @RequestParam(required = false) Long cursorId,
+            @RequestParam(defaultValue = "10") int size
+    ) {
+
+        SearchHomeNewOotdCursorResponse response = searchService.getNewOotds(cursor, cursorId, currentUserProvider.getCurrentUserId(), size);
+        return BaseResponse.success(response);
+    }
+
+    @Operation(
+            summary = "인기 사용자 더보기",
+            description = "팔로워 수 기준 인기 사용자를 추가로 조회합니다.",
+            parameters = {
+                    @Parameter(name = "X-USER-ID", in = ParameterIn.HEADER, required = true,
+                            description = "JWT 적용 전 Swagger 테스트용 현재 사용자 ID", example = "1")
+            })
+    @GetMapping("/home/popular-users")
+    public BaseResponse<SearchHomePopularUserCursorResponse> getPopularUsers(
+            @RequestParam(required = false) Long cursorFollowerCount,
+            @RequestParam(required = false) Long cursorId,
+            @RequestParam(defaultValue = "10") int size
+    ) {
+
+        SearchHomePopularUserCursorResponse response = searchService
+                .getPopularUsers(cursorFollowerCount, cursorId, currentUserProvider.getCurrentUserId(), size);
+        return BaseResponse.success(response);
+    }
 }

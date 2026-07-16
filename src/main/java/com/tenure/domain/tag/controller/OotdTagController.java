@@ -61,7 +61,8 @@ public class OotdTagController {
 
     @Operation(
             summary = "OOTD 태그 수정",
-            description = "기존 태그(AI 태그 포함)의 연결 아이템, bbox, 라벨을 수정합니다. status(확정 여부)는 이 API에서 다루지 않습니다.",
+            description = "기존 태그(AI 태그 포함)의 연결 아이템, bbox, 라벨을 수정합니다. "
+                    + "수정된 태그는 사용자가 직접 확인한 것으로 간주되어 status가 CONFIRMED로 함께 변경됩니다.",
             parameters = {
                     @Parameter(
                             name = "X-USER-ID",
