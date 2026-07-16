@@ -114,6 +114,27 @@ public class Item extends BaseTimeEntity {
         this.purchaseOfferEnabled = purchaseOfferEnabled;
     }
 
+    public void updateInfo(
+            Category category,
+            String brandName,
+            String itemName,
+            WearingTarget wearingTarget,
+            String sizeSystem,
+            String sizeValue,
+            LocalDate firstOwnedAt,
+            String representativeImageUrl
+    ) {
+        this.category = category;
+        this.brandName = brandName;
+        this.itemName = itemName;
+        this.wearingTarget = wearingTarget;
+        this.sizeSystem = sizeSystem;
+        this.sizeValue = sizeValue;
+        this.firstOwnedAt = firstOwnedAt;
+        this.representativeImageUrl = representativeImageUrl;
+    }
+
+
     public void markSold() {
         this.itemStatus = ItemStatus.SOLD;
     }
