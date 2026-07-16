@@ -13,6 +13,7 @@ import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -89,7 +90,7 @@ public class SearchController {
             @RequestParam(required = false) List<Long> categoryIds,
             @RequestParam(required = false) ItemStatus itemStatus,
             @RequestParam(defaultValue = "LATEST") SearchSortType sort,
-            @RequestParam(required = false) LocalDateTime cursor,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime cursor,
             @RequestParam(required = false) Long cursorId,
             @RequestParam(required = false) Integer cursorValue,
             @RequestParam(defaultValue = "20") int size)
@@ -186,7 +187,7 @@ public class SearchController {
             })
     @GetMapping("/home/new-ootds")
     public BaseResponse<SearchHomeNewOotdCursorResponse> getNewOotds(
-            @RequestParam(required = false) LocalDateTime cursor,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime cursor,
             @RequestParam(required = false) Long cursorId,
             @RequestParam(defaultValue = "10") int size
     ) {
