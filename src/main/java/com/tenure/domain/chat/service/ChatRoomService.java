@@ -40,6 +40,8 @@ public class ChatRoomService {
     @Transactional
     public ChatRoomResponse findOrCreateChatRoom(Long buyerId, Long itemId) {
 
+        log.info("[채팅방 생성/조회] buyerId = {}, itemId = {}", buyerId, itemId);
+
         //아이템 조회
         Item item = itemRepository.findById(itemId)
                 .orElseThrow(() -> {
@@ -49,7 +51,10 @@ public class ChatRoomService {
 
         //아이템 주인 조회
         User owner = userRepository.findById(item.getOwner().getId())
-                .orElseThrow(() -> new CustomException(UserErrorCode.USER_NOT_FOUND));
+                .orElseThrow(() -> {
+                    log.warn("[채팅방 생성/조회] 아이템 주인을 찾을 수 없습니다. ownerId = {}", item.getOwner().getId());
+                    return new CustomException(UserErrorCode.USER_NOT_FOUND);
+                });
 
         //구매자(사용자) 조회
         User buyer = userRepository.findById(buyerId)
