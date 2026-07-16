@@ -32,13 +32,6 @@ public class SearchController {
     private final CurrentUserProvider currentUserProvider;
 
 
-    @Operation(summary = "검색 홈 추천 조회", description = "전체 사용자 기준 가장 많이 검색된 키워드 TOP 10을 반환합니다.")
-    @GetMapping("/suggestions")
-    public BaseResponse<SearchSuggestionResponse> getSuggestions() {
-        SearchSuggestionResponse suggestions = searchService.getSuggestions();
-
-        return BaseResponse.success(suggestions);
-    }
 
     @Operation(
             summary = "최근 검색어 및 최근 본 사용자 조회",
@@ -115,7 +108,8 @@ public class SearchController {
         log.info("[OOTD 검색 api 호출] keyword = {}, sort = {}", keyword, sort);
 
         SearchOotdCursorResponse searchOotdCursorResponse = searchService.
-                searchOotds(keyword, gender, heightMin, heightMax,
+                searchOotds(currentUserProvider.getCurrentUserId(),
+                        keyword, gender, heightMin, heightMax,
                         weightMin, weightMax, categoryIds, itemStatus, sort,
                         cursor, cursorId, cursorValue, size);
 

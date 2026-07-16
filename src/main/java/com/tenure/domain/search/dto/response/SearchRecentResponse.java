@@ -12,8 +12,9 @@ public class SearchRecentResponse {
 
     private List<RecentUserResponse> recentUsers;
     private List<RecentKeywordResponse> recentKeywords;
+    private List<String> suggestions;
 
-    public static SearchRecentResponse from(List<RecentUserResponse> users, List<RecentKeywordResponse> keywords) {
-        return new SearchRecentResponse(users, keywords);
+    public static SearchRecentResponse from(List<RecentUserResponse> users, List<RecentKeywordResponse> keywords, List<String> suggestions) {
+        return new SearchRecentResponse(users, keywords, suggestions);
     }
 }
