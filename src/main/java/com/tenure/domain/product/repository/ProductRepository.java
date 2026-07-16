@@ -8,6 +8,9 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 public interface ProductRepository extends JpaRepository<Product, Long> {
@@ -29,4 +32,14 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     Optional<Product> findByIdForUpdate(@Param("productId") Long productId);
 
     boolean existsByItemIdAndProductStatus(Long itemId, ProductStatus productStatus);
+
+
+
+    @Query("select p from Product p " +
+            "where p.item.id = :itemId " +
+            "and p.productStatus in :status " +
+            "order by p.createdAt desc " +
+            "limit 1")
+    Optional<Product> findByItemIdAndProductStatus(@Param("itemId") Long itemId,
+                                                   @Param("statuses") List<ProductStatus> status);
 }
