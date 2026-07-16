@@ -132,7 +132,7 @@ class OotdTagServiceTest {
     }
 
     @Test
-    void updateTag_updatesContentWithoutChangingStatus() {
+    void updateTag_updatesContentAndConfirmsStatus() {
         User owner = user(OWNER_ID);
         Ootd ootd = ootd(OOTD_ID, owner);
         Item item = item(ITEM_ID);
@@ -146,8 +146,30 @@ class OotdTagServiceTest {
         assertThat(response.itemId()).isEqualTo(ITEM_ID);
         assertThat(response.labelText()).isEqualTo("블루종 자켓");
         assertThat(response.source()).isEqualTo(TagSource.AI);
-        assertThat(aiTag.getStatus()).isEqualTo(TagStatus.AUTO_UNCONFIRMED);
+        assertThat(response.status()).isEqualTo(TagStatus.CONFIRMED);
+        assertThat(aiTag.getStatus()).isEqualTo(TagStatus.CONFIRMED);
         assertThat(aiTag.getItem()).isEqualTo(item);
+    }
+
+    @Test
+    void updateTag_keepsConfirmedStatusWhenAlreadyConfirmed() {
+        User owner = user(OWNER_ID);
+        Ootd ootd = ootd(OOTD_ID, owner);
+        Item originalItem = item(ITEM_ID);
+        Item newItem = item(ITEM_ID + 1);
+        OotdTag manualTag = OotdTag.createManualTag(
+                ootd, originalItem, "청바지",
+                BigDecimal.valueOf(0.1), BigDecimal.valueOf(0.2), BigDecimal.valueOf(0.3), BigDecimal.valueOf(0.4)
+        );
+
+        when(ootdTagRepository.findById(TAG_ID)).thenReturn(Optional.of(manualTag));
+        when(itemRepository.findById(ITEM_ID + 1)).thenReturn(Optional.of(newItem));
+
+        OotdTagResponse response = ootdTagService.updateTag(TAG_ID, OWNER_ID, updateRequest(ITEM_ID + 1));
+
+        assertThat(response.status()).isEqualTo(TagStatus.CONFIRMED);
+        assertThat(manualTag.getStatus()).isEqualTo(TagStatus.CONFIRMED);
+        assertThat(manualTag.getItem()).isEqualTo(newItem);
     }
 
     @Test
