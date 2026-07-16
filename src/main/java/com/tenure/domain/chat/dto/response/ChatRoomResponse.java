@@ -11,6 +11,7 @@ import lombok.Getter;
 
 import java.time.LocalDate;
 
+//채팅방 최초 생성 or 기존 채팅방 조회
 @Getter
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
 public class ChatRoomResponse {

@@ -1,8 +1,10 @@
 package com.tenure.domain.chat.service;
 
+import com.tenure.domain.chat.dto.response.ChatRoomListCursorResponse;
 import com.tenure.domain.chat.dto.response.ChatRoomResponse;
 import com.tenure.domain.chat.entity.ChatRoom;
 import com.tenure.domain.chat.entity.ChatRoomMember;
+import com.tenure.domain.chat.enums.ChatRoomFilterType;
 import com.tenure.domain.chat.exception.ChatErrorCode;
 import com.tenure.domain.chat.repository.ChatRoomMemberRepository;
 import com.tenure.domain.chat.repository.ChatRoomRepository;
@@ -20,9 +22,12 @@ import com.tenure.global.exception.CustomException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static com.tenure.domain.product.enums.ProductStatus.*;
@@ -103,6 +108,28 @@ public class ChatRoomService {
 
 
         return ChatRoomResponse.from(chatRoom, owner, item, product);
+    }
+
+    public ChatRoomListCursorResponse chatRoomList(Long currentUserId, ChatRoomFilterType type,
+                             LocalDateTime cursor, Long cursorId, int size)
+    {
+
+        if(cursor == null) cursor = LocalDateTime.now();
+        if(cursorId == null) cursorId = Long.MAX_VALUE;
+
+        log.info("[채팅방 목록 조회] currentUserId = {}, type = {}, cursor = {}, cursorId = {}, size = {}", currentUserId, type, cursor, cursorId, size);
+
+        PageRequest pageRequest = PageRequest.of(0, size);
+
+        Slice<ChatRoomMember> chatRooms = switch (type) {
+            case BUYING -> chatRoomMemberRepository.findBuyingChatRooms(currentUserId, cursor, cursorId, pageRequest);
+            case SELLING -> chatRoomMemberRepository.findSellingChatRooms(currentUserId, cursor, cursorId, pageRequest);
+            case UNREAD -> chatRoomMemberRepository.findUnreadChatRooms(currentUserId, cursor, cursorId, pageRequest);
+            default -> chatRoomMemberRepository.findAllChatRooms(currentUserId, cursor, cursorId, pageRequest); //기본 전체 조회
+        };
+
+        log.info("[채팅방 목록 조회] 조회 결과 = {}건, hasNext = {}", chatRooms.getContent().size(), chatRooms.hasNext());
+        return ChatRoomListCursorResponse.from(chatRooms, currentUserId);
     }
 
     //채팅방 생성 매서드
