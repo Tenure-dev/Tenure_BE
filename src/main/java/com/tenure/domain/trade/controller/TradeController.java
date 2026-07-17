@@ -18,6 +18,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -57,7 +58,7 @@ public class TradeController {
                     @Parameter(
                             name = "status",
                             in = ParameterIn.QUERY,
-                            description = "거래 상태 필터. 미지정 시 전체 상태를 조회합니다.",
+                            description = "거래 상태 필터. 값을 여러 개 지정하면 해당 상태들만, 미지정 시 전체 상태를 조회합니다.",
                             example = "PAID"
                     ),
                     @Parameter(
@@ -96,7 +97,13 @@ public class TradeController {
                                             "sellerUserId": 1,
                                             "paymentAmount": 50000,
                                             "status": "PAID",
-                                            "createdAt": "2026-07-10T12:00:00"
+                                            "createdAt": "2026-07-10T12:00:00",
+                                            "item": {
+                                              "itemId": 10,
+                                              "itemName": "Gray Hoodie",
+                                              "brandName": "Nike",
+                                              "representativeImageUrl": "https://image.url/item.jpg"
+                                            }
                                           }
                                         ],
                                         "page": 0,
@@ -113,7 +120,7 @@ public class TradeController {
     @GetMapping("/trades")
     public BaseResponse<PageResponse<TradeListItemResponse>> getTradeList(
             @RequestParam(required = false) TradeRole role,
-            @RequestParam(required = false) TradeStatus status,
+            @RequestParam(required = false) List<TradeStatus> status,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
@@ -168,6 +175,10 @@ public class TradeController {
                                         "paymentAmount": 51500,
                                         "sellerServiceFee": null,
                                         "settlementAmount": null,
+                                        "shippedAt": null,
+                                        "deliveredAt": null,
+                                        "confirmedAt": null,
+                                        "settledAt": null,
                                         "createdAt": "2026-07-10T12:00:00",
                                         "updatedAt": "2026-07-10T12:00:00"
                                       }

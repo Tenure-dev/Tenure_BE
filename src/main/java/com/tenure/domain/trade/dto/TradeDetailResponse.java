@@ -89,6 +89,18 @@ public record TradeDetailResponse(
         @Schema(description = "배송 요청사항", example = "문 앞에 놓아주세요")
         String deliveryRequestNote,
 
+        @Schema(description = "발송 시각", example = "2026-07-11T09:00:00")
+        LocalDateTime shippedAt,
+
+        @Schema(description = "배송 완료 시각", example = "2026-07-12T15:00:00")
+        LocalDateTime deliveredAt,
+
+        @Schema(description = "구매 확정 시각", example = "2026-07-15T10:00:00")
+        LocalDateTime confirmedAt,
+
+        @Schema(description = "정산 완료 시각", example = "2026-07-15T10:00:01")
+        LocalDateTime settledAt,
+
         @Schema(description = "거래 생성 시각", example = "2026-07-10T12:00:00")
         LocalDateTime createdAt,
 
@@ -124,6 +136,10 @@ public record TradeDetailResponse(
                 trade.getDeliveryAddressLine2(),
                 trade.getDeliveryPostalCode(),
                 trade.getDeliveryRequestNote(),
+                trade.getShippedAt(),
+                trade.getDeliveredAt(),
+                trade.getConfirmedAt(),
+                trade.getSettledAt(),
                 trade.getCreatedAt(),
                 trade.getUpdatedAt()
         );
