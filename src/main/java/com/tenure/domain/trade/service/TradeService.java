@@ -15,6 +15,7 @@ import com.tenure.domain.trade.exception.TradeErrorCode;
 import com.tenure.domain.trade.repository.TradeRepository;
 import com.tenure.global.exception.CustomException;
 import com.tenure.global.response.PageResponse;
+import java.util.Arrays;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -38,13 +39,13 @@ public class TradeService {
     public PageResponse<TradeListItemResponse> getTradeList(
             Long currentUserId,
             TradeRole role,
-            TradeStatus status,
+            List<TradeStatus> status,
             int page,
             int size
     ) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
 
-        Page<Trade> trades = findTrades(currentUserId, role, status, pageable);
+        Page<Trade> trades = findTrades(currentUserId, role, normalizeStatuses(status), pageable);
 
         return PageResponse.from(trades, TradeListItemResponse::of);
     }
@@ -122,14 +123,21 @@ public class TradeService {
                 .orElseThrow(() -> new CustomException(TradeErrorCode.TRADE_NOT_FOUND));
     }
 
-    private Page<Trade> findTrades(Long currentUserId, TradeRole role, TradeStatus status, Pageable pageable) {
+    private Page<Trade> findTrades(Long currentUserId, TradeRole role, List<TradeStatus> statuses, Pageable pageable) {
         if (role == TradeRole.BUYER) {
-            return tradeRepository.findAllByBuyer(currentUserId, status, pageable);
+            return tradeRepository.findAllByBuyer(currentUserId, statuses, pageable);
         }
         if (role == TradeRole.SELLER) {
-            return tradeRepository.findAllBySeller(currentUserId, status, pageable);
+            return tradeRepository.findAllBySeller(currentUserId, statuses, pageable);
         }
-        return tradeRepository.findAllByParticipant(currentUserId, status, pageable);
+        return tradeRepository.findAllByParticipant(currentUserId, statuses, pageable);
+    }
+
+    private List<TradeStatus> normalizeStatuses(List<TradeStatus> statuses) {
+        if (statuses == null || statuses.isEmpty()) {
+            return Arrays.asList(TradeStatus.values());
+        }
+        return statuses;
     }
 
     private TradeViewerMode resolveViewerMode(Trade trade, Long currentUserId) {

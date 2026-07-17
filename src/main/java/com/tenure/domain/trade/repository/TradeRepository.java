@@ -16,39 +16,66 @@ import org.springframework.data.repository.query.Param;
 
 public interface TradeRepository extends JpaRepository<Trade, Long> {
 
-    @Query("""
-            select trade
-            from Trade trade
-            where trade.buyer.id = :userId
-              and (:status is null or trade.status = :status)
-            """)
+    @Query(
+            value = """
+                    select trade
+                    from Trade trade
+                    join fetch trade.item item
+                    where trade.buyer.id = :userId
+                      and trade.status in :statuses
+                    """,
+            countQuery = """
+                    select count(trade)
+                    from Trade trade
+                    where trade.buyer.id = :userId
+                      and trade.status in :statuses
+                    """
+    )
     Page<Trade> findAllByBuyer(
             @Param("userId") Long userId,
-            @Param("status") TradeStatus status,
+            @Param("statuses") Collection<TradeStatus> statuses,
             Pageable pageable
     );
 
-    @Query("""
-            select trade
-            from Trade trade
-            where trade.seller.id = :userId
-              and (:status is null or trade.status = :status)
-            """)
+    @Query(
+            value = """
+                    select trade
+                    from Trade trade
+                    join fetch trade.item item
+                    where trade.seller.id = :userId
+                      and trade.status in :statuses
+                    """,
+            countQuery = """
+                    select count(trade)
+                    from Trade trade
+                    where trade.seller.id = :userId
+                      and trade.status in :statuses
+                    """
+    )
     Page<Trade> findAllBySeller(
             @Param("userId") Long userId,
-            @Param("status") TradeStatus status,
+            @Param("statuses") Collection<TradeStatus> statuses,
             Pageable pageable
     );
 
-    @Query("""
-            select trade
-            from Trade trade
-            where (trade.buyer.id = :userId or trade.seller.id = :userId)
-              and (:status is null or trade.status = :status)
-            """)
+    @Query(
+            value = """
+                    select trade
+                    from Trade trade
+                    join fetch trade.item item
+                    where (trade.buyer.id = :userId or trade.seller.id = :userId)
+                      and trade.status in :statuses
+                    """,
+            countQuery = """
+                    select count(trade)
+                    from Trade trade
+                    where (trade.buyer.id = :userId or trade.seller.id = :userId)
+                      and trade.status in :statuses
+                    """
+    )
     Page<Trade> findAllByParticipant(
             @Param("userId") Long userId,
-            @Param("status") TradeStatus status,
+            @Param("statuses") Collection<TradeStatus> statuses,
             Pageable pageable
     );
 

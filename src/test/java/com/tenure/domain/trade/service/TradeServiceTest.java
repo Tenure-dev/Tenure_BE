@@ -16,6 +16,7 @@ import com.tenure.domain.item.entity.Item;
 import com.tenure.domain.product.entity.Product;
 import com.tenure.domain.product.enums.ProductStatus;
 import com.tenure.domain.product.repository.ProductRepository;
+import com.tenure.domain.trade.dto.ItemSummaryResponse;
 import com.tenure.domain.trade.dto.TradeDetailResponse;
 import com.tenure.domain.trade.dto.TradeListItemResponse;
 import com.tenure.domain.trade.dto.TradeStatusChangeRequest;
@@ -34,6 +35,7 @@ import com.tenure.global.exception.CustomException;
 import com.tenure.global.response.PageResponse;
 import java.lang.reflect.Constructor;
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -78,54 +80,100 @@ class TradeServiceTest {
     void getTradeList_withBuyerRole_queriesByBuyerWithCurrentUserId() {
         Trade trade = trade(100L, CURRENT_USER_ID, 2L, TradeStatus.PAID);
         Page<Trade> page = new PageImpl<>(List.of(trade));
-        when(tradeRepository.findAllByBuyer(eq(CURRENT_USER_ID), eq(TradeStatus.PAID), any(Pageable.class)))
+        when(tradeRepository.findAllByBuyer(eq(CURRENT_USER_ID), eq(List.of(TradeStatus.PAID)), any(Pageable.class)))
                 .thenReturn(page);
 
         PageResponse<TradeListItemResponse> response =
-                tradeService.getTradeList(CURRENT_USER_ID, TradeRole.BUYER, TradeStatus.PAID, 0, 20);
+                tradeService.getTradeList(CURRENT_USER_ID, TradeRole.BUYER, List.of(TradeStatus.PAID), 0, 20);
 
         assertThat(response.getContent()).hasSize(1);
         assertThat(response.getContent().get(0).tradeId()).isEqualTo(100L);
-        verify(tradeRepository).findAllByBuyer(eq(CURRENT_USER_ID), eq(TradeStatus.PAID), any(Pageable.class));
+        verify(tradeRepository).findAllByBuyer(eq(CURRENT_USER_ID), eq(List.of(TradeStatus.PAID)), any(Pageable.class));
     }
 
     @Test
     void getTradeList_withSellerRole_queriesBySellerWithCurrentUserId() {
         Trade trade = trade(101L, 2L, CURRENT_USER_ID, TradeStatus.SHIPPED);
         Page<Trade> page = new PageImpl<>(List.of(trade));
-        when(tradeRepository.findAllBySeller(eq(CURRENT_USER_ID), isNull(), any(Pageable.class)))
+        when(tradeRepository.findAllBySeller(eq(CURRENT_USER_ID), eq(Arrays.asList(TradeStatus.values())), any(Pageable.class)))
                 .thenReturn(page);
 
         PageResponse<TradeListItemResponse> response =
                 tradeService.getTradeList(CURRENT_USER_ID, TradeRole.SELLER, null, 0, 20);
 
         assertThat(response.getContent()).hasSize(1);
-        verify(tradeRepository).findAllBySeller(eq(CURRENT_USER_ID), isNull(), any(Pageable.class));
+        verify(tradeRepository).findAllBySeller(eq(CURRENT_USER_ID), eq(Arrays.asList(TradeStatus.values())), any(Pageable.class));
     }
 
     @Test
     void getTradeList_withoutRole_queriesByParticipantWithCurrentUserId() {
         Trade trade = trade(102L, CURRENT_USER_ID, 3L, TradeStatus.DELIVERED);
         Page<Trade> page = new PageImpl<>(List.of(trade));
-        when(tradeRepository.findAllByParticipant(eq(CURRENT_USER_ID), isNull(), any(Pageable.class)))
+        when(tradeRepository.findAllByParticipant(eq(CURRENT_USER_ID), eq(Arrays.asList(TradeStatus.values())), any(Pageable.class)))
                 .thenReturn(page);
 
         PageResponse<TradeListItemResponse> response =
                 tradeService.getTradeList(CURRENT_USER_ID, null, null, 0, 20);
 
         assertThat(response.getContent()).hasSize(1);
-        verify(tradeRepository).findAllByParticipant(eq(CURRENT_USER_ID), isNull(), any(Pageable.class));
+        verify(tradeRepository).findAllByParticipant(eq(CURRENT_USER_ID), eq(Arrays.asList(TradeStatus.values())), any(Pageable.class));
     }
 
     @Test
     void getTradeList_passesStatusFilterToRepository() {
         Page<Trade> page = new PageImpl<>(List.of());
-        when(tradeRepository.findAllByParticipant(eq(CURRENT_USER_ID), eq(TradeStatus.SETTLED), any(Pageable.class)))
+        when(tradeRepository.findAllByParticipant(eq(CURRENT_USER_ID), eq(List.of(TradeStatus.SETTLED)), any(Pageable.class)))
                 .thenReturn(page);
 
-        tradeService.getTradeList(CURRENT_USER_ID, null, TradeStatus.SETTLED, 0, 20);
+        tradeService.getTradeList(CURRENT_USER_ID, null, List.of(TradeStatus.SETTLED), 0, 20);
 
-        verify(tradeRepository).findAllByParticipant(eq(CURRENT_USER_ID), eq(TradeStatus.SETTLED), any(Pageable.class));
+        verify(tradeRepository).findAllByParticipant(eq(CURRENT_USER_ID), eq(List.of(TradeStatus.SETTLED)), any(Pageable.class));
+    }
+
+    @Test
+    void getTradeList_withMultipleStatuses_returnsOnlyMatchingStatuses() {
+        Trade paidTrade = trade(110L, CURRENT_USER_ID, 2L, TradeStatus.PAID);
+        Trade shippedTrade = trade(111L, CURRENT_USER_ID, 2L, TradeStatus.SHIPPED);
+        Page<Trade> page = new PageImpl<>(List.of(paidTrade, shippedTrade));
+        List<TradeStatus> requestedStatuses = List.of(TradeStatus.PAID, TradeStatus.SHIPPED);
+        when(tradeRepository.findAllByParticipant(eq(CURRENT_USER_ID), eq(requestedStatuses), any(Pageable.class)))
+                .thenReturn(page);
+
+        PageResponse<TradeListItemResponse> response =
+                tradeService.getTradeList(CURRENT_USER_ID, null, requestedStatuses, 0, 20);
+
+        assertThat(response.getContent())
+                .extracting(TradeListItemResponse::status)
+                .containsExactly(TradeStatus.PAID, TradeStatus.SHIPPED);
+        verify(tradeRepository).findAllByParticipant(eq(CURRENT_USER_ID), eq(requestedStatuses), any(Pageable.class));
+    }
+
+    @Test
+    void getTradeList_withoutStatus_queriesAllStatuses() {
+        Page<Trade> page = new PageImpl<>(List.of());
+        when(tradeRepository.findAllByParticipant(eq(CURRENT_USER_ID), eq(Arrays.asList(TradeStatus.values())), any(Pageable.class)))
+                .thenReturn(page);
+
+        tradeService.getTradeList(CURRENT_USER_ID, null, null, 0, 20);
+
+        verify(tradeRepository).findAllByParticipant(eq(CURRENT_USER_ID), eq(Arrays.asList(TradeStatus.values())), any(Pageable.class));
+    }
+
+    @Test
+    void getTradeList_mapsItemSummaryFields() {
+        Trade trade = trade(104L, CURRENT_USER_ID, 2L, TradeStatus.PAID);
+        Page<Trade> page = new PageImpl<>(List.of(trade));
+        when(tradeRepository.findAllByBuyer(eq(CURRENT_USER_ID), eq(List.of(TradeStatus.PAID)), any(Pageable.class)))
+                .thenReturn(page);
+
+        PageResponse<TradeListItemResponse> response =
+                tradeService.getTradeList(CURRENT_USER_ID, TradeRole.BUYER, List.of(TradeStatus.PAID), 0, 20);
+
+        ItemSummaryResponse item = response.getContent().get(0).item();
+        assertThat(item.itemId()).isEqualTo(10L);
+        assertThat(item.itemName()).isEqualTo("Gray Hoodie");
+        assertThat(item.brandName()).isEqualTo("Nike");
+        assertThat(item.representativeImageUrl()).isEqualTo("https://image.url/item.jpg");
     }
 
     @Test
@@ -554,6 +602,9 @@ class TradeServiceTest {
     private Item item(Long id) {
         Item item = instantiate(Item.class);
         ReflectionTestUtils.setField(item, "id", id);
+        ReflectionTestUtils.setField(item, "itemName", "Gray Hoodie");
+        ReflectionTestUtils.setField(item, "brandName", "Nike");
+        ReflectionTestUtils.setField(item, "representativeImageUrl", "https://image.url/item.jpg");
         return item;
     }
 
