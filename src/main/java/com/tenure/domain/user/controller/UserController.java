@@ -20,6 +20,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import com.tenure.domain.user.dto.request.ProfileUpdateRequest;
 import org.springframework.web.bind.annotation.PatchMapping;
 import com.tenure.domain.user.dto.request.AccountSettingsUpdateRequest;
+import com.tenure.domain.user.dto.response.PublicUserProfileResponse;
+import org.springframework.web.bind.annotation.PathVariable;
 
 
 // 사용자, 인증 관련 API
@@ -72,5 +74,15 @@ public class UserController {
         Long currentUserId = currentUserProvider.getCurrentUserId();
         UserProfileResponse response = userService.updateAccountSettings(currentUserId, request);
         return BaseResponse.success(response, "계정 설정이 수정되었습니다.");
+    }
+
+    @Operation(summary = "타 사용자 프로필 조회", description = "특정 사용자의 공개 프로필을 조회합니다.")
+    @GetMapping("/users/{userId}")
+    public BaseResponse<PublicUserProfileResponse> getUserProfile(
+            @PathVariable Long userId
+    ) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        PublicUserProfileResponse response = userService.getUserProfile(currentUserId, userId);
+        return BaseResponse.success(response);
     }
 }
