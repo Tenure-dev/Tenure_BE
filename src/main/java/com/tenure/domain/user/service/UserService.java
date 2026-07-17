@@ -15,6 +15,7 @@ import com.tenure.domain.user.dto.request.LoginRequest;
 import com.tenure.domain.user.dto.response.TokenResponse;
 import com.tenure.global.security.JwtProvider;
 import com.tenure.domain.user.dto.response.UserProfileResponse;
+import com.tenure.domain.user.dto.request.ProfileUpdateRequest;
 
 
 @Slf4j
@@ -88,12 +89,38 @@ public class UserService {
         return new TokenResponse(accessToken, user.getId(), user.getUsername());
     }
 
-    // 내 정보 조회.
+    // 내 정보 조회
     // currentUserId(JWT에서 추출된 로그인 사용자 ID)로 조회
     @Transactional(readOnly = true)
     public UserProfileResponse getMyProfile(Long currentUserId) {
         User user = userRepository.findById(currentUserId)
                 .orElseThrow(() -> new CustomException(UserErrorCode.USER_NOT_FOUND));
+
+        return UserProfileResponse.from(user);
+    }
+
+    // 프로필 수정
+    @Transactional
+    public UserProfileResponse updateMyProfile(Long currentUserId, ProfileUpdateRequest request) {
+        User user = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new CustomException(UserErrorCode.USER_NOT_FOUND));
+
+        // 닉네임을 바꾸려는 경우에만 중복 검사.
+        // 현재 자기 닉네임과 다르고, 그 닉네임을 이미 누군가 쓰고 있으면 에러
+        if (request.username() != null
+                && !request.username().equals(user.getUsername())
+                && userRepository.existsByUsername(request.username())) {
+            throw new CustomException(UserErrorCode.USERNAME_ALREADY_EXISTS);
+        }
+
+        // 엔티티의 수정 메서드 호출. 트랜잭션 종료 시 변경 감지로 자동 UPDATE
+        user.updateProfile(
+                request.username(),
+                request.gender(),
+                request.heightCm(),
+                request.weightKg(),
+                request.profileImageUrl()
+        );
 
         return UserProfileResponse.from(user);
     }
