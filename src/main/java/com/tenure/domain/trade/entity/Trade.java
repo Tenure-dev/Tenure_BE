@@ -101,8 +101,17 @@ public class Trade extends BaseTimeEntity {
     @Column(name = "tracking_number", length = 100)
     private String trackingNumber;
 
+    @Column(name = "shipped_at")
+    private LocalDateTime shippedAt;
+
     @Column(name = "delivered_at")
     private LocalDateTime deliveredAt;
+
+    @Column(name = "confirmed_at")
+    private LocalDateTime confirmedAt;
+
+    @Column(name = "settled_at")
+    private LocalDateTime settledAt;
 
     @Column(name = "payment_method_id", nullable = false, length = 100)
     private String paymentMethodId;
