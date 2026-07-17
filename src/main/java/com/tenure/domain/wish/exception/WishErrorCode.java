@@ -11,7 +11,8 @@ public enum WishErrorCode implements ErrorCode {
 
     USER_NOT_FOUND("USER_404", "사용자 정보를 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
     ITEM_NOT_FOUND("ITEM_404", "아이템 정보를 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
-    WISH_ALREADY_EXISTS("WISH_409", "이미 위시 등록한 아이템입니다.", HttpStatus.CONFLICT);
+    WISH_ALREADY_EXISTS("WISH_409", "이미 위시 등록한 아이템입니다.", HttpStatus.CONFLICT),
+    WISH_NOT_FOUND("WISH_404", "위시 등록되지 않은 아이템입니다.", HttpStatus.NOT_FOUND);
 
     private final String code;
     private final String message;

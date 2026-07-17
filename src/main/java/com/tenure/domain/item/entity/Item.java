@@ -118,6 +118,12 @@ public class Item extends BaseTimeEntity {
         this.wishCount++;
     }
 
+    public void decreaseWishCount() {
+        if (this.wishCount > 0) {
+            this.wishCount--;
+        }
+    }
+
     public void updateInfo(
             Category category,
             String brandName,

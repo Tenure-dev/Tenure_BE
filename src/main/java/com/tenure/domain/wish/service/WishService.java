@@ -5,6 +5,7 @@ import com.tenure.domain.item.repository.ItemRepository;
 import com.tenure.domain.user.entity.User;
 import com.tenure.domain.user.repository.UserRepository;
 import com.tenure.domain.wish.dto.WishCreateResponse;
+import com.tenure.domain.wish.dto.WishDeleteResponse;
 import com.tenure.domain.wish.entity.Wish;
 import com.tenure.domain.wish.exception.WishErrorCode;
 import com.tenure.domain.wish.repository.WishRepository;
@@ -34,6 +35,27 @@ public class WishService {
         item.increaseWishCount();
 
         return WishCreateResponse.from(savedWish);
+    }
+
+    @Transactional
+    public WishDeleteResponse deleteWish(Long currentUserId, Long itemId) {
+        User user = findUser(currentUserId);
+        Item item = findItem(itemId);
+        Wish wish = findWish(currentUserId, itemId);
+
+        wishRepository.delete(wish);
+        item.decreaseWishCount();
+
+        return new WishDeleteResponse(
+                item.getId(),
+                user.getId(),
+                item.getWishCount()
+        );
+    }
+
+    private Wish findWish(Long userId, Long itemId) {
+        return wishRepository.findByUserIdAndItemId(userId, itemId)
+                .orElseThrow(() -> new CustomException(WishErrorCode.WISH_NOT_FOUND));
     }
 
     private User findUser(Long userId) {
