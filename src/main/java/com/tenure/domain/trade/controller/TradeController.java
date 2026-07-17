@@ -175,6 +175,10 @@ public class TradeController {
                                         "paymentAmount": 51500,
                                         "sellerServiceFee": null,
                                         "settlementAmount": null,
+                                        "shippedAt": null,
+                                        "deliveredAt": null,
+                                        "confirmedAt": null,
+                                        "settledAt": null,
                                         "createdAt": "2026-07-10T12:00:00",
                                         "updatedAt": "2026-07-10T12:00:00"
                                       }

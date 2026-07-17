@@ -50,7 +50,8 @@ public enum TradeTransition {
                     to,
                     request.deliveryCarrier(),
                     request.customDeliveryCarrierName(),
-                    request.trackingNumber()
+                    request.trackingNumber(),
+                    LocalDateTime.now()
             );
         }
 
@@ -90,7 +91,7 @@ public enum TradeTransition {
 
         @Override
         public int applyUpdate(TradeRepository tradeRepository, Trade trade, TradeStatusChangeRequest request) {
-            return tradeRepository.updateStatus(trade.getId(), from, to);
+            return tradeRepository.updateToConfirmed(trade.getId(), from, to, LocalDateTime.now());
         }
 
         @Override
@@ -110,7 +111,7 @@ public enum TradeTransition {
             markProductSoldIfPresent(context);
 
             // 정산 확인 로직은 PG 도입 시 SETTLED 전이 트리거 교체로 추가 가능한 구조. 현재는 구매확정 직후 자동 정산 처리한다.
-            chain(context, tradeId, TradeStatus.PURCHASE_CONFIRMED, TradeStatus.SETTLED);
+            chainToSettled(context, tradeId);
             context.eventPublisher().publishEvent(new TradeStatusChangedEvent(
                     tradeId, TradeStatus.PURCHASE_CONFIRMED, TradeStatus.SETTLED, buyerUserId, sellerUserId));
 
@@ -138,6 +139,21 @@ public enum TradeTransition {
         if (rows == 0) {
             throw new IllegalStateException(
                     "거래 자동 연쇄 전이 실패: tradeId=%d, %s -> %s".formatted(tradeId, from, to)
+            );
+        }
+    }
+
+    /**
+     * PURCHASE_CONFIRMED -> SETTLED 연쇄 전이 전용. settledAt을 status와 같은 조건부 UPDATE로 원자적으로 기록해야 해서
+     * status만 바꾸는 범용 chain()을 쓸 수 없다.
+     */
+    private static void chainToSettled(Context context, Long tradeId) {
+        int rows = context.tradeRepository().updateToSettled(
+                tradeId, TradeStatus.PURCHASE_CONFIRMED, TradeStatus.SETTLED, LocalDateTime.now());
+        if (rows == 0) {
+            throw new IllegalStateException(
+                    "거래 자동 연쇄 전이 실패: tradeId=%d, %s -> %s".formatted(
+                            tradeId, TradeStatus.PURCHASE_CONFIRMED, TradeStatus.SETTLED)
             );
         }
     }

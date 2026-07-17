@@ -288,13 +288,34 @@ class TradeServiceTest {
     }
 
     @Test
+    void getTradeDetail_mapsTransitionTimestamps() {
+        Trade trade = trade(107L, CURRENT_USER_ID, 2L, TradeStatus.SETTLED);
+        LocalDateTime shippedAt = LocalDateTime.of(2026, 7, 11, 9, 0);
+        LocalDateTime deliveredAt = LocalDateTime.of(2026, 7, 12, 15, 0);
+        LocalDateTime confirmedAt = LocalDateTime.of(2026, 7, 15, 10, 0);
+        LocalDateTime settledAt = LocalDateTime.of(2026, 7, 15, 10, 0, 1);
+        ReflectionTestUtils.setField(trade, "shippedAt", shippedAt);
+        ReflectionTestUtils.setField(trade, "deliveredAt", deliveredAt);
+        ReflectionTestUtils.setField(trade, "confirmedAt", confirmedAt);
+        ReflectionTestUtils.setField(trade, "settledAt", settledAt);
+        when(tradeRepository.findById(107L)).thenReturn(Optional.of(trade));
+
+        TradeDetailResponse response = tradeService.getTradeDetail(107L, CURRENT_USER_ID);
+
+        assertThat(response.shippedAt()).isEqualTo(shippedAt);
+        assertThat(response.deliveredAt()).isEqualTo(deliveredAt);
+        assertThat(response.confirmedAt()).isEqualTo(confirmedAt);
+        assertThat(response.settledAt()).isEqualTo(settledAt);
+    }
+
+    @Test
     void changeTradeStatus_paidAsSellerWithValidTracking_transitionsToShippedAndPublishesEvent() {
         Trade paidTrade = trade(200L, 2L, CURRENT_USER_ID, TradeStatus.PAID);
         Trade shippedTrade = trade(200L, 2L, CURRENT_USER_ID, TradeStatus.SHIPPED);
         when(tradeRepository.findById(200L)).thenReturn(Optional.of(paidTrade), Optional.of(shippedTrade));
         when(tradeRepository.updateToShipped(
                 eq(200L), eq(TradeStatus.PAID), eq(TradeStatus.SHIPPED),
-                eq(DeliveryCarrier.CJ_LOGISTICS), isNull(), eq("1234567890")
+                eq(DeliveryCarrier.CJ_LOGISTICS), isNull(), eq("1234567890"), any(LocalDateTime.class)
         )).thenReturn(1);
 
         TradeStatusChangeRequest request =
@@ -307,6 +328,30 @@ class TradeServiceTest {
         verify(eventPublisher).publishEvent(captor.capture());
         assertThat(captor.getValue().from()).isEqualTo(TradeStatus.PAID);
         assertThat(captor.getValue().to()).isEqualTo(TradeStatus.SHIPPED);
+    }
+
+    @Test
+    void changeTradeStatus_paidAsSeller_recordsShippedAtAndLeavesOtherTimestampsUntouched() {
+        Trade paidTrade = trade(220L, 2L, CURRENT_USER_ID, TradeStatus.PAID);
+        Trade shippedTrade = trade(220L, 2L, CURRENT_USER_ID, TradeStatus.SHIPPED);
+        when(tradeRepository.findById(220L)).thenReturn(Optional.of(paidTrade), Optional.of(shippedTrade));
+        when(tradeRepository.updateToShipped(
+                eq(220L), eq(TradeStatus.PAID), eq(TradeStatus.SHIPPED),
+                eq(DeliveryCarrier.CJ_LOGISTICS), isNull(), eq("1234567890"), any(LocalDateTime.class)
+        )).thenReturn(1);
+
+        TradeStatusChangeRequest request =
+                new TradeStatusChangeRequest(TradeStatus.SHIPPED, DeliveryCarrier.CJ_LOGISTICS, "1234567890", null);
+
+        tradeService.changeTradeStatus(220L, CURRENT_USER_ID, request);
+
+        verify(tradeRepository).updateToShipped(
+                eq(220L), eq(TradeStatus.PAID), eq(TradeStatus.SHIPPED),
+                eq(DeliveryCarrier.CJ_LOGISTICS), isNull(), eq("1234567890"), any(LocalDateTime.class)
+        );
+        verify(tradeRepository, never()).updateToDelivered(anyLong(), any(), any(), any());
+        verify(tradeRepository, never()).updateToConfirmed(anyLong(), any(), any(), any());
+        verify(tradeRepository, never()).updateToSettled(anyLong(), any(), any(), any());
     }
 
     @Test
@@ -397,8 +442,8 @@ class TradeServiceTest {
         when(tradeRepository.findById(205L)).thenReturn(
                 Optional.of(deliveredTrade), Optional.of(confirmedTrade), Optional.of(completedTrade)
         );
-        when(tradeRepository.updateStatus(205L, TradeStatus.DELIVERED, TradeStatus.PURCHASE_CONFIRMED)).thenReturn(1);
-        when(tradeRepository.updateStatus(205L, TradeStatus.PURCHASE_CONFIRMED, TradeStatus.SETTLED)).thenReturn(1);
+        when(tradeRepository.updateToConfirmed(eq(205L), eq(TradeStatus.DELIVERED), eq(TradeStatus.PURCHASE_CONFIRMED), any(LocalDateTime.class))).thenReturn(1);
+        when(tradeRepository.updateToSettled(eq(205L), eq(TradeStatus.PURCHASE_CONFIRMED), eq(TradeStatus.SETTLED), any(LocalDateTime.class))).thenReturn(1);
         when(tradeRepository.updateStatus(205L, TradeStatus.SETTLED, TradeStatus.COMPLETED)).thenReturn(1);
 
         Product product = product(10L, ProductStatus.TRADING);
@@ -418,6 +463,26 @@ class TradeServiceTest {
     }
 
     @Test
+    void changeTradeStatus_deliveredAsBuyer_recordsConfirmedAtAndChainedSettledAt() {
+        Trade deliveredTrade = trade(212L, CURRENT_USER_ID, 2L, TradeStatus.DELIVERED);
+        Trade confirmedTrade = trade(212L, CURRENT_USER_ID, 2L, TradeStatus.PURCHASE_CONFIRMED);
+        Trade completedTrade = trade(212L, CURRENT_USER_ID, 2L, TradeStatus.COMPLETED);
+        when(tradeRepository.findById(212L)).thenReturn(
+                Optional.of(deliveredTrade), Optional.of(confirmedTrade), Optional.of(completedTrade)
+        );
+        when(tradeRepository.updateToConfirmed(eq(212L), eq(TradeStatus.DELIVERED), eq(TradeStatus.PURCHASE_CONFIRMED), any(LocalDateTime.class))).thenReturn(1);
+        when(tradeRepository.updateToSettled(eq(212L), eq(TradeStatus.PURCHASE_CONFIRMED), eq(TradeStatus.SETTLED), any(LocalDateTime.class))).thenReturn(1);
+        when(tradeRepository.updateStatus(212L, TradeStatus.SETTLED, TradeStatus.COMPLETED)).thenReturn(1);
+
+        tradeService.changeTradeStatus(212L, CURRENT_USER_ID, TradeStatusChangeRequest.empty(TradeStatus.PURCHASE_CONFIRMED));
+
+        verify(tradeRepository).updateToConfirmed(eq(212L), eq(TradeStatus.DELIVERED), eq(TradeStatus.PURCHASE_CONFIRMED), any(LocalDateTime.class));
+        verify(tradeRepository).updateToSettled(eq(212L), eq(TradeStatus.PURCHASE_CONFIRMED), eq(TradeStatus.SETTLED), any(LocalDateTime.class));
+        verify(tradeRepository, never()).updateStatus(212L, TradeStatus.DELIVERED, TradeStatus.PURCHASE_CONFIRMED);
+        verify(tradeRepository, never()).updateStatus(212L, TradeStatus.PURCHASE_CONFIRMED, TradeStatus.SETTLED);
+    }
+
+    @Test
     void changeTradeStatus_deliveredAsBuyerWithNullProduct_confirmsWithoutNpe() {
         Trade deliveredTrade = trade(206L, CURRENT_USER_ID, 2L, TradeStatus.DELIVERED);
         Trade confirmedTrade = trade(206L, CURRENT_USER_ID, 2L, TradeStatus.PURCHASE_CONFIRMED);
@@ -425,8 +490,8 @@ class TradeServiceTest {
         when(tradeRepository.findById(206L)).thenReturn(
                 Optional.of(deliveredTrade), Optional.of(confirmedTrade), Optional.of(completedTrade)
         );
-        when(tradeRepository.updateStatus(206L, TradeStatus.DELIVERED, TradeStatus.PURCHASE_CONFIRMED)).thenReturn(1);
-        when(tradeRepository.updateStatus(206L, TradeStatus.PURCHASE_CONFIRMED, TradeStatus.SETTLED)).thenReturn(1);
+        when(tradeRepository.updateToConfirmed(eq(206L), eq(TradeStatus.DELIVERED), eq(TradeStatus.PURCHASE_CONFIRMED), any(LocalDateTime.class))).thenReturn(1);
+        when(tradeRepository.updateToSettled(eq(206L), eq(TradeStatus.PURCHASE_CONFIRMED), eq(TradeStatus.SETTLED), any(LocalDateTime.class))).thenReturn(1);
         when(tradeRepository.updateStatus(206L, TradeStatus.SETTLED, TradeStatus.COMPLETED)).thenReturn(1);
 
         TradeStatusChangeRequest request = TradeStatusChangeRequest.empty(TradeStatus.PURCHASE_CONFIRMED);
@@ -493,7 +558,7 @@ class TradeServiceTest {
         when(tradeRepository.findById(210L)).thenReturn(Optional.of(trade));
         when(tradeRepository.updateToShipped(
                 eq(210L), eq(TradeStatus.PAID), eq(TradeStatus.SHIPPED),
-                eq(DeliveryCarrier.CJ_LOGISTICS), isNull(), eq("1234567890")
+                eq(DeliveryCarrier.CJ_LOGISTICS), isNull(), eq("1234567890"), any(LocalDateTime.class)
         )).thenReturn(0);
 
         TradeStatusChangeRequest request =
@@ -513,13 +578,15 @@ class TradeServiceTest {
         when(tradeRepository.findById(300L)).thenReturn(
                 Optional.of(deliveredTrade), Optional.of(confirmedTrade), Optional.of(completedTrade)
         );
-        when(tradeRepository.updateStatus(300L, TradeStatus.DELIVERED, TradeStatus.PURCHASE_CONFIRMED)).thenReturn(1);
-        when(tradeRepository.updateStatus(300L, TradeStatus.PURCHASE_CONFIRMED, TradeStatus.SETTLED)).thenReturn(1);
+        when(tradeRepository.updateToConfirmed(eq(300L), eq(TradeStatus.DELIVERED), eq(TradeStatus.PURCHASE_CONFIRMED), any(LocalDateTime.class))).thenReturn(1);
+        when(tradeRepository.updateToSettled(eq(300L), eq(TradeStatus.PURCHASE_CONFIRMED), eq(TradeStatus.SETTLED), any(LocalDateTime.class))).thenReturn(1);
         when(tradeRepository.updateStatus(300L, TradeStatus.SETTLED, TradeStatus.COMPLETED)).thenReturn(1);
 
         boolean confirmed = tradeService.confirmPurchaseBySystem(300L);
 
         assertThat(confirmed).isTrue();
+        verify(tradeRepository).updateToConfirmed(eq(300L), eq(TradeStatus.DELIVERED), eq(TradeStatus.PURCHASE_CONFIRMED), any(LocalDateTime.class));
+        verify(tradeRepository).updateToSettled(eq(300L), eq(TradeStatus.PURCHASE_CONFIRMED), eq(TradeStatus.SETTLED), any(LocalDateTime.class));
     }
 
     @Test
@@ -530,8 +597,8 @@ class TradeServiceTest {
         when(tradeRepository.findById(211L)).thenReturn(
                 Optional.of(deliveredTrade), Optional.of(confirmedTrade), Optional.of(completedTrade)
         );
-        when(tradeRepository.updateStatus(211L, TradeStatus.DELIVERED, TradeStatus.PURCHASE_CONFIRMED)).thenReturn(1);
-        when(tradeRepository.updateStatus(211L, TradeStatus.PURCHASE_CONFIRMED, TradeStatus.SETTLED)).thenReturn(1);
+        when(tradeRepository.updateToConfirmed(eq(211L), eq(TradeStatus.DELIVERED), eq(TradeStatus.PURCHASE_CONFIRMED), any(LocalDateTime.class))).thenReturn(1);
+        when(tradeRepository.updateToSettled(eq(211L), eq(TradeStatus.PURCHASE_CONFIRMED), eq(TradeStatus.SETTLED), any(LocalDateTime.class))).thenReturn(1);
         when(tradeRepository.updateStatus(211L, TradeStatus.SETTLED, TradeStatus.COMPLETED)).thenReturn(1);
         when(productRepository.findByIdForUpdate(11L)).thenReturn(Optional.of(product(11L, ProductStatus.TRADING)));
 
@@ -540,7 +607,7 @@ class TradeServiceTest {
         // Product 변경이 clearAutomatically를 유발하는 벌크 UPDATE보다 뒤로 밀리면 dirty checking이 유실되므로 순서를 고정한다.
         InOrder inOrder = inOrder(productRepository, tradeRepository);
         inOrder.verify(productRepository).findByIdForUpdate(11L);
-        inOrder.verify(tradeRepository).updateStatus(211L, TradeStatus.PURCHASE_CONFIRMED, TradeStatus.SETTLED);
+        inOrder.verify(tradeRepository).updateToSettled(eq(211L), eq(TradeStatus.PURCHASE_CONFIRMED), eq(TradeStatus.SETTLED), any(LocalDateTime.class));
     }
 
     @Test
@@ -548,8 +615,8 @@ class TradeServiceTest {
         Trade deliveredTrade = trade(302L, CURRENT_USER_ID, 2L, TradeStatus.DELIVERED);
         Trade confirmedTrade = trade(302L, CURRENT_USER_ID, 2L, TradeStatus.PURCHASE_CONFIRMED);
         when(tradeRepository.findById(302L)).thenReturn(Optional.of(deliveredTrade), Optional.of(confirmedTrade));
-        when(tradeRepository.updateStatus(302L, TradeStatus.DELIVERED, TradeStatus.PURCHASE_CONFIRMED)).thenReturn(1);
-        when(tradeRepository.updateStatus(302L, TradeStatus.PURCHASE_CONFIRMED, TradeStatus.SETTLED)).thenReturn(0);
+        when(tradeRepository.updateToConfirmed(eq(302L), eq(TradeStatus.DELIVERED), eq(TradeStatus.PURCHASE_CONFIRMED), any(LocalDateTime.class))).thenReturn(1);
+        when(tradeRepository.updateToSettled(eq(302L), eq(TradeStatus.PURCHASE_CONFIRMED), eq(TradeStatus.SETTLED), any(LocalDateTime.class))).thenReturn(0);
 
         // 진입 전이의 0행은 정상 경합이지만, 연쇄 구간의 0행은 불변식 위반이므로 삼키지 않고 롤백되어야 한다.
         assertThatThrownBy(() -> tradeService.confirmPurchaseBySystem(302L))
@@ -560,7 +627,7 @@ class TradeServiceTest {
     void confirmPurchaseBySystem_zeroRowsAffected_returnsFalseWithoutThrowing() {
         Trade deliveredTrade = trade(301L, CURRENT_USER_ID, 2L, TradeStatus.DELIVERED);
         when(tradeRepository.findById(301L)).thenReturn(Optional.of(deliveredTrade));
-        when(tradeRepository.updateStatus(301L, TradeStatus.DELIVERED, TradeStatus.PURCHASE_CONFIRMED)).thenReturn(0);
+        when(tradeRepository.updateToConfirmed(eq(301L), eq(TradeStatus.DELIVERED), eq(TradeStatus.PURCHASE_CONFIRMED), any(LocalDateTime.class))).thenReturn(0);
 
         boolean confirmed = tradeService.confirmPurchaseBySystem(301L);
 

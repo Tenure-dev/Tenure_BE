@@ -90,7 +90,8 @@ public interface TradeRepository extends JpaRepository<Trade, Long> {
                set t.status = :to,
                    t.deliveryCarrier = :deliveryCarrier,
                    t.customDeliveryCarrierName = :customDeliveryCarrierName,
-                   t.trackingNumber = :trackingNumber
+                   t.trackingNumber = :trackingNumber,
+                   t.shippedAt = :shippedAt
              where t.id = :id
                and t.status = :from
             """)
@@ -100,7 +101,8 @@ public interface TradeRepository extends JpaRepository<Trade, Long> {
             @Param("to") TradeStatus to,
             @Param("deliveryCarrier") DeliveryCarrier deliveryCarrier,
             @Param("customDeliveryCarrierName") String customDeliveryCarrierName,
-            @Param("trackingNumber") String trackingNumber
+            @Param("trackingNumber") String trackingNumber,
+            @Param("shippedAt") LocalDateTime shippedAt
     );
 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
@@ -116,6 +118,36 @@ public interface TradeRepository extends JpaRepository<Trade, Long> {
             @Param("from") TradeStatus from,
             @Param("to") TradeStatus to,
             @Param("deliveredAt") LocalDateTime deliveredAt
+    );
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            update Trade t
+               set t.status = :to,
+                   t.confirmedAt = :confirmedAt
+             where t.id = :id
+               and t.status = :from
+            """)
+    int updateToConfirmed(
+            @Param("id") Long id,
+            @Param("from") TradeStatus from,
+            @Param("to") TradeStatus to,
+            @Param("confirmedAt") LocalDateTime confirmedAt
+    );
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            update Trade t
+               set t.status = :to,
+                   t.settledAt = :settledAt
+             where t.id = :id
+               and t.status = :from
+            """)
+    int updateToSettled(
+            @Param("id") Long id,
+            @Param("from") TradeStatus from,
+            @Param("to") TradeStatus to,
+            @Param("settledAt") LocalDateTime settledAt
     );
 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
