@@ -2,10 +2,12 @@ package com.tenure.domain.chat.service;
 
 import com.tenure.domain.chat.dto.response.ChatRoomListCursorResponse;
 import com.tenure.domain.chat.dto.response.ChatRoomResponse;
+import com.tenure.domain.chat.entity.ChatMessage;
 import com.tenure.domain.chat.entity.ChatRoom;
 import com.tenure.domain.chat.entity.ChatRoomMember;
 import com.tenure.domain.chat.enums.ChatRoomFilterType;
 import com.tenure.domain.chat.exception.ChatErrorCode;
+import com.tenure.domain.chat.repository.ChatMessageRepository;
 import com.tenure.domain.chat.repository.ChatRoomMemberRepository;
 import com.tenure.domain.chat.repository.ChatRoomRepository;
 import com.tenure.domain.item.entity.Item;
@@ -29,6 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 import static com.tenure.domain.product.enums.ProductStatus.*;
 
@@ -44,6 +47,7 @@ public class ChatRoomService {
     private final ProductRepository productRepository;
     private final ChatRoomMemberRepository chatRoomMemberRepository;
     private final UserBlockRepository userBlockRepository;
+    private final ChatMessageRepository chatMessageRepository;
 
     @Transactional
     public ChatRoomResponse findOrCreateChatRoom(Long buyerId, Long itemId) {
@@ -130,6 +134,31 @@ public class ChatRoomService {
 
         log.info("[채팅방 목록 조회] 조회 결과 = {}건, hasNext = {}", chatRooms.getContent().size(), chatRooms.hasNext());
         return ChatRoomListCursorResponse.from(chatRooms, currentUserId);
+    }
+
+    //채팅방 접속 시 unreadCount 업데이트
+    @Transactional
+    public void updateRead(Long currentUserId, Long chatRoomId) {
+
+        //채팅방이 없으면
+        if (!chatRoomRepository.existsById(chatRoomId)) {
+            log.warn("[읽음 처리] 채팅방을 찾을 수 없습니다. chatRoomId = {}", chatRoomId);
+            throw new CustomException(ChatErrorCode.CHAT_ROOM_NOT_FOUND);
+        }
+
+        // 해당 채팅방 멤버가 아니면
+        ChatRoomMember chatRoomMember = chatRoomMemberRepository.findByUserIdAndChatRoomId(currentUserId, chatRoomId)
+                .orElseThrow(() -> {
+                    log.warn("[읽음 처리] 채팅방 접근 권한이 없습니다. currentUserId = {}, chatRoomId = {}", currentUserId, chatRoomId);
+                    return new CustomException(ChatErrorCode.CHAT_FORBIDDEN);
+                });
+
+        // 해당 채팅방의 가장 최근 메시지 조회
+        ChatMessage chatMessage = chatMessageRepository.findByRecentMessage(chatRoomId)
+                .orElse(null);
+
+        chatRoomMember.updateLastRead(chatMessage);
+
     }
 
     //채팅방 생성 매서드
