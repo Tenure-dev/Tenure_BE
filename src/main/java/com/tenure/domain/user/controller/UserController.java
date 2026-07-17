@@ -19,6 +19,8 @@ import com.tenure.global.security.CurrentUserProvider;
 import org.springframework.web.bind.annotation.GetMapping;
 import com.tenure.domain.user.dto.request.ProfileUpdateRequest;
 import org.springframework.web.bind.annotation.PatchMapping;
+import com.tenure.domain.user.dto.request.AccountSettingsUpdateRequest;
+
 
 // 사용자, 인증 관련 API
 @Tag(name = "User", description = "사용자/인증 API")
@@ -60,5 +62,15 @@ public class UserController {
         Long currentUserId = currentUserProvider.getCurrentUserId();
         UserProfileResponse response = userService.updateMyProfile(currentUserId, request);
         return BaseResponse.success(response, "프로필이 수정되었습니다.");
+    }
+
+    @Operation(summary = "계정 설정 수정", description = "기본 배송비, 정산 계좌 등 계정 설정을 수정합니다. 보낸 필드만 변경됩니다.")
+    @PatchMapping("/users/me/settings")
+    public BaseResponse<UserProfileResponse> updateAccountSettings(
+            @Valid @RequestBody AccountSettingsUpdateRequest request
+    ) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        UserProfileResponse response = userService.updateAccountSettings(currentUserId, request);
+        return BaseResponse.success(response, "계정 설정이 수정되었습니다.");
     }
 }

@@ -1,10 +1,14 @@
 package com.tenure.domain.user.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.tenure.domain.user.dto.request.AccountSettingsUpdateRequest;
 import com.tenure.domain.user.dto.request.SignupRequest;
 import com.tenure.domain.user.dto.response.SignupResponse;
 import com.tenure.domain.user.entity.User;
 import com.tenure.domain.user.exception.UserErrorCode;
 import com.tenure.domain.user.repository.UserRepository;
+import com.tenure.global.exception.CommonErrorCode;
 import com.tenure.global.exception.CustomException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,6 +20,8 @@ import com.tenure.domain.user.dto.response.TokenResponse;
 import com.tenure.global.security.JwtProvider;
 import com.tenure.domain.user.dto.response.UserProfileResponse;
 import com.tenure.domain.user.dto.request.ProfileUpdateRequest;
+import com.tenure.domain.user.dto.SettlementAccountDto;
+import com.tenure.global.util.AesEncryptor;
 
 
 @Slf4j
@@ -26,7 +32,8 @@ public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtProvider jwtProvider;
-
+    private final ObjectMapper objectMapper;
+    private final AesEncryptor aesEncryptor;
 
     // 회원가입
     // (검증 -> 암호화 -> 저장)을 하나의 트랜잭션으로 처리
@@ -121,6 +128,44 @@ public class UserService {
                 request.weightKg(),
                 request.profileImageUrl()
         );
+
+        return UserProfileResponse.from(user);
+    }
+
+    // 계정 설정 수정
+    // 정산 계좌의 계좌번호는 AES로 암호화한 뒤 JSON으로 직렬화해 저장
+    @Transactional
+    public UserProfileResponse updateAccountSettings(
+            Long currentUserId,
+            AccountSettingsUpdateRequest request
+    ) {
+        User user = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new CustomException(UserErrorCode.USER_NOT_FOUND));
+
+        String settlementAccountJson = null;
+        if (request.settlementAccount() != null) {
+            SettlementAccountDto account = request.settlementAccount();
+
+            // 계좌번호만 암호화. 은행명·예금주는 평문 유지
+            String encryptedAccountNumber = account.accountNumber() != null
+                    ? aesEncryptor.encrypt(account.accountNumber())
+                    : null;
+
+            // 암호화된 계좌번호로 새 DTO를 만들어 JSON 직렬화
+            SettlementAccountDto encryptedAccount = new SettlementAccountDto(
+                    account.bankName(),
+                    encryptedAccountNumber,
+                    account.accountHolder()
+            );
+
+            try {
+                settlementAccountJson = objectMapper.writeValueAsString(encryptedAccount);
+            } catch (JsonProcessingException e) {
+                throw new CustomException(CommonErrorCode.INVALID_REQUEST);
+            }
+        }
+
+        user.updateAccountSettings(request.defaultShippingFee(), settlementAccountJson);
 
         return UserProfileResponse.from(user);
     }
