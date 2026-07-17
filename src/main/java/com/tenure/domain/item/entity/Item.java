@@ -142,4 +142,11 @@ public class Item extends BaseTimeEntity {
     public void markOwned() {
         this.itemStatus = ItemStatus.OWNED;
     }
+
+    // 새 소유자가 재판매·offer 수신을 이어갈 수 있어야 하며, validateOfferableItem이 OWNED 상태를 요구하므로
+    // TRANSFERRED가 아닌 OWNED로 되돌린다.
+    public void transferOwnership(User newOwner) {
+        this.owner = newOwner;
+        this.itemStatus = ItemStatus.OWNED;
+    }
 }

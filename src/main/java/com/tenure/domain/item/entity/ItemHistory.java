@@ -61,4 +61,16 @@ public class ItemHistory {
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
     }
+
+    // historyType="TRANSFER"는 팀 합의 전 잠정치.
+    public static ItemHistory ofTransfer(Item item, User previousOwner, User currentOwner, Trade trade) {
+        ItemHistory history = new ItemHistory();
+        history.item = item;
+        history.previousOwner = previousOwner;
+        history.currentOwner = currentOwner;
+        history.trade = trade;
+        history.historyType = "TRANSFER";
+        history.historyDescription = "거래를 통해 아이템 소유권이 이전되었습니다.";
+        return history;
+    }
 }

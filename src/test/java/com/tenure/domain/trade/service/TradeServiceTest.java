@@ -13,9 +13,17 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.tenure.domain.item.entity.Item;
+import com.tenure.domain.item.entity.ItemHistory;
+import com.tenure.domain.item.enums.ItemStatus;
+import com.tenure.domain.item.repository.ItemHistoryRepository;
+import com.tenure.domain.item.repository.ItemRepository;
 import com.tenure.domain.product.entity.Product;
 import com.tenure.domain.product.enums.ProductStatus;
 import com.tenure.domain.product.repository.ProductRepository;
+import com.tenure.domain.common.enums.PaymentAuthorizationStatus;
+import com.tenure.domain.purchase.entity.PurchaseOffer;
+import com.tenure.domain.purchase.enums.PurchaseOfferStatus;
+import com.tenure.domain.purchase.repository.PurchaseOfferRepository;
 import com.tenure.domain.trade.dto.ItemSummaryResponse;
 import com.tenure.domain.trade.dto.TradeDetailResponse;
 import com.tenure.domain.trade.dto.TradeListItemResponse;
@@ -31,6 +39,7 @@ import com.tenure.domain.trade.event.TradeStatusChangedEvent;
 import com.tenure.domain.trade.exception.TradeErrorCode;
 import com.tenure.domain.trade.repository.TradeRepository;
 import com.tenure.domain.user.entity.User;
+import com.tenure.domain.user.repository.UserRepository;
 import com.tenure.global.exception.CustomException;
 import com.tenure.global.response.PageResponse;
 import java.lang.reflect.Constructor;
@@ -67,13 +76,40 @@ class TradeServiceTest {
     private ProductRepository productRepository;
 
     @Mock
+    private ItemRepository itemRepository;
+
+    @Mock
+    private UserRepository userRepository;
+
+    @Mock
+    private PurchaseOfferRepository purchaseOfferRepository;
+
+    @Mock
+    private ItemHistoryRepository itemHistoryRepository;
+
+    @Mock
     private ApplicationEventPublisher eventPublisher;
 
     private TradeService tradeService;
 
     @BeforeEach
     void setUp() {
-        tradeService = new TradeService(tradeRepository, productRepository, eventPublisher);
+        tradeService = new TradeService(
+                tradeRepository, productRepository, itemRepository, userRepository,
+                purchaseOfferRepository, itemHistoryRepository, eventPublisher
+        );
+    }
+
+    // COMPLETED -> TRANSFERRED 자동 연쇄(소유권 이전) 부수효과가 항상 거치는 스텁 묶음.
+    // Item.owner는 seller(2L)로 시작해 buyer(CURRENT_USER_ID)로 이전된다고 가정한다.
+    private void stubOwnershipTransfer(Long tradeId, Long itemId, Long buyerId, Long sellerId) {
+        when(tradeRepository.updateStatus(tradeId, TradeStatus.COMPLETED, TradeStatus.TRANSFERRED)).thenReturn(1);
+        Item item = item(itemId);
+        ReflectionTestUtils.setField(item, "owner", user(sellerId));
+        when(itemRepository.findByIdForUpdate(itemId)).thenReturn(Optional.of(item));
+        when(userRepository.getReferenceById(buyerId)).thenReturn(user(buyerId));
+        when(tradeRepository.getReferenceById(tradeId)).thenReturn(trade(tradeId, buyerId, sellerId, TradeStatus.TRANSFERRED));
+        when(purchaseOfferRepository.findSentByItemIdForUpdate(itemId, PurchaseOfferStatus.SENT)).thenReturn(List.of());
     }
 
     @Test
@@ -128,6 +164,48 @@ class TradeServiceTest {
         tradeService.getTradeList(CURRENT_USER_ID, null, List.of(TradeStatus.SETTLED), 0, 20);
 
         verify(tradeRepository).findAllByParticipant(eq(CURRENT_USER_ID), eq(List.of(TradeStatus.SETTLED)), any(Pageable.class));
+    }
+
+    @Test
+    void getTradeList_withCompletedFilter_expandsQueryToIncludeTransferred() {
+        // 커밋된 거래는 실제로 TRANSFERRED까지 자동 전이되므로, COMPLETED 필터는 TRANSFERRED 행도 함께 조회해야 한다.
+        Page<Trade> page = new PageImpl<>(List.of());
+        when(tradeRepository.findAllByParticipant(
+                eq(CURRENT_USER_ID), eq(List.of(TradeStatus.COMPLETED, TradeStatus.TRANSFERRED)), any(Pageable.class)
+        )).thenReturn(page);
+
+        tradeService.getTradeList(CURRENT_USER_ID, null, List.of(TradeStatus.COMPLETED), 0, 20);
+
+        verify(tradeRepository).findAllByParticipant(
+                eq(CURRENT_USER_ID), eq(List.of(TradeStatus.COMPLETED, TradeStatus.TRANSFERRED)), any(Pageable.class)
+        );
+    }
+
+    @Test
+    void getTradeList_withTransferredFilter_throwsStatusFilterNotAllowed() {
+        // TRANSFERRED는 API 계약상 노출되지 않는 내부 상태이므로 필터로 직접 조회할 수 없다.
+        assertThatThrownBy(() -> tradeService.getTradeList(CURRENT_USER_ID, null, List.of(TradeStatus.TRANSFERRED), 0, 20))
+                .isInstanceOf(CustomException.class)
+                .extracting(e -> ((CustomException) e).getErrorCode())
+                .isEqualTo(TradeErrorCode.TRADE_STATUS_FILTER_NOT_ALLOWED);
+
+        verify(tradeRepository, never()).findAllByParticipant(anyLong(), any(), any(Pageable.class));
+    }
+
+    @Test
+    void getTradeList_returnsCompletedStatusForTransferredTrade() {
+        // 목록 응답도 상세 응답과 마찬가지로 TRANSFERRED 엔티티를 COMPLETED로 노출해야 한다.
+        Trade transferredTrade = trade(120L, CURRENT_USER_ID, 2L, TradeStatus.TRANSFERRED);
+        Page<Trade> page = new PageImpl<>(List.of(transferredTrade));
+        when(tradeRepository.findAllByParticipant(
+                eq(CURRENT_USER_ID), eq(List.of(TradeStatus.COMPLETED, TradeStatus.TRANSFERRED)), any(Pageable.class)
+        )).thenReturn(page);
+
+        PageResponse<TradeListItemResponse> response =
+                tradeService.getTradeList(CURRENT_USER_ID, null, List.of(TradeStatus.COMPLETED), 0, 20);
+
+        assertThat(response.getContent()).extracting(TradeListItemResponse::status).containsExactly(TradeStatus.COMPLETED);
+        assertThat(transferredTrade.getStatus()).isEqualTo(TradeStatus.TRANSFERRED);
     }
 
     @Test
@@ -309,6 +387,19 @@ class TradeServiceTest {
     }
 
     @Test
+    void getTradeDetail_transferredTrade_displaysAsCompletedWhileEntityStatusStaysTransferred() {
+        // TRANSFERRED는 API 계약상 COMPLETED로 노출되는 내부 상태다. 매핑은 응답 조립 시점에만 적용되고
+        // 엔티티에 저장된 실제 상태(trade.getStatus())는 그대로 TRANSFERRED로 남아야 한다.
+        Trade transferredTrade = trade(108L, CURRENT_USER_ID, 2L, TradeStatus.TRANSFERRED);
+        when(tradeRepository.findById(108L)).thenReturn(Optional.of(transferredTrade));
+
+        TradeDetailResponse response = tradeService.getTradeDetail(108L, CURRENT_USER_ID);
+
+        assertThat(response.status()).isEqualTo(TradeStatus.COMPLETED);
+        assertThat(transferredTrade.getStatus()).isEqualTo(TradeStatus.TRANSFERRED);
+    }
+
+    @Test
     void changeTradeStatus_paidAsSellerWithValidTracking_transitionsToShippedAndPublishesEvent() {
         Trade paidTrade = trade(200L, 2L, CURRENT_USER_ID, TradeStatus.PAID);
         Trade shippedTrade = trade(200L, 2L, CURRENT_USER_ID, TradeStatus.SHIPPED);
@@ -435,16 +526,17 @@ class TradeServiceTest {
     }
 
     @Test
-    void changeTradeStatus_deliveredAsBuyer_chainsToCompletedAndMarksProductSold() {
+    void changeTradeStatus_deliveredAsBuyer_chainsToTransferredAndMarksProductSold() {
         Trade deliveredTrade = tradeWithProduct(205L, CURRENT_USER_ID, 2L, TradeStatus.DELIVERED, 10L, ProductStatus.TRADING);
         Trade confirmedTrade = tradeWithProduct(205L, CURRENT_USER_ID, 2L, TradeStatus.PURCHASE_CONFIRMED, 10L, ProductStatus.TRADING);
-        Trade completedTrade = tradeWithProduct(205L, CURRENT_USER_ID, 2L, TradeStatus.COMPLETED, 10L, ProductStatus.SOLD);
+        Trade transferredTrade = tradeWithProduct(205L, CURRENT_USER_ID, 2L, TradeStatus.TRANSFERRED, 10L, ProductStatus.SOLD);
         when(tradeRepository.findById(205L)).thenReturn(
-                Optional.of(deliveredTrade), Optional.of(confirmedTrade), Optional.of(completedTrade)
+                Optional.of(deliveredTrade), Optional.of(confirmedTrade), Optional.of(transferredTrade)
         );
         when(tradeRepository.updateToConfirmed(eq(205L), eq(TradeStatus.DELIVERED), eq(TradeStatus.PURCHASE_CONFIRMED), any(LocalDateTime.class))).thenReturn(1);
         when(tradeRepository.updateToSettled(eq(205L), eq(TradeStatus.PURCHASE_CONFIRMED), eq(TradeStatus.SETTLED), any(LocalDateTime.class))).thenReturn(1);
         when(tradeRepository.updateStatus(205L, TradeStatus.SETTLED, TradeStatus.COMPLETED)).thenReturn(1);
+        stubOwnershipTransfer(205L, 10L, CURRENT_USER_ID, 2L);
 
         Product product = product(10L, ProductStatus.TRADING);
         when(productRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(product));
@@ -452,6 +544,7 @@ class TradeServiceTest {
         TradeStatusChangeRequest request = TradeStatusChangeRequest.empty(TradeStatus.PURCHASE_CONFIRMED);
         TradeDetailResponse response = tradeService.changeTradeStatus(205L, CURRENT_USER_ID, request);
 
+        // 엔티티 상태는 TRANSFERRED까지 연쇄됐지만(stubOwnershipTransfer가 이를 검증), API 응답은 COMPLETED로 노출된다.
         assertThat(response.status()).isEqualTo(TradeStatus.COMPLETED);
         assertThat(product.getProductStatus()).isEqualTo(ProductStatus.SOLD);
 
@@ -460,6 +553,97 @@ class TradeServiceTest {
         assertThat(captor.getAllValues())
                 .extracting(TradeStatusChangedEvent::to)
                 .containsExactly(TradeStatus.PURCHASE_CONFIRMED, TradeStatus.SETTLED);
+    }
+
+    @Test
+    void changeTradeStatus_deliveredAsBuyer_transfersItemOwnershipAndSavesHistory() {
+        // 소유권 이전 부수효과: Item owner가 buyer로 바뀌고, 상태는 OWNED로 되돌아가며(재판매 가능),
+        // item_histories에 이전 기록이 정확한 필드로 저장된다.
+        Long itemId = 10L;
+        Trade deliveredTrade = trade(220L, CURRENT_USER_ID, 2L, TradeStatus.DELIVERED);
+        Trade confirmedTrade = trade(220L, CURRENT_USER_ID, 2L, TradeStatus.PURCHASE_CONFIRMED);
+        Trade transferredTrade = trade(220L, CURRENT_USER_ID, 2L, TradeStatus.TRANSFERRED);
+        when(tradeRepository.findById(220L)).thenReturn(
+                Optional.of(deliveredTrade), Optional.of(confirmedTrade), Optional.of(transferredTrade)
+        );
+        when(tradeRepository.updateToConfirmed(eq(220L), eq(TradeStatus.DELIVERED), eq(TradeStatus.PURCHASE_CONFIRMED), any(LocalDateTime.class))).thenReturn(1);
+        when(tradeRepository.updateToSettled(eq(220L), eq(TradeStatus.PURCHASE_CONFIRMED), eq(TradeStatus.SETTLED), any(LocalDateTime.class))).thenReturn(1);
+        when(tradeRepository.updateStatus(220L, TradeStatus.SETTLED, TradeStatus.COMPLETED)).thenReturn(1);
+        when(tradeRepository.updateStatus(220L, TradeStatus.COMPLETED, TradeStatus.TRANSFERRED)).thenReturn(1);
+
+        Item item = item(itemId);
+        User seller = user(2L);
+        User buyer = user(CURRENT_USER_ID);
+        ReflectionTestUtils.setField(item, "owner", seller);
+        when(itemRepository.findByIdForUpdate(itemId)).thenReturn(Optional.of(item));
+        when(userRepository.getReferenceById(CURRENT_USER_ID)).thenReturn(buyer);
+        when(tradeRepository.getReferenceById(220L)).thenReturn(transferredTrade);
+        when(purchaseOfferRepository.findSentByItemIdForUpdate(itemId, PurchaseOfferStatus.SENT)).thenReturn(List.of());
+
+        tradeService.changeTradeStatus(220L, CURRENT_USER_ID, TradeStatusChangeRequest.empty(TradeStatus.PURCHASE_CONFIRMED));
+
+        assertThat(item.getOwner()).isEqualTo(buyer);
+        assertThat(item.getItemStatus()).isEqualTo(ItemStatus.OWNED);
+
+        ArgumentCaptor<ItemHistory> historyCaptor = ArgumentCaptor.forClass(ItemHistory.class);
+        verify(itemHistoryRepository).save(historyCaptor.capture());
+        ItemHistory savedHistory = historyCaptor.getValue();
+        assertThat(savedHistory.getItem()).isEqualTo(item);
+        assertThat(savedHistory.getPreviousOwner()).isEqualTo(seller);
+        assertThat(savedHistory.getCurrentOwner()).isEqualTo(buyer);
+        assertThat(savedHistory.getTrade()).isEqualTo(transferredTrade);
+        assertThat(savedHistory.getHistoryType()).isEqualTo("TRANSFER");
+    }
+
+    @Test
+    void changeTradeStatus_deliveredAsBuyer_cancelsRemainingSentOffersForItem() {
+        Long itemId = 10L;
+        Trade deliveredTrade = trade(221L, CURRENT_USER_ID, 2L, TradeStatus.DELIVERED);
+        Trade confirmedTrade = trade(221L, CURRENT_USER_ID, 2L, TradeStatus.PURCHASE_CONFIRMED);
+        Trade transferredTrade = trade(221L, CURRENT_USER_ID, 2L, TradeStatus.TRANSFERRED);
+        when(tradeRepository.findById(221L)).thenReturn(
+                Optional.of(deliveredTrade), Optional.of(confirmedTrade), Optional.of(transferredTrade)
+        );
+        when(tradeRepository.updateToConfirmed(eq(221L), eq(TradeStatus.DELIVERED), eq(TradeStatus.PURCHASE_CONFIRMED), any(LocalDateTime.class))).thenReturn(1);
+        when(tradeRepository.updateToSettled(eq(221L), eq(TradeStatus.PURCHASE_CONFIRMED), eq(TradeStatus.SETTLED), any(LocalDateTime.class))).thenReturn(1);
+        when(tradeRepository.updateStatus(221L, TradeStatus.SETTLED, TradeStatus.COMPLETED)).thenReturn(1);
+        when(tradeRepository.updateStatus(221L, TradeStatus.COMPLETED, TradeStatus.TRANSFERRED)).thenReturn(1);
+
+        Item item = item(itemId);
+        ReflectionTestUtils.setField(item, "owner", user(2L));
+        when(itemRepository.findByIdForUpdate(itemId)).thenReturn(Optional.of(item));
+        when(userRepository.getReferenceById(CURRENT_USER_ID)).thenReturn(user(CURRENT_USER_ID));
+        when(tradeRepository.getReferenceById(221L)).thenReturn(transferredTrade);
+
+        PurchaseOffer sentOffer1 = purchaseOffer(501L, PurchaseOfferStatus.SENT, PaymentAuthorizationStatus.AUTHORIZED);
+        PurchaseOffer sentOffer2 = purchaseOffer(502L, PurchaseOfferStatus.SENT, PaymentAuthorizationStatus.AUTHORIZED);
+        when(purchaseOfferRepository.findSentByItemIdForUpdate(itemId, PurchaseOfferStatus.SENT))
+                .thenReturn(List.of(sentOffer1, sentOffer2));
+
+        tradeService.changeTradeStatus(221L, CURRENT_USER_ID, TradeStatusChangeRequest.empty(TradeStatus.PURCHASE_CONFIRMED));
+
+        assertThat(sentOffer1.getStatus()).isEqualTo(PurchaseOfferStatus.CANCELED);
+        assertThat(sentOffer1.getPaymentAuthorizationStatus()).isEqualTo(PaymentAuthorizationStatus.RELEASED);
+        assertThat(sentOffer2.getStatus()).isEqualTo(PurchaseOfferStatus.CANCELED);
+        assertThat(sentOffer2.getPaymentAuthorizationStatus()).isEqualTo(PaymentAuthorizationStatus.RELEASED);
+    }
+
+    @Test
+    void changeTradeStatus_transferredChainAffectsZeroRows_throwsInsteadOfSilentlySkipping() {
+        // COMPLETED -> TRANSFERRED는 직전 단계가 같은 트랜잭션에서 만든 상태를 대상으로 하므로,
+        // 영향 행 0건은 외부 경합이 아니라 불변식 위반이다 (기존 chain() 동작과 동일).
+        Trade deliveredTrade = trade(222L, CURRENT_USER_ID, 2L, TradeStatus.DELIVERED);
+        Trade confirmedTrade = trade(222L, CURRENT_USER_ID, 2L, TradeStatus.PURCHASE_CONFIRMED);
+        when(tradeRepository.findById(222L)).thenReturn(Optional.of(deliveredTrade), Optional.of(confirmedTrade));
+        when(tradeRepository.updateToConfirmed(eq(222L), eq(TradeStatus.DELIVERED), eq(TradeStatus.PURCHASE_CONFIRMED), any(LocalDateTime.class))).thenReturn(1);
+        when(tradeRepository.updateToSettled(eq(222L), eq(TradeStatus.PURCHASE_CONFIRMED), eq(TradeStatus.SETTLED), any(LocalDateTime.class))).thenReturn(1);
+        when(tradeRepository.updateStatus(222L, TradeStatus.SETTLED, TradeStatus.COMPLETED)).thenReturn(1);
+        when(tradeRepository.updateStatus(222L, TradeStatus.COMPLETED, TradeStatus.TRANSFERRED)).thenReturn(0);
+
+        assertThatThrownBy(() -> tradeService.changeTradeStatus(222L, CURRENT_USER_ID, TradeStatusChangeRequest.empty(TradeStatus.PURCHASE_CONFIRMED)))
+                .isInstanceOf(IllegalStateException.class);
+
+        verify(itemRepository, never()).findByIdForUpdate(anyLong());
     }
 
     @Test
@@ -473,6 +657,7 @@ class TradeServiceTest {
         when(tradeRepository.updateToConfirmed(eq(212L), eq(TradeStatus.DELIVERED), eq(TradeStatus.PURCHASE_CONFIRMED), any(LocalDateTime.class))).thenReturn(1);
         when(tradeRepository.updateToSettled(eq(212L), eq(TradeStatus.PURCHASE_CONFIRMED), eq(TradeStatus.SETTLED), any(LocalDateTime.class))).thenReturn(1);
         when(tradeRepository.updateStatus(212L, TradeStatus.SETTLED, TradeStatus.COMPLETED)).thenReturn(1);
+        stubOwnershipTransfer(212L, 10L, CURRENT_USER_ID, 2L);
 
         tradeService.changeTradeStatus(212L, CURRENT_USER_ID, TradeStatusChangeRequest.empty(TradeStatus.PURCHASE_CONFIRMED));
 
@@ -486,17 +671,19 @@ class TradeServiceTest {
     void changeTradeStatus_deliveredAsBuyerWithNullProduct_confirmsWithoutNpe() {
         Trade deliveredTrade = trade(206L, CURRENT_USER_ID, 2L, TradeStatus.DELIVERED);
         Trade confirmedTrade = trade(206L, CURRENT_USER_ID, 2L, TradeStatus.PURCHASE_CONFIRMED);
-        Trade completedTrade = trade(206L, CURRENT_USER_ID, 2L, TradeStatus.COMPLETED);
+        Trade transferredTrade = trade(206L, CURRENT_USER_ID, 2L, TradeStatus.TRANSFERRED);
         when(tradeRepository.findById(206L)).thenReturn(
-                Optional.of(deliveredTrade), Optional.of(confirmedTrade), Optional.of(completedTrade)
+                Optional.of(deliveredTrade), Optional.of(confirmedTrade), Optional.of(transferredTrade)
         );
         when(tradeRepository.updateToConfirmed(eq(206L), eq(TradeStatus.DELIVERED), eq(TradeStatus.PURCHASE_CONFIRMED), any(LocalDateTime.class))).thenReturn(1);
         when(tradeRepository.updateToSettled(eq(206L), eq(TradeStatus.PURCHASE_CONFIRMED), eq(TradeStatus.SETTLED), any(LocalDateTime.class))).thenReturn(1);
         when(tradeRepository.updateStatus(206L, TradeStatus.SETTLED, TradeStatus.COMPLETED)).thenReturn(1);
+        stubOwnershipTransfer(206L, 10L, CURRENT_USER_ID, 2L);
 
         TradeStatusChangeRequest request = TradeStatusChangeRequest.empty(TradeStatus.PURCHASE_CONFIRMED);
         TradeDetailResponse response = tradeService.changeTradeStatus(206L, CURRENT_USER_ID, request);
 
+        // 엔티티 상태는 TRANSFERRED까지 연쇄됐지만(stubOwnershipTransfer가 이를 검증), API 응답은 COMPLETED로 노출된다.
         assertThat(response.status()).isEqualTo(TradeStatus.COMPLETED);
         verify(productRepository, never()).findByIdForUpdate(anyLong());
     }
@@ -534,7 +721,9 @@ class TradeServiceTest {
                 Arguments.of(TradeStatus.SHIPPED, TradeStatus.PAID),
                 Arguments.of(TradeStatus.COMPLETED, TradeStatus.SHIPPED),
                 Arguments.of(TradeStatus.PURCHASE_CONFIRMED, TradeStatus.SETTLED),
-                Arguments.of(TradeStatus.DELIVERED, TradeStatus.SETTLED)
+                Arguments.of(TradeStatus.DELIVERED, TradeStatus.SETTLED),
+                // TRANSFERRED는 SETTLED/COMPLETED와 마찬가지로 자동 연쇄 전용 상태이며 외부에서 직접 요청할 수 없다.
+                Arguments.of(TradeStatus.COMPLETED, TradeStatus.TRANSFERRED)
         );
     }
 
@@ -572,21 +761,26 @@ class TradeServiceTest {
 
     @Test
     void confirmPurchaseBySystem_deliveredTrade_confirmsAndChains() {
+        // 스케줄러 경로(SYSTEM 액터)도 changeTradeStatus와 동일한 applyTransition을 타므로
+        // COMPLETED -> TRANSFERRED 연쇄와 소유권 이전이 동일하게 일어나야 한다.
         Trade deliveredTrade = trade(300L, CURRENT_USER_ID, 2L, TradeStatus.DELIVERED);
         Trade confirmedTrade = trade(300L, CURRENT_USER_ID, 2L, TradeStatus.PURCHASE_CONFIRMED);
-        Trade completedTrade = trade(300L, CURRENT_USER_ID, 2L, TradeStatus.COMPLETED);
+        Trade transferredTrade = trade(300L, CURRENT_USER_ID, 2L, TradeStatus.TRANSFERRED);
         when(tradeRepository.findById(300L)).thenReturn(
-                Optional.of(deliveredTrade), Optional.of(confirmedTrade), Optional.of(completedTrade)
+                Optional.of(deliveredTrade), Optional.of(confirmedTrade), Optional.of(transferredTrade)
         );
         when(tradeRepository.updateToConfirmed(eq(300L), eq(TradeStatus.DELIVERED), eq(TradeStatus.PURCHASE_CONFIRMED), any(LocalDateTime.class))).thenReturn(1);
         when(tradeRepository.updateToSettled(eq(300L), eq(TradeStatus.PURCHASE_CONFIRMED), eq(TradeStatus.SETTLED), any(LocalDateTime.class))).thenReturn(1);
         when(tradeRepository.updateStatus(300L, TradeStatus.SETTLED, TradeStatus.COMPLETED)).thenReturn(1);
+        stubOwnershipTransfer(300L, 10L, CURRENT_USER_ID, 2L);
 
         boolean confirmed = tradeService.confirmPurchaseBySystem(300L);
 
         assertThat(confirmed).isTrue();
         verify(tradeRepository).updateToConfirmed(eq(300L), eq(TradeStatus.DELIVERED), eq(TradeStatus.PURCHASE_CONFIRMED), any(LocalDateTime.class));
         verify(tradeRepository).updateToSettled(eq(300L), eq(TradeStatus.PURCHASE_CONFIRMED), eq(TradeStatus.SETTLED), any(LocalDateTime.class));
+        verify(tradeRepository).updateStatus(300L, TradeStatus.COMPLETED, TradeStatus.TRANSFERRED);
+        verify(itemHistoryRepository).save(any(ItemHistory.class));
     }
 
     @Test
@@ -601,6 +795,7 @@ class TradeServiceTest {
         when(tradeRepository.updateToSettled(eq(211L), eq(TradeStatus.PURCHASE_CONFIRMED), eq(TradeStatus.SETTLED), any(LocalDateTime.class))).thenReturn(1);
         when(tradeRepository.updateStatus(211L, TradeStatus.SETTLED, TradeStatus.COMPLETED)).thenReturn(1);
         when(productRepository.findByIdForUpdate(11L)).thenReturn(Optional.of(product(11L, ProductStatus.TRADING)));
+        stubOwnershipTransfer(211L, 10L, CURRENT_USER_ID, 2L);
 
         tradeService.changeTradeStatus(211L, CURRENT_USER_ID, TradeStatusChangeRequest.empty(TradeStatus.PURCHASE_CONFIRMED));
 
@@ -686,6 +881,14 @@ class TradeServiceTest {
         User user = instantiate(User.class);
         ReflectionTestUtils.setField(user, "id", id);
         return user;
+    }
+
+    private PurchaseOffer purchaseOffer(Long id, PurchaseOfferStatus status, PaymentAuthorizationStatus authStatus) {
+        PurchaseOffer offer = instantiate(PurchaseOffer.class);
+        ReflectionTestUtils.setField(offer, "id", id);
+        ReflectionTestUtils.setField(offer, "status", status);
+        ReflectionTestUtils.setField(offer, "paymentAuthorizationStatus", authStatus);
+        return offer;
     }
 
     private <T> T instantiate(Class<T> type) {

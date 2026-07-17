@@ -49,7 +49,7 @@ public record TradeListItemResponse(
                 trade.getBuyer().getId(),
                 trade.getSeller().getId(),
                 trade.getPaymentAmount(),
-                trade.getStatus(),
+                trade.getStatus().displayStatus(),
                 trade.getCreatedAt(),
                 ItemSummaryResponse.from(trade.getItem())
         );
