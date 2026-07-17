@@ -42,4 +42,12 @@ public class Wish extends BaseTimeEntity {
 
     @Column(name = "notification_enabled", nullable = false)
     private Boolean notificationEnabled = true;
+
+    public static Wish create(User user, Item item) {
+        Wish wish = new Wish();
+        wish.user = user;
+        wish.item = item;
+        wish.notificationEnabled = true;
+        return wish;
+    }
 }
