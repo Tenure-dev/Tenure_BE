@@ -7,6 +7,7 @@ import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import java.util.Optional;
 
 public interface UserRepository extends JpaRepository<User, Long> {
 
@@ -50,4 +51,13 @@ public interface UserRepository extends JpaRepository<User, Long> {
             @Param("currentUserId") Long currentUserId,
             Pageable pageable);
 
+    // email 중복 검사용. 가입 시 이미 존재하는 이메일이면 true 반환
+    // Spring Data JPA가 존재여부 쿼리를 자동 생성
+    boolean existsByEmail(String email);
+
+    // username 중복 검사용. 가입 시 중복 닉네임이면 true 반환
+    boolean existsByUsername(String username);
+
+    // 로그인 시 이메일로 user 찾기
+    Optional<User> findByEmail(String email);
 }
