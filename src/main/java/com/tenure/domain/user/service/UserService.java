@@ -11,6 +11,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.tenure.domain.user.dto.request.LoginRequest;
+import com.tenure.domain.user.dto.response.TokenResponse;
+import com.tenure.domain.user.entity.User;
+import com.tenure.global.security.JwtProvider;
 
 
 @Slf4j
@@ -20,6 +24,8 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final JwtProvider jwtProvider;
+
 
     // 이메일 회원가입
     // (검증 -> 암호화 -> 저장)을 하나의 트랜잭션으로 처리
@@ -58,5 +64,27 @@ public class UserService {
 
         // 6) 응답 DTO 변환
         return SignupResponse.from(savedUser);
+    }
+
+    // 로그인
+    // 이메일로 사용자를 찾고 비밀번호를 검증한 뒤 Access Token 발급
+    @Transactional(readOnly = true)
+    public TokenResponse login(LoginRequest request) {
+
+        // 1) 이메일로 사용자 조회. 없으면 로그인 실패
+        User user = userRepository.findByEmail(request.email())
+                .orElseThrow(() -> new CustomException(UserErrorCode.LOGIN_FAILED));
+
+        // 2) 비밀번호 검증. 평문(request) vs 저장된 해시(user) 비교
+        if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+            throw new CustomException(UserErrorCode.LOGIN_FAILED);
+        }
+
+        // 3) Access Token 발급 (subject에 userId 담김)
+        String accessToken = jwtProvider.createAccessToken(user.getId());
+        log.info("로그인 성공: userId={}, email={}", user.getId(), user.getEmail());
+
+        // 4) 응답
+        return new TokenResponse(accessToken, user.getId(), user.getUsername());
     }
 }
