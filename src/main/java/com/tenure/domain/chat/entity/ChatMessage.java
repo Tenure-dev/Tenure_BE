@@ -55,4 +55,18 @@ public class ChatMessage {
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
     }
+
+    // 채팅 매시지 생성 매서드
+    public static ChatMessage of(ChatRoom chatRoom, User sender,
+                                 MessageType messageType, String content,  String imageUrl) {
+
+        ChatMessage chatMessage = new ChatMessage();
+        chatMessage.chatRoom = chatRoom;
+        chatMessage.sender = sender;
+        chatMessage.messageType = messageType;
+        chatMessage.content = content;
+        chatMessage.imageUrl = imageUrl;
+        return chatMessage;
+
+    }
 }

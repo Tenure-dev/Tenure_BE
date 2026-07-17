@@ -53,4 +53,21 @@ public class ChatRoom extends BaseTimeEntity {
 
     @Column(name = "last_message_at")
     private LocalDateTime lastMessageAt;
+
+
+    //채팅방 생성 매서드
+    public static ChatRoom of(Item item, User buyer, User seller) {
+        ChatRoom chatRoom = new ChatRoom();
+        chatRoom.item = item;
+        chatRoom.buyer = buyer;
+        chatRoom.seller = seller;
+
+        return chatRoom;
+    }
+
+    // 마지막 메시지 및 시각 갱신 매서드
+    public void updateLastMessage(String lastMessage, LocalDateTime lastMessageAt) {
+        this.lastMessage = lastMessage;
+        this.lastMessageAt = lastMessageAt;
+    }
 }

@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -49,7 +50,7 @@ public class NotificationController {
             @RequestParam(defaultValue = "false") boolean unreadOnly,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) Long cursorId,
-            @RequestParam(required = false) LocalDateTime cursor
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime cursor
     ) {
         NotificationCursorResponse notifications = notificationService
                 .findAllNotification(currentUserProvider.getCurrentUserId(), category, unreadOnly, size, cursorId, cursor);
