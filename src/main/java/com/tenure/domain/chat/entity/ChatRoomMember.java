@@ -39,4 +39,21 @@ public class ChatRoomMember extends BaseTimeEntity {
 
     @Column(name = "unread_count", nullable = false)
     private Integer unreadCount = 0;
+
+    public static ChatRoomMember of(ChatRoom chatRoom, User user) {
+        ChatRoomMember chatRoomMember = new ChatRoomMember();
+        chatRoomMember.chatRoom = chatRoom;
+        chatRoomMember.user = user;
+        return chatRoomMember;
+    }
+
+    //채팅방 접속 시 최근에 읽은 메시지 업데이트.
+    public void updateLastRead(ChatMessage lastReadMessage) {
+        this.lastReadMessage = lastReadMessage;
+        this.unreadCount = 0;
+    }
+
+    public void incrementUnRead() {
+        this.unreadCount ++;
+    }
 }
