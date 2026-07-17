@@ -34,7 +34,10 @@ public record TradeListItemResponse(
         TradeStatus status,
 
         @Schema(description = "거래 생성 시각", example = "2026-07-10T12:00:00")
-        LocalDateTime createdAt
+        LocalDateTime createdAt,
+
+        @Schema(description = "아이템 요약")
+        ItemSummaryResponse item
 ) {
 
     public static TradeListItemResponse of(Trade trade) {
@@ -47,7 +50,8 @@ public record TradeListItemResponse(
                 trade.getSeller().getId(),
                 trade.getPaymentAmount(),
                 trade.getStatus(),
-                trade.getCreatedAt()
+                trade.getCreatedAt(),
+                ItemSummaryResponse.from(trade.getItem())
         );
     }
 }
