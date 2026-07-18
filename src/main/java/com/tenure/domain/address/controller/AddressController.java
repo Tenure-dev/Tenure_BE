@@ -15,6 +15,9 @@ import com.tenure.domain.address.dto.request.AddressCreateRequest;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import com.tenure.domain.address.dto.request.AddressUpdateRequest;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 
 
 @Tag(name = "Address", description = "배송지 API")
@@ -42,6 +45,19 @@ public class AddressController {
         return BaseResponse.success(
                 addressService.createAddress(currentUserId, request),
                 "배송지가 등록되었습니다."
+        );
+    }
+
+    @Operation(summary = "배송지 수정", description = "본인 소유의 배송지를 수정합니다.")
+    @PatchMapping("/{addressId}")
+    public BaseResponse<AddressResponse> updateAddress(
+            @PathVariable Long addressId,
+            @Valid @RequestBody AddressUpdateRequest request
+    ) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        return BaseResponse.success(
+                addressService.updateAddress(currentUserId, addressId, request),
+                "배송지가 수정되었습니다."
         );
     }
 }

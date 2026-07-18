@@ -77,4 +77,31 @@ public class DeliveryAddress extends BaseTimeEntity {
     public void unmarkDefault() {
         this.isDefault = false;
     }
+
+    // 배송지 부분 수정
+    public void update(
+            String receiverName,
+            String phone,
+            String addressLine1,
+            String addressLine2,
+            String postalCode,
+            String requestNote
+    ) {
+        if (receiverName != null) this.receiverName = receiverName;
+        if (phone != null) this.phone = phone;
+        if (addressLine1 != null) this.addressLine1 = addressLine1;
+        if (addressLine2 != null) this.addressLine2 = addressLine2;
+        if (postalCode != null) this.postalCode = postalCode;
+        if (requestNote != null) this.requestNote = requestNote;
+    }
+
+    // 기본 배송지
+    public void markAsDefault() {
+        this.isDefault = true;
+    }
+
+    // 배송지 등록자
+    public boolean isOwnedBy(Long userId) {
+        return this.user.getId().equals(userId);
+    }
 }
