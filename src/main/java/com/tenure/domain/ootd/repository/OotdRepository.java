@@ -12,10 +12,27 @@ import java.util.Optional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface OotdRepository extends JpaRepository<Ootd, Long> {
+
+    @Modifying(clearAutomatically = true)
+    @Query("update Ootd o set o.heartCount = o.heartCount + 1 where o.id = :ootdId")
+    int increaseHeartCount(@Param("ootdId") Long ootdId);
+
+    @Modifying(clearAutomatically = true)
+    @Query("update Ootd o set o.heartCount = o.heartCount - 1 where o.id = :ootdId and o.heartCount > 0")
+    int decreaseHeartCount(@Param("ootdId") Long ootdId);
+
+    @Modifying(clearAutomatically = true)
+    @Query("update Ootd o set o.saveCount = o.saveCount + 1 where o.id = :ootdId")
+    int increaseSaveCount(@Param("ootdId") Long ootdId);
+
+    @Modifying(clearAutomatically = true)
+    @Query("update Ootd o set o.saveCount = o.saveCount - 1 where o.id = :ootdId and o.saveCount > 0")
+    int decreaseSaveCount(@Param("ootdId") Long ootdId);
 
     @Query("select count(o) from Ootd o " +
             "where o.publicationStatus = com.tenure.domain.ootd.enums.OotdPublicationStatus.ACTIVE " +
