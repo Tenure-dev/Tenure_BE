@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -31,4 +32,5 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     boolean existsByItemIdAndProductStatus(Long itemId, ProductStatus productStatus);
     Optional<Product> findByItemIdAndProductStatusIn(Long itemId, List<ProductStatus> status);
+    List<Product> findByItemIdInAndProductStatus(Collection<Long> itemIds, ProductStatus productStatus);
 }
