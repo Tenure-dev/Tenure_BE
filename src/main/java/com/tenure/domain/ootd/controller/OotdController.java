@@ -1,8 +1,10 @@
 package com.tenure.domain.ootd.controller;
 
 import com.tenure.domain.ootd.dto.OotdCreateResponse;
+import com.tenure.domain.ootd.dto.OotdDetailResponse;
 import com.tenure.domain.ootd.dto.OotdMyPostsResponse;
 import com.tenure.domain.ootd.dto.OotdRelatedResponse;
+import com.tenure.domain.ootd.service.OotdDetailService;
 import com.tenure.domain.ootd.service.OotdMyPostService;
 import com.tenure.domain.ootd.service.OotdRelatedService;
 import com.tenure.domain.ootd.service.OotdService;
@@ -35,6 +37,7 @@ public class OotdController {
     private final OotdService ootdService;
     private final OotdMyPostService ootdMyPostService;
     private final OotdRelatedService ootdRelatedService;
+    private final OotdDetailService ootdDetailService;
     private final CurrentUserProvider currentUserProvider;
 
     @Operation(
@@ -71,6 +74,33 @@ public class OotdController {
                 size
         );
         return BaseResponse.success(response, "내 게시물 목록을 조회했습니다.");
+    }
+
+    @Operation(
+            summary = "OOTD 상세 조회",
+            description = "OOTD 상세 정보를 조회합니다. 공개 계정이거나 승인된 팔로워만 비공개 계정의 게시물을 조회할 수 있습니다.",
+            parameters = {
+                    @Parameter(
+                            name = "X-USER-ID",
+                            in = ParameterIn.HEADER,
+                            required = true,
+                            description = "JWT 적용 전 Swagger/local testing용 임시 헤더.",
+                            example = "1"
+                    )
+            }
+    )
+    @ApiResponse(
+            responseCode = "200",
+            description = "OOTD 상세 조회 성공",
+            content = @Content(schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = OotdDetailResponse.class))
+    )
+    @ApiResponse(responseCode = "403", description = "비공개 계정이며 승인된 팔로워가 아님")
+    @ApiResponse(responseCode = "404", description = "존재하지 않거나 비공개(ARCHIVED) 처리된 OOTD")
+    @GetMapping("/{ootdId}")
+    public BaseResponse<OotdDetailResponse> getOotdDetail(@PathVariable Long ootdId) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        OotdDetailResponse response = ootdDetailService.getOotdDetail(currentUserId, ootdId);
+        return BaseResponse.success(response, "OOTD 상세를 조회했습니다.");
     }
 
     @Operation(

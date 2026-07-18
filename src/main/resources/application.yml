@@ -55,3 +55,10 @@ tenure:
       model: ${GEMINI_MODEL:gemini-flash-lite-latest}
     tag:
       confidence-threshold: ${AI_TAG_CONFIDENCE_THRESHOLD:0.6}
+
+jwt:
+  secret: ${JWT_SECRET:tenure-local-dev-secret-key-change-me-please-at-least-32bytes}
+  access-token-validity-in-seconds: 3600
+
+encryption:
+  secret: ${ENCRYPTION_SECRET:tenure-local-aes-secret-key-32b!}

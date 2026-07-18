@@ -1,6 +1,9 @@
 package com.tenure.domain.trade.service;
 
+import com.tenure.domain.item.repository.ItemHistoryRepository;
+import com.tenure.domain.item.repository.ItemRepository;
 import com.tenure.domain.product.repository.ProductRepository;
+import com.tenure.domain.purchase.repository.PurchaseOfferRepository;
 import com.tenure.domain.trade.dto.TradeDetailResponse;
 import com.tenure.domain.trade.dto.TradeListItemResponse;
 import com.tenure.domain.trade.dto.TradeStatusChangeRequest;
@@ -13,8 +16,10 @@ import com.tenure.domain.trade.enums.TradeTransition;
 import com.tenure.domain.trade.enums.TradeViewerMode;
 import com.tenure.domain.trade.exception.TradeErrorCode;
 import com.tenure.domain.trade.repository.TradeRepository;
+import com.tenure.domain.user.repository.UserRepository;
 import com.tenure.global.exception.CustomException;
 import com.tenure.global.response.PageResponse;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +38,10 @@ public class TradeService {
 
     private final TradeRepository tradeRepository;
     private final ProductRepository productRepository;
+    private final ItemRepository itemRepository;
+    private final UserRepository userRepository;
+    private final PurchaseOfferRepository purchaseOfferRepository;
+    private final ItemHistoryRepository itemHistoryRepository;
     private final ApplicationEventPublisher eventPublisher;
 
     @Transactional(readOnly = true)
@@ -117,7 +126,10 @@ public class TradeService {
         Trade afterPrimaryUpdate = tradeRepository.findById(trade.getId())
                 .orElseThrow(() -> new CustomException(TradeErrorCode.TRADE_NOT_FOUND));
 
-        transition.applySideEffects(new TradeTransition.Context(tradeRepository, productRepository, eventPublisher, afterPrimaryUpdate));
+        transition.applySideEffects(new TradeTransition.Context(
+                tradeRepository, productRepository, itemRepository, userRepository,
+                purchaseOfferRepository, itemHistoryRepository, eventPublisher, afterPrimaryUpdate
+        ));
 
         return tradeRepository.findById(trade.getId())
                 .orElseThrow(() -> new CustomException(TradeErrorCode.TRADE_NOT_FOUND));
@@ -136,6 +148,16 @@ public class TradeService {
     private List<TradeStatus> normalizeStatuses(List<TradeStatus> statuses) {
         if (statuses == null || statuses.isEmpty()) {
             return Arrays.asList(TradeStatus.values());
+        }
+        if (statuses.contains(TradeStatus.TRANSFERRED)) {
+            // TRANSFERRED는 API 계약상 COMPLETED로만 노출되는 내부 상태이므로 필터로 직접 조회할 수 없다.
+            throw new CustomException(TradeErrorCode.TRADE_STATUS_FILTER_NOT_ALLOWED);
+        }
+        if (statuses.contains(TradeStatus.COMPLETED)) {
+            // 커밋된 거래는 실제로 TRANSFERRED까지 자동 전이되므로, COMPLETED 필터는 TRANSFERRED 행도 함께 조회해야 한다.
+            List<TradeStatus> expanded = new ArrayList<>(statuses);
+            expanded.add(TradeStatus.TRANSFERRED);
+            return expanded;
         }
         return statuses;
     }

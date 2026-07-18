@@ -89,4 +89,68 @@ public class User extends BaseTimeEntity {
 
     @Column(name = "onboarding_completed", nullable = false)
     private Boolean onboardingCompleted = false;
+
+    // 이메일 회원가입용 User 생성 정적 팩토리 메서드
+    // 나중에 구글 가입이 생기면 createByGoogle 을 따로 만들어 구분
+    public static User createByEmail(
+            String email,
+            String passwordHash,   // 암호화된 비밀번호 (Service에서 인코딩)
+            String username,
+            UserGender gender,
+            Integer heightCm,
+            Integer weightKg,
+            String profileImageUrl
+    ) {
+        User user = new User();
+        user.email = email;
+        user.passwordHash = passwordHash;
+        user.username = username;
+        user.gender = gender;
+        user.heightCm = heightCm;
+        user.weightKg = weightKg;
+        user.profileImageUrl = profileImageUrl;
+
+        // 가입 완료 = 온보딩까지 끝난 시점으로 처리
+        user.onboardingCompleted = true;
+
+        return user;
+    }
+
+    // 프로필 부분 수정
+    public void updateProfile(
+            String username,
+            UserGender gender,
+            Integer heightCm,
+            Integer weightKg,
+            String profileImageUrl
+    ) {
+        if (username != null) {
+            this.username = username;
+        }
+        if (gender != null) {
+            this.gender = gender;
+        }
+        if (heightCm != null) {
+            this.heightCm = heightCm;
+        }
+        if (weightKg != null) {
+            this.weightKg = weightKg;
+        }
+        if (profileImageUrl != null) {
+            this.profileImageUrl = profileImageUrl;
+        }
+    }
+
+    // 계정 설정 부분 수정
+    public void updateAccountSettings(
+            Integer defaultShippingFee,
+            String settlementAccountJson
+    ) {
+        if (defaultShippingFee != null) {
+            this.defaultShippingFee = defaultShippingFee;
+        }
+        if (settlementAccountJson != null) {
+            this.settlementAccount = settlementAccountJson;
+        }
+    }
 }
