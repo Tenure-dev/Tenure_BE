@@ -17,6 +17,8 @@ import com.tenure.domain.user.dto.response.TokenResponse;
 import com.tenure.domain.user.dto.response.UserProfileResponse;
 import com.tenure.global.security.CurrentUserProvider;
 import org.springframework.web.bind.annotation.GetMapping;
+import com.tenure.domain.user.dto.request.ProfileUpdateRequest;
+import org.springframework.web.bind.annotation.PatchMapping;
 
 // 사용자, 인증 관련 API
 @Tag(name = "User", description = "사용자/인증 API")
@@ -48,5 +50,15 @@ public class UserController {
         Long currentUserId = currentUserProvider.getCurrentUserId();
         UserProfileResponse response = userService.getMyProfile(currentUserId);
         return BaseResponse.success(response);
+    }
+
+    @Operation(summary = "프로필 수정", description = "로그인한 사용자의 프로필을 수정합니다. 보낸 필드만 변경됩니다.")
+    @PatchMapping("/users/me")
+    public BaseResponse<UserProfileResponse> updateMyProfile(
+            @Valid @RequestBody ProfileUpdateRequest request
+    ) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        UserProfileResponse response = userService.updateMyProfile(currentUserId, request);
+        return BaseResponse.success(response, "프로필이 수정되었습니다.");
     }
 }

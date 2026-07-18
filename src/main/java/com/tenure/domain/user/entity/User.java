@@ -115,4 +115,29 @@ public class User extends BaseTimeEntity {
 
         return user;
     }
+
+    // 프로필 부분 수정
+    public void updateProfile(
+            String username,
+            UserGender gender,
+            Integer heightCm,
+            Integer weightKg,
+            String profileImageUrl
+    ) {
+        if (username != null) {
+            this.username = username;
+        }
+        if (gender != null) {
+            this.gender = gender;
+        }
+        if (heightCm != null) {
+            this.heightCm = heightCm;
+        }
+        if (weightKg != null) {
+            this.weightKg = weightKg;
+        }
+        if (profileImageUrl != null) {
+            this.profileImageUrl = profileImageUrl;
+        }
+    }
 }
