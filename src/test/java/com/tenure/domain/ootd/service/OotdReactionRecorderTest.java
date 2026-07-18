@@ -76,6 +76,38 @@ class OotdReactionRecorderTest {
         verify(ootdRepository, never()).increaseHeartCount(OOTD_ID);
     }
 
+    @Test
+    void insert_savesReactionThenIncreasesSaveCountInThatOrder() {
+        User userRef = instantiate(User.class);
+        Ootd ootdRef = instantiate(Ootd.class);
+        when(userRepository.getReferenceById(USER_ID)).thenReturn(userRef);
+        when(ootdRepository.getReferenceById(OOTD_ID)).thenReturn(ootdRef);
+        when(ootdReactionRepository.saveAndFlush(any(OotdReaction.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        ootdReactionRecorder.insert(USER_ID, OOTD_ID, OotdReactionType.SAVE);
+
+        InOrder inOrder = Mockito.inOrder(ootdReactionRepository, ootdRepository);
+        inOrder.verify(ootdReactionRepository).saveAndFlush(any(OotdReaction.class));
+        inOrder.verify(ootdRepository).increaseSaveCount(OOTD_ID);
+        verify(ootdRepository, never()).increaseHeartCount(OOTD_ID);
+    }
+
+    @Test
+    void insert_doesNotIncreaseSaveCountAndPropagatesExceptionWhenUniqueConstraintViolated() {
+        User userRef = instantiate(User.class);
+        Ootd ootdRef = instantiate(Ootd.class);
+        when(userRepository.getReferenceById(USER_ID)).thenReturn(userRef);
+        when(ootdRepository.getReferenceById(OOTD_ID)).thenReturn(ootdRef);
+        when(ootdReactionRepository.saveAndFlush(any(OotdReaction.class)))
+                .thenThrow(new DataIntegrityViolationException("uk_ootd_reactions_user_ootd_type"));
+
+        assertThatThrownBy(() -> ootdReactionRecorder.insert(USER_ID, OOTD_ID, OotdReactionType.SAVE))
+                .isInstanceOf(DataIntegrityViolationException.class);
+
+        verify(ootdRepository, never()).increaseSaveCount(OOTD_ID);
+    }
+
     private <T> T instantiate(Class<T> type) {
         try {
             Constructor<T> constructor = type.getDeclaredConstructor();

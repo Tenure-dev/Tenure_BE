@@ -34,6 +34,13 @@ public class OotdReactionService {
         addReaction(currentUserId, ootd.getId(), OotdReactionType.HEART);
     }
 
+    public void saveOotd(Long currentUserId, Long ootdId) {
+        Ootd ootd = ootdRepository.findVisibleActiveById(ootdId, currentUserId, OotdPublicationStatus.ACTIVE)
+                .orElseThrow(() -> new CustomException(OotdErrorCode.OOTD_NOT_FOUND));
+
+        addReaction(currentUserId, ootd.getId(), OotdReactionType.SAVE);
+    }
+
     @Transactional
     public void unheartOotd(Long currentUserId, Long ootdId) {
         Ootd ootd = ootdRepository.findVisibleActiveById(ootdId, currentUserId, OotdPublicationStatus.ACTIVE)
