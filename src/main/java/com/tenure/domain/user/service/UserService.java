@@ -22,6 +22,8 @@ import com.tenure.domain.user.dto.response.UserProfileResponse;
 import com.tenure.domain.user.dto.request.ProfileUpdateRequest;
 import com.tenure.domain.user.dto.SettlementAccountDto;
 import com.tenure.global.util.AesEncryptor;
+import com.tenure.domain.user.dto.response.PublicUserProfileResponse;
+import com.tenure.domain.user.repository.UserBlockRepository;
 
 
 @Slf4j
@@ -34,6 +36,7 @@ public class UserService {
     private final JwtProvider jwtProvider;
     private final ObjectMapper objectMapper;
     private final AesEncryptor aesEncryptor;
+    private final UserBlockRepository userBlockRepository;
 
     // 회원가입
     // (검증 -> 암호화 -> 저장)을 하나의 트랜잭션으로 처리
@@ -168,5 +171,25 @@ public class UserService {
         user.updateAccountSettings(request.defaultShippingFee(), settlementAccountJson);
 
         return UserProfileResponse.from(user);
+    }
+
+    // 타 사용자 프로필 조회
+    // 내가 상대를 차단했거나, 상대가 나를 차단한 경우 조회를 막는다.
+    @Transactional(readOnly = true)
+    public PublicUserProfileResponse getUserProfile(Long currentUserId, Long targetUserId) {
+
+        // 대상 사용자 조회
+        User target = userRepository.findById(targetUserId)
+                .orElseThrow(() -> new CustomException(UserErrorCode.USER_NOT_FOUND));
+
+        // 차단 관계 확인
+        // 내가 상대를 차단했거나, 상대가 나를 차단한 경우 -> 차단 에러
+        boolean blockedByMe = userBlockRepository.isBlocked(currentUserId, targetUserId);
+        boolean blockedByTarget = userBlockRepository.isBlocked(targetUserId, currentUserId);
+        if (blockedByMe || blockedByTarget) {
+            throw new CustomException(UserErrorCode.USER_BLOCKED);
+        }
+
+        return PublicUserProfileResponse.from(target);
     }
 }
