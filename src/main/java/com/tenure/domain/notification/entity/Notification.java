@@ -46,9 +46,6 @@ public class Notification {
     @Column(nullable = false, length = 50)
     private NotificationType type;
 
-    @Column(nullable = false, length = 100)
-    private String title;
-
     @Column(nullable = false, length = 500)
     private String body;
 
@@ -61,6 +58,18 @@ public class Notification {
 
     @Column(name = "read_at")
     private LocalDateTime readAt;
+
+    @Column(name = "image_url", length = 500)
+    private String imageUrl;    //아이템 알림인경우 - representativeImageUrl, 유저 알림 - profileImageUrl
+
+    @Column(name = "brand_name", length = 100)
+    private String brandName;
+
+    @Column(name = "item_name", length = 200)
+    private String itemName;
+
+    @Column(name = "sender_username", length = 50)
+    private String senderUsername;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

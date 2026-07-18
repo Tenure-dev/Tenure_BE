@@ -1,20 +1,34 @@
 package com.tenure.domain.notification.enums;
 
 public enum NotificationType {
-    PRICE_CHANGED,              // 관심 상품의 가격이 변동됨
-    SALE_STARTED,               // 관심 상품의 할인이 시작됨
-    PURCHASE_INTENT_RECEIVED,   // 구매 의사(구매 요청)를 받음
-    PURCHASE_OFFER_RECEIVED,    // 가격 제안(오퍼)을 받음
-    PURCHASE_INTENT_ACCEPTED,   // 보낸 구매 의사가 수락됨
-    PURCHASE_OFFER_ACCEPTED,    // 보낸 가격 제안이 수락됨
-    PURCHASE_INTENT_REJECTED,   // 보낸 구매 의사가 거절됨
-    PURCHASE_OFFER_REJECTED,    // 보낸 가격 제안이 거절됨
-    PURCHASE_REQUEST_EXPIRED,   // 구매 요청이 기간 만료로 종료됨
-    PURCHASE_REQUEST_SUPERSEDED,// 구매 요청이 다른 요청에 의해 대체됨
-    ITEM_SOLD,                  // 상품이 판매 완료됨
-    SHIPPING_STARTED,           // 배송이 시작됨
-    TRADE_STATUS_CHANGED,       // 거래 상태가 변경됨
-    FOLLOW_REQUEST_RECEIVED,    // 팔로우 요청을 받음
-    FOLLOW_REQUEST_ACCEPTED,    // 보낸 팔로우 요청이 수락됨
-    TAG_REVIEW_REQUIRED         // 태그에 대한 검토가 필요함
+    // 거래 요청
+    PURCHASE_INTENT_SENT,                       // 판매중 상품의 거래 의사 도착
+    PURCHASE_OFFER_SENT,                        // 미판매 아이템의 구매 제안 도착
+    REQUEST_ACCEPTED,                           // 거래 의사 또는 구매 제안 수락됨
+    REQUEST_REJECTED,                           // 거래 의사 또는 구매 제안 거절됨
+    REQUEST_CANCELED_BY_REQUESTER,              // 요청자가 수락 전 취소
+    REQUEST_EXPIRED,                            // 24시간 응답 없어 만료됨
+    REQUEST_CANCELED_BY_COMPETING_ACCEPTANCE,   // 다른 요청이 먼저 수락되어 취소됨
+    REQUEST_CANCELED_BY_ITEM_DELETE,            // 아이템 삭제로 취소됨
+
+    // 거래 상태
+    TRADE_CANCELED,                             // 발송 전 거래 취소
+    SHIPMENT_REGISTERED,                        // 운송장 등록 완료 (상품 발송)
+    DELIVERY_COMPLETED,                         // 배송 완료됨
+    PURCHASE_CONFIRMED,                         // 구매 확정됨
+    SETTLEMENT_COMPLETED,                       // 판매자 정산 완료
+    TRADE_COMPLETED,                            // 구매자 거래 완료
+
+    // 관심 아이템
+    WISH_CREATED,                               // 타 사용자가 내 아이템을 관심 등록함
+    PRODUCT_CREATED,                            // 관심 아이템 판매 전환됨
+    PRODUCT_RETURNED_TO_UNSOLD,                 // 관심 아이템 미판매 전환됨
+    PRODUCT_SOLD,                               // 관심 아이템 판매 완료됨
+    PRODUCT_PRICE_CHANGED,                      // 관심 아이템 가격 변경됨
+
+    // 채팅
+    CHAT_MESSAGE_CREATED,                       // 새로운 채팅 메시지 수신
+
+    // 팔로우
+    FOLLOW_CREATED                              // 새로운 사용자가 나를 팔로우함
 }
