@@ -4,6 +4,13 @@ ALTER TABLE item_histories
     ADD COLUMN started_at TIMESTAMP(6),
     ADD COLUMN ended_at TIMESTAMP(6);
 
+ALTER TABLE item_histories RENAME COLUMN current_owner_user_id TO owner_user_id;
+ALTER TABLE item_histories RENAME CONSTRAINT fk_item_histories_current_owner TO fk_item_histories_owner;
+
+ALTER TABLE item_histories
+    DROP COLUMN history_type,
+    DROP COLUMN history_description;
+
 UPDATE item_histories
 SET acquisition_type = 'TENURE_TRADE',
     started_at = created_at
@@ -51,18 +58,13 @@ WHERE NOT EXISTS (
     SELECT 1 FROM item_histories h WHERE h.item_id = it.id
 );
 
-ALTER TABLE item_histories RENAME COLUMN current_owner_user_id TO owner_user_id;
-ALTER TABLE item_histories RENAME CONSTRAINT fk_item_histories_current_owner TO fk_item_histories_owner;
-
 ALTER TABLE item_histories
     DROP CONSTRAINT fk_item_histories_previous_owner,
     DROP CONSTRAINT fk_item_histories_ootd;
 
 ALTER TABLE item_histories
     DROP COLUMN previous_owner_user_id,
-    DROP COLUMN ootd_id,
-    DROP COLUMN history_type,
-    DROP COLUMN history_description;
+    DROP COLUMN ootd_id;
 
 ALTER TABLE item_histories
     ALTER COLUMN acquisition_type SET NOT NULL,
