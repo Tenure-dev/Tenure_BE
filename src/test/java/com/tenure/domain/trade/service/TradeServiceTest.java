@@ -14,6 +14,8 @@ import static org.mockito.Mockito.when;
 
 import com.tenure.domain.item.entity.Item;
 import com.tenure.domain.item.entity.ItemHistory;
+import com.tenure.domain.item.enums.AcquisitionType;
+import com.tenure.domain.item.enums.EndReason;
 import com.tenure.domain.item.enums.ItemStatus;
 import com.tenure.domain.item.repository.ItemHistoryRepository;
 import com.tenure.domain.item.repository.ItemRepository;
@@ -101,15 +103,19 @@ class TradeServiceTest {
     }
 
     // COMPLETED -> TRANSFERRED 자동 연쇄(소유권 이전) 부수효과가 항상 거치는 스텁 묶음.
-    // Item.owner는 seller(2L)로 시작해 buyer(CURRENT_USER_ID)로 이전된다고 가정한다.
+    // Item.owner는 seller(2L)로 시작해 buyer(CURRENT_USER_ID)로 이전된다고 가정하고,
+    // seller 명의의 열린 이력 행이 이미 있다고 가정한다(정상 경로라면 createItem이나 이전 거래가 만들어둔 행).
     private void stubOwnershipTransfer(Long tradeId, Long itemId, Long buyerId, Long sellerId) {
         when(tradeRepository.updateStatus(tradeId, TradeStatus.COMPLETED, TradeStatus.TRANSFERRED)).thenReturn(1);
         Item item = item(itemId);
-        ReflectionTestUtils.setField(item, "owner", user(sellerId));
+        User seller = user(sellerId);
+        ReflectionTestUtils.setField(item, "owner", seller);
         when(itemRepository.findByIdForUpdate(itemId)).thenReturn(Optional.of(item));
         when(userRepository.getReferenceById(buyerId)).thenReturn(user(buyerId));
         when(tradeRepository.getReferenceById(tradeId)).thenReturn(trade(tradeId, buyerId, sellerId, TradeStatus.TRANSFERRED));
         when(purchaseOfferRepository.findSentByItemIdForUpdate(itemId, PurchaseOfferStatus.SENT)).thenReturn(List.of());
+        ItemHistory openHistory = ItemHistory.ofFirstRegistration(item, seller, LocalDateTime.now().minusDays(1));
+        when(itemHistoryRepository.findByItemIdAndEndedAtIsNull(itemId)).thenReturn(Optional.of(openHistory));
     }
 
     @Test
@@ -558,7 +564,7 @@ class TradeServiceTest {
     @Test
     void changeTradeStatus_deliveredAsBuyer_transfersItemOwnershipAndSavesHistory() {
         // 소유권 이전 부수효과: Item owner가 buyer로 바뀌고, 상태는 OWNED로 되돌아가며(재판매 가능),
-        // item_histories에 이전 기록이 정확한 필드로 저장된다.
+        // seller의 열린 이력 행은 TENURE_TRADE로 마감되고, buyer의 새 열린 행이 저장된다.
         Long itemId = 10L;
         Trade deliveredTrade = trade(220L, CURRENT_USER_ID, 2L, TradeStatus.DELIVERED);
         Trade confirmedTrade = trade(220L, CURRENT_USER_ID, 2L, TradeStatus.PURCHASE_CONFIRMED);
@@ -579,20 +585,61 @@ class TradeServiceTest {
         when(userRepository.getReferenceById(CURRENT_USER_ID)).thenReturn(buyer);
         when(tradeRepository.getReferenceById(220L)).thenReturn(transferredTrade);
         when(purchaseOfferRepository.findSentByItemIdForUpdate(itemId, PurchaseOfferStatus.SENT)).thenReturn(List.of());
+        ItemHistory openHistory = ItemHistory.ofFirstRegistration(item, seller, LocalDateTime.now().minusDays(10));
+        when(itemHistoryRepository.findByItemIdAndEndedAtIsNull(itemId)).thenReturn(Optional.of(openHistory));
 
         tradeService.changeTradeStatus(220L, CURRENT_USER_ID, TradeStatusChangeRequest.empty(TradeStatus.PURCHASE_CONFIRMED));
 
         assertThat(item.getOwner()).isEqualTo(buyer);
         assertThat(item.getItemStatus()).isEqualTo(ItemStatus.OWNED);
 
+        assertThat(openHistory.getEndReason()).isEqualTo(EndReason.TENURE_TRADE);
+        assertThat(openHistory.getEndedAt()).isNotNull();
+
+        // close()의 지연 UPDATE가 save()의 즉시 INSERT보다 먼저 flush되는지 확인한다.
+        // (부분 유니크 인덱스 위반을 막기 위한 순서 보장 회귀 테스트)
+        InOrder historyOrder = inOrder(itemHistoryRepository);
+        historyOrder.verify(itemHistoryRepository).findByItemIdAndEndedAtIsNull(itemId);
+        historyOrder.verify(itemHistoryRepository).flush();
+        historyOrder.verify(itemHistoryRepository).save(any(ItemHistory.class));
+
         ArgumentCaptor<ItemHistory> historyCaptor = ArgumentCaptor.forClass(ItemHistory.class);
         verify(itemHistoryRepository).save(historyCaptor.capture());
         ItemHistory savedHistory = historyCaptor.getValue();
         assertThat(savedHistory.getItem()).isEqualTo(item);
-        assertThat(savedHistory.getPreviousOwner()).isEqualTo(seller);
-        assertThat(savedHistory.getCurrentOwner()).isEqualTo(buyer);
+        assertThat(savedHistory.getOwner()).isEqualTo(buyer);
+        assertThat(savedHistory.getAcquisitionType()).isEqualTo(AcquisitionType.TENURE_TRADE);
         assertThat(savedHistory.getTrade()).isEqualTo(transferredTrade);
-        assertThat(savedHistory.getHistoryType()).isEqualTo("TRANSFER");
+        assertThat(savedHistory.getStartedAt()).isEqualTo(openHistory.getEndedAt());
+        assertThat(savedHistory.getEndReason()).isNull();
+        assertThat(savedHistory.getEndedAt()).isNull();
+    }
+
+    @Test
+    void changeTradeStatus_deliveredAsBuyer_noOpenHistoryRow_throwsIllegalStateException() {
+        // createItem이 정상적으로 FIRST_REGISTERED 행을 남겼다면 열린 행이 없는 상황은 발생하지 않는다.
+        // 발생했다면 정합성 위반이므로 예외로 롤백시킨다.
+        Long itemId = 10L;
+        Trade deliveredTrade = trade(223L, CURRENT_USER_ID, 2L, TradeStatus.DELIVERED);
+        Trade confirmedTrade = trade(223L, CURRENT_USER_ID, 2L, TradeStatus.PURCHASE_CONFIRMED);
+        when(tradeRepository.findById(223L)).thenReturn(Optional.of(deliveredTrade), Optional.of(confirmedTrade));
+        when(tradeRepository.updateToConfirmed(eq(223L), eq(TradeStatus.DELIVERED), eq(TradeStatus.PURCHASE_CONFIRMED), any(LocalDateTime.class))).thenReturn(1);
+        when(tradeRepository.updateToSettled(eq(223L), eq(TradeStatus.PURCHASE_CONFIRMED), eq(TradeStatus.SETTLED), any(LocalDateTime.class))).thenReturn(1);
+        when(tradeRepository.updateStatus(223L, TradeStatus.SETTLED, TradeStatus.COMPLETED)).thenReturn(1);
+        when(tradeRepository.updateStatus(223L, TradeStatus.COMPLETED, TradeStatus.TRANSFERRED)).thenReturn(1);
+
+        Item item = item(itemId);
+        ReflectionTestUtils.setField(item, "owner", user(2L));
+        when(itemRepository.findByIdForUpdate(itemId)).thenReturn(Optional.of(item));
+        when(userRepository.getReferenceById(CURRENT_USER_ID)).thenReturn(user(CURRENT_USER_ID));
+        when(tradeRepository.getReferenceById(223L)).thenReturn(trade(223L, CURRENT_USER_ID, 2L, TradeStatus.TRANSFERRED));
+        when(itemHistoryRepository.findByItemIdAndEndedAtIsNull(itemId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> tradeService.changeTradeStatus(
+                223L, CURRENT_USER_ID, TradeStatusChangeRequest.empty(TradeStatus.PURCHASE_CONFIRMED)
+        )).isInstanceOf(IllegalStateException.class);
+
+        verify(itemHistoryRepository, never()).save(any(ItemHistory.class));
     }
 
     @Test
@@ -610,10 +657,14 @@ class TradeServiceTest {
         when(tradeRepository.updateStatus(221L, TradeStatus.COMPLETED, TradeStatus.TRANSFERRED)).thenReturn(1);
 
         Item item = item(itemId);
-        ReflectionTestUtils.setField(item, "owner", user(2L));
+        User seller = user(2L);
+        ReflectionTestUtils.setField(item, "owner", seller);
         when(itemRepository.findByIdForUpdate(itemId)).thenReturn(Optional.of(item));
         when(userRepository.getReferenceById(CURRENT_USER_ID)).thenReturn(user(CURRENT_USER_ID));
         when(tradeRepository.getReferenceById(221L)).thenReturn(transferredTrade);
+        when(itemHistoryRepository.findByItemIdAndEndedAtIsNull(itemId)).thenReturn(
+                Optional.of(ItemHistory.ofFirstRegistration(item, seller, LocalDateTime.now().minusDays(1)))
+        );
 
         PurchaseOffer sentOffer1 = purchaseOffer(501L, PurchaseOfferStatus.SENT, PaymentAuthorizationStatus.AUTHORIZED);
         PurchaseOffer sentOffer2 = purchaseOffer(502L, PurchaseOfferStatus.SENT, PaymentAuthorizationStatus.AUTHORIZED);

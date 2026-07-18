@@ -3,6 +3,7 @@ package com.tenure.domain.item.service;
 import com.tenure.domain.item.dto.*;
 import com.tenure.domain.item.entity.Category;
 import com.tenure.domain.item.entity.Item;
+import com.tenure.domain.item.entity.ItemHistory;
 import com.tenure.domain.item.enums.ItemStatus;
 import com.tenure.domain.item.exception.ItemErrorCode;
 import com.tenure.domain.item.repository.CategoryRepository;
@@ -17,6 +18,8 @@ import com.tenure.domain.user.entity.User;
 import com.tenure.domain.user.repository.UserRepository;
 import com.tenure.global.exception.CustomException;
 import com.tenure.global.response.PageResponse;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -38,6 +41,8 @@ public class ItemService {
 
     @Transactional
     public ItemCreateResponse createItem(Long currentUserId, ItemCreateRequest request) {
+        validateFirstOwnedAt(request.firstOwnedAt());
+
         User owner = findUser(currentUserId); //로그인한 사용자 찾기
         Category largeCategory = findLargeCategory(request.categoryLarge()); //요청으로 들어온 카테고리명을 실제 Category 엔티티로 변경
         Category smallCategory = findSmallCategory(request.categorySmall(), largeCategory);
@@ -55,7 +60,26 @@ public class ItemService {
         );
 
         Item savedItem = itemRepository.save(item);
+        itemHistoryRepository.save(
+                ItemHistory.ofFirstRegistration(savedItem, owner, resolveFirstRegisteredStartedAt(savedItem))
+        );
+
         return ItemCreateResponse.of(savedItem); //저장 결과 응답DTO로 돌려줌
+    }
+
+    private void validateFirstOwnedAt(LocalDate firstOwnedAt) {
+        if (firstOwnedAt != null && firstOwnedAt.isAfter(LocalDate.now())) {
+            throw new CustomException(ItemErrorCode.FIRST_OWNED_AT_IN_FUTURE);
+        }
+    }
+
+    // items.first_owned_at은 사용자가 입력한 최초 보유일(DATE, nullable)이라 이걸 우선 쓰고,
+    // 없으면 아이템 등록 시각(created_at)을 소유 기간 시작 시각으로 대신 쓴다.
+    private LocalDateTime resolveFirstRegisteredStartedAt(Item item) {
+        if (item.getFirstOwnedAt() != null) {
+            return item.getFirstOwnedAt().atStartOfDay();
+        }
+        return item.getCreatedAt();
     }
 
     @Transactional(readOnly = true)
@@ -199,7 +223,7 @@ public class ItemService {
         validateItemAccess(item, currentUserId);
 
         return PageResponse.from(
-                itemHistoryRepository.findByItemIdOrderByCreatedAtDesc(itemId, pageable),
+                itemHistoryRepository.findByItemIdOrderByStartedAtDesc(itemId, pageable),
                 ItemHistoryResponse::from
         );
     }

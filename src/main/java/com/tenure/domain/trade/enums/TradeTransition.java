@@ -2,6 +2,7 @@ package com.tenure.domain.trade.enums;
 
 import com.tenure.domain.item.entity.Item;
 import com.tenure.domain.item.entity.ItemHistory;
+import com.tenure.domain.item.enums.EndReason;
 import com.tenure.domain.item.exception.ItemErrorCode;
 import com.tenure.domain.item.repository.ItemHistoryRepository;
 import com.tenure.domain.item.repository.ItemRepository;
@@ -149,15 +150,29 @@ public enum TradeTransition {
         private void transferItemOwnership(Context context, Long tradeId, Long itemId, Long buyerUserId) {
             Item item = context.itemRepository().findByIdForUpdate(itemId)
                     .orElseThrow(() -> new CustomException(ItemErrorCode.ITEM_NOT_FOUND));
-            User previousOwner = item.getOwner();
             User buyer = context.userRepository().getReferenceById(buyerUserId);
             Trade tradeRef = context.tradeRepository().getReferenceById(tradeId);
+            LocalDateTime transferredAt = LocalDateTime.now();
 
             item.transferOwnership(buyer);
 
-            context.itemHistoryRepository().save(ItemHistory.ofTransfer(item, previousOwner, buyer, tradeRef));
+            closeOpenHistory(context, itemId, transferredAt);
+            // close()의 UPDATE는 dirty checking이라 커밋 시 지연되지만, 뒤이은 save()는 IDENTITY라 즉시 INSERT되므로
+            // flush 없이는 같은 item_id에 열린 행이 순간적으로 2개가 되어 부분 유니크 인덱스를 위반한다.
+            context.itemHistoryRepository().flush();
+            context.itemHistoryRepository().save(ItemHistory.ofTenureTrade(item, buyer, tradeRef, transferredAt));
 
             cancelSentOffers(context, itemId);
+        }
+
+        // 아이템 등록 시 createItem이 이미 FIRST_REGISTERED 열린 행을 만들어두므로, 여기서 열린 행이
+        // 없는 건 정합성 위반이다(마이그레이션 백필로 기존 아이템도 모두 열린 행을 갖도록 보장했다).
+        private void closeOpenHistory(Context context, Long itemId, LocalDateTime endedAt) {
+            ItemHistory openHistory = context.itemHistoryRepository().findByItemIdAndEndedAtIsNull(itemId)
+                    .orElseThrow(() -> new IllegalStateException(
+                            "소유 이력 불변식 위반: 열린 행이 없습니다. itemId=%d".formatted(itemId)
+                    ));
+            openHistory.close(EndReason.TENURE_TRADE, endedAt);
         }
 
         // Item 락을 이미 잡은 뒤이므로 락 순서 규약 위반이 아니다.

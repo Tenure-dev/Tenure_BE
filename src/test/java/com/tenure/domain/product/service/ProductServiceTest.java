@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -16,7 +17,10 @@ import com.tenure.domain.follow.enums.FollowStatus;
 import com.tenure.domain.follow.repository.FollowRelationshipRepository;
 import com.tenure.domain.item.entity.Category;
 import com.tenure.domain.item.entity.Item;
+import com.tenure.domain.item.entity.ItemHistory;
+import com.tenure.domain.item.enums.EndReason;
 import com.tenure.domain.item.enums.ItemStatus;
+import com.tenure.domain.item.repository.ItemHistoryRepository;
 import com.tenure.domain.item.repository.ItemRepository;
 import com.tenure.domain.ootd.entity.Ootd;
 import com.tenure.domain.ootd.enums.OotdPublicationStatus;
@@ -73,6 +77,9 @@ class ProductServiceTest {
     private ItemRepository itemRepository;
 
     @Mock
+    private ItemHistoryRepository itemHistoryRepository;
+
+    @Mock
     private ProductRepository productRepository;
 
     @Mock
@@ -99,6 +106,7 @@ class ProductServiceTest {
     void setUp() {
         productService = new ProductService(
                 itemRepository,
+                itemHistoryRepository,
                 productRepository,
                 productAttachedOotdRepository,
                 ootdRepository,
@@ -389,6 +397,8 @@ class ProductServiceTest {
                 .thenReturn(List.of(intent));
         when(purchaseOfferRepository.findSentByItemIdForUpdate(ITEM_ID, PurchaseOfferStatus.SENT))
                 .thenReturn(List.of(offer));
+        ItemHistory openHistory = ItemHistory.ofFirstRegistration(item, seller, LocalDateTime.now().minusDays(10));
+        when(itemHistoryRepository.findByItemIdAndEndedAtIsNull(ITEM_ID)).thenReturn(Optional.of(openHistory));
 
         ProductExternalCompleteResponse response = productService.completeExternalProduct(200L, CURRENT_USER_ID);
 
@@ -404,6 +414,10 @@ class ProductServiceTest {
         assertThat(intent.getPaymentAuthorizationStatus()).isEqualTo(PaymentAuthorizationStatus.RELEASED);
         assertThat(offer.getStatus()).isEqualTo(PurchaseOfferStatus.CANCELED);
         assertThat(offer.getPaymentAuthorizationStatus()).isEqualTo(PaymentAuthorizationStatus.RELEASED);
+        // SOLD 아이템은 열린 행 0개가 정상이다: 기존 열린 행을 닫기만 하고 새 열린 행은 만들지 않는다.
+        assertThat(openHistory.getEndReason()).isEqualTo(EndReason.EXTERNAL_SALE);
+        assertThat(openHistory.getEndedAt()).isNotNull();
+        verify(itemHistoryRepository, never()).save(any(ItemHistory.class));
 
         InOrder inOrder = inOrder(
                 productRepository,

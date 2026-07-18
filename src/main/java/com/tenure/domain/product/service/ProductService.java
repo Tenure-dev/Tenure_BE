@@ -7,7 +7,10 @@ import com.tenure.domain.common.enums.FeePolicy;
 import com.tenure.domain.follow.enums.FollowStatus;
 import com.tenure.domain.follow.repository.FollowRelationshipRepository;
 import com.tenure.domain.item.entity.Item;
+import com.tenure.domain.item.entity.ItemHistory;
+import com.tenure.domain.item.enums.EndReason;
 import com.tenure.domain.item.enums.ItemStatus;
+import com.tenure.domain.item.repository.ItemHistoryRepository;
 import com.tenure.domain.item.repository.ItemRepository;
 import com.tenure.domain.ootd.entity.Ootd;
 import com.tenure.domain.ootd.enums.OotdPublicationStatus;
@@ -41,6 +44,7 @@ import com.tenure.domain.user.enums.UserGrade;
 import com.tenure.global.exception.CustomException;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -56,6 +60,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ProductService {
 
     private final ItemRepository itemRepository;
+    private final ItemHistoryRepository itemHistoryRepository;
     private final ProductRepository productRepository;
     private final ProductAttachedOotdRepository productAttachedOotdRepository;
     private final OotdRepository ootdRepository;
@@ -192,6 +197,7 @@ public class ProductService {
 
         product.markExternalSold();
         item.markSold();
+        closeOpenHistoryForExternalSale(item.getId());
 
         return ProductExternalCompleteResponse.of(
                 product,
@@ -199,6 +205,15 @@ public class ProductService {
                 sentIntents.size(),
                 sentOffers.size()
         );
+    }
+
+    // 외부 판매는 새 소유자를 기록하지 않으므로(테뉴어 밖에서 거래가 끝난 것) 열린 행을 닫기만 한다.
+    private void closeOpenHistoryForExternalSale(Long itemId) {
+        ItemHistory openHistory = itemHistoryRepository.findByItemIdAndEndedAtIsNull(itemId)
+                .orElseThrow(() -> new IllegalStateException(
+                        "소유 이력 불변식 위반: 열린 행이 없습니다. itemId=%d".formatted(itemId)
+                ));
+        openHistory.close(EndReason.EXTERNAL_SALE, LocalDateTime.now());
     }
 
     @Transactional
