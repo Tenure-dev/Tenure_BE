@@ -3,9 +3,11 @@ package com.tenure.domain.ootd.controller;
 import com.tenure.domain.ootd.dto.OotdCreateResponse;
 import com.tenure.domain.ootd.dto.OotdDetailResponse;
 import com.tenure.domain.ootd.dto.OotdMyPostsResponse;
+import com.tenure.domain.ootd.dto.OotdReactionListResponse;
 import com.tenure.domain.ootd.dto.OotdRelatedResponse;
 import com.tenure.domain.ootd.service.OotdDetailService;
 import com.tenure.domain.ootd.service.OotdMyPostService;
+import com.tenure.domain.ootd.service.OotdReactionListService;
 import com.tenure.domain.ootd.service.OotdReactionService;
 import com.tenure.domain.ootd.service.OotdRelatedService;
 import com.tenure.domain.ootd.service.OotdService;
@@ -42,6 +44,7 @@ public class OotdController {
     private final OotdRelatedService ootdRelatedService;
     private final OotdDetailService ootdDetailService;
     private final OotdReactionService ootdReactionService;
+    private final OotdReactionListService ootdReactionListService;
     private final CurrentUserProvider currentUserProvider;
 
     @Operation(
@@ -251,5 +254,42 @@ public class OotdController {
         Long currentUserId = currentUserProvider.getCurrentUserId();
         ootdReactionService.unsaveOotd(currentUserId, ootdId);
         return ResponseEntity.noContent().build();
+    }
+
+    @Operation(
+            summary = "하트한 OOTD 목록",
+            description = "로그인 사용자가 하트(좋아요)한 OOTD를 마이페이지 썸네일 그리드용으로 조회합니다. "
+                    + "반응 이후 삭제되었거나 차단 관계가 된 게시물은 제외됩니다.",
+            parameters = {
+                    @Parameter(
+                            name = "X-USER-ID",
+                            in = ParameterIn.HEADER,
+                            required = true,
+                            description = "JWT 적용 전 Swagger/local testing용 임시 헤더.",
+                            example = "1"
+                    )
+            }
+    )
+    @ApiResponse(
+            responseCode = "200",
+            description = "하트한 OOTD 목록 조회 성공",
+            content = @Content(schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = OotdReactionListResponse.class))
+    )
+    @GetMapping("/hearted")
+    public BaseResponse<OotdReactionListResponse> getHeartedOotds(
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+            LocalDateTime cursorCreatedAt,
+            @RequestParam(required = false) Long cursorId,
+            @RequestParam(defaultValue = "20") Integer size
+    ) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        OotdReactionListResponse response = ootdReactionListService.getHeartedOotds(
+                currentUserId,
+                cursorCreatedAt,
+                cursorId,
+                size
+        );
+        return BaseResponse.success(response, "하트한 OOTD 목록을 조회했습니다.");
     }
 }
