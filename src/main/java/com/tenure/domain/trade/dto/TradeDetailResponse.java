@@ -120,7 +120,7 @@ public record TradeDetailResponse(
                 trade.getProduct() == null ? null : trade.getProduct().getId(),
                 trade.getBuyer().getId(),
                 trade.getSeller().getId(),
-                trade.getStatus(),
+                trade.getStatus().displayStatus(),
                 trade.getDeliveryCarrier(),
                 trade.getCustomDeliveryCarrierName(),
                 trade.getTrackingNumber(),

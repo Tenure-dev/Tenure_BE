@@ -12,7 +12,8 @@ public enum ItemErrorCode implements ErrorCode {
     USER_NOT_FOUND("USER_404", "사용자 정보를 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
     CATEGORY_NOT_FOUND("CATEGORY_404", "카테고리 정보를 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
     ITEM_NOT_FOUND("ITEM_404", "아이템 정보를 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
-    ITEM_ACCESS_DENIED("ITEM_403", "아이템에 접근할 권한이 없습니다.", HttpStatus.FORBIDDEN);
+    ITEM_ACCESS_DENIED("ITEM_403", "아이템에 접근할 권한이 없습니다.", HttpStatus.FORBIDDEN),
+    FIRST_OWNED_AT_IN_FUTURE("ITEM_400_FIRST_OWNED_AT_IN_FUTURE", "최초 보유 날짜는 오늘 이후일 수 없습니다.", HttpStatus.BAD_REQUEST);
 
     private final String code;
     private final String message;
