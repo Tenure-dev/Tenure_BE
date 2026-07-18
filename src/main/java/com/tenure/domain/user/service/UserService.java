@@ -13,8 +13,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.tenure.domain.user.dto.request.LoginRequest;
 import com.tenure.domain.user.dto.response.TokenResponse;
-import com.tenure.domain.user.entity.User;
 import com.tenure.global.security.JwtProvider;
+import com.tenure.domain.user.dto.response.UserProfileResponse;
 
 
 @Slf4j
@@ -27,7 +27,7 @@ public class UserService {
     private final JwtProvider jwtProvider;
 
 
-    // 이메일 회원가입
+    // 회원가입
     // (검증 -> 암호화 -> 저장)을 하나의 트랜잭션으로 처리
     @Transactional
     public SignupResponse signup(SignupRequest request) {
@@ -86,5 +86,15 @@ public class UserService {
 
         // 4) 응답
         return new TokenResponse(accessToken, user.getId(), user.getUsername());
+    }
+
+    // 내 정보 조회.
+    // currentUserId(JWT에서 추출된 로그인 사용자 ID)로 조회
+    @Transactional(readOnly = true)
+    public UserProfileResponse getMyProfile(Long currentUserId) {
+        User user = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new CustomException(UserErrorCode.USER_NOT_FOUND));
+
+        return UserProfileResponse.from(user);
     }
 }
