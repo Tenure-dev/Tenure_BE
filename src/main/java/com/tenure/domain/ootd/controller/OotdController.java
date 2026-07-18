@@ -208,4 +208,26 @@ public class OotdController {
         ootdReactionService.unheartOotd(currentUserId, ootdId);
         return ResponseEntity.noContent().build();
     }
+
+    @Operation(
+            summary = "OOTD 저장 등록",
+            description = "로그인 사용자가 OOTD를 저장(save)합니다. 이미 저장되어 있는 경우에도 동일하게 204를 반환합니다(멱등).",
+            parameters = {
+                    @Parameter(
+                            name = "X-USER-ID",
+                            in = ParameterIn.HEADER,
+                            required = true,
+                            description = "JWT 적용 전 Swagger/local testing용 임시 헤더.",
+                            example = "1"
+                    )
+            }
+    )
+    @ApiResponse(responseCode = "204", description = "저장 성공 또는 이미 저장되어 있어 멱등 처리됨")
+    @ApiResponse(responseCode = "404", description = "존재하지 않거나 비공개(ARCHIVED) 처리되었거나 차단 관계로 조회할 수 없는 OOTD")
+    @PostMapping("/{ootdId}/save")
+    public ResponseEntity<Void> saveOotd(@PathVariable Long ootdId) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        ootdReactionService.saveOotd(currentUserId, ootdId);
+        return ResponseEntity.noContent().build();
+    }
 }

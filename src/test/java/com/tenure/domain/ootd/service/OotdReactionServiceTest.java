@@ -110,6 +110,66 @@ class OotdReactionServiceTest {
     }
 
     @Test
+    void saveOotd_delegatesInsertToRecorderOnFirstRegistration() {
+        User owner = user(2L);
+        Ootd ootd = ootd(OOTD_ID, owner);
+
+        when(ootdRepository.findVisibleActiveById(OOTD_ID, CURRENT_USER_ID, OotdPublicationStatus.ACTIVE))
+                .thenReturn(Optional.of(ootd));
+        when(ootdReactionRepository.existsByUser_IdAndOotd_IdAndReactionType(CURRENT_USER_ID, OOTD_ID, OotdReactionType.SAVE))
+                .thenReturn(false);
+
+        ootdReactionService.saveOotd(CURRENT_USER_ID, OOTD_ID);
+
+        verify(ootdReactionRecorder).insert(CURRENT_USER_ID, OOTD_ID, OotdReactionType.SAVE);
+    }
+
+    @Test
+    void saveOotd_skipsRecorderInsertWhenAlreadySaved() {
+        User owner = user(2L);
+        Ootd ootd = ootd(OOTD_ID, owner);
+
+        when(ootdRepository.findVisibleActiveById(OOTD_ID, CURRENT_USER_ID, OotdPublicationStatus.ACTIVE))
+                .thenReturn(Optional.of(ootd));
+        when(ootdReactionRepository.existsByUser_IdAndOotd_IdAndReactionType(CURRENT_USER_ID, OOTD_ID, OotdReactionType.SAVE))
+                .thenReturn(true);
+
+        assertThatCode(() -> ootdReactionService.saveOotd(CURRENT_USER_ID, OOTD_ID))
+                .doesNotThrowAnyException();
+
+        verify(ootdReactionRecorder, never()).insert(CURRENT_USER_ID, OOTD_ID, OotdReactionType.SAVE);
+    }
+
+    @Test
+    void saveOotd_isIdempotentWhenRecorderThrowsUniqueConstraintViolationOnConcurrentRace() {
+        User owner = user(2L);
+        Ootd ootd = ootd(OOTD_ID, owner);
+
+        when(ootdRepository.findVisibleActiveById(OOTD_ID, CURRENT_USER_ID, OotdPublicationStatus.ACTIVE))
+                .thenReturn(Optional.of(ootd));
+        when(ootdReactionRepository.existsByUser_IdAndOotd_IdAndReactionType(CURRENT_USER_ID, OOTD_ID, OotdReactionType.SAVE))
+                .thenReturn(false);
+        doThrow(new DataIntegrityViolationException("uk_ootd_reactions_user_ootd_type"))
+                .when(ootdReactionRecorder).insert(CURRENT_USER_ID, OOTD_ID, OotdReactionType.SAVE);
+
+        assertThatCode(() -> ootdReactionService.saveOotd(CURRENT_USER_ID, OOTD_ID))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void saveOotd_throwsNotFoundWhenOotdIsNotVisible() {
+        when(ootdRepository.findVisibleActiveById(OOTD_ID, CURRENT_USER_ID, OotdPublicationStatus.ACTIVE))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> ootdReactionService.saveOotd(CURRENT_USER_ID, OOTD_ID))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(OotdErrorCode.OOTD_NOT_FOUND);
+
+        verify(ootdReactionRecorder, never()).insert(CURRENT_USER_ID, OOTD_ID, OotdReactionType.SAVE);
+    }
+
+    @Test
     void unheartOotd_deletesReactionThenDecreasesHeartCountInThatOrderWhenReactionExisted() {
         User owner = user(2L);
         Ootd ootd = ootd(OOTD_ID, owner);

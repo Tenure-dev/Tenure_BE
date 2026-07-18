@@ -40,8 +40,9 @@ public class OotdReactionRecorder {
     }
 
     private void increaseCount(Long ootdId, OotdReactionType reactionType) {
-        if (reactionType == OotdReactionType.HEART) {
-            ootdRepository.increaseHeartCount(ootdId);
+        switch (reactionType) {
+            case HEART -> ootdRepository.increaseHeartCount(ootdId);
+            case SAVE -> ootdRepository.increaseSaveCount(ootdId);
         }
     }
 }
