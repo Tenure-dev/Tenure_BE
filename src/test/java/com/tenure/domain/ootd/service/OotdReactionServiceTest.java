@@ -20,7 +20,9 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -105,6 +107,54 @@ class OotdReactionServiceTest {
                 .isEqualTo(OotdErrorCode.OOTD_NOT_FOUND);
 
         verify(ootdReactionRecorder, never()).insert(CURRENT_USER_ID, OOTD_ID, OotdReactionType.HEART);
+    }
+
+    @Test
+    void unheartOotd_deletesReactionThenDecreasesHeartCountInThatOrderWhenReactionExisted() {
+        User owner = user(2L);
+        Ootd ootd = ootd(OOTD_ID, owner);
+
+        when(ootdRepository.findVisibleActiveById(OOTD_ID, CURRENT_USER_ID, OotdPublicationStatus.ACTIVE))
+                .thenReturn(Optional.of(ootd));
+        when(ootdReactionRepository.deleteByUserAndOotdAndReactionType(CURRENT_USER_ID, OOTD_ID, OotdReactionType.HEART))
+                .thenReturn(1);
+
+        ootdReactionService.unheartOotd(CURRENT_USER_ID, OOTD_ID);
+
+        InOrder inOrder = Mockito.inOrder(ootdReactionRepository, ootdRepository);
+        inOrder.verify(ootdReactionRepository).deleteByUserAndOotdAndReactionType(CURRENT_USER_ID, OOTD_ID, OotdReactionType.HEART);
+        inOrder.verify(ootdRepository).decreaseHeartCount(OOTD_ID);
+    }
+
+    @Test
+    void unheartOotd_skipsCountDecreaseWhenNoReactionExisted() {
+        User owner = user(2L);
+        Ootd ootd = ootd(OOTD_ID, owner);
+
+        when(ootdRepository.findVisibleActiveById(OOTD_ID, CURRENT_USER_ID, OotdPublicationStatus.ACTIVE))
+                .thenReturn(Optional.of(ootd));
+        when(ootdReactionRepository.deleteByUserAndOotdAndReactionType(CURRENT_USER_ID, OOTD_ID, OotdReactionType.HEART))
+                .thenReturn(0);
+
+        assertThatCode(() -> ootdReactionService.unheartOotd(CURRENT_USER_ID, OOTD_ID))
+                .doesNotThrowAnyException();
+
+        verify(ootdRepository, never()).decreaseHeartCount(OOTD_ID);
+    }
+
+    @Test
+    void unheartOotd_throwsNotFoundWhenOotdIsNotVisible() {
+        when(ootdRepository.findVisibleActiveById(OOTD_ID, CURRENT_USER_ID, OotdPublicationStatus.ACTIVE))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> ootdReactionService.unheartOotd(CURRENT_USER_ID, OOTD_ID))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(OotdErrorCode.OOTD_NOT_FOUND);
+
+        verify(ootdReactionRepository, never())
+                .deleteByUserAndOotdAndReactionType(CURRENT_USER_ID, OOTD_ID, OotdReactionType.HEART);
+        verify(ootdRepository, never()).decreaseHeartCount(OOTD_ID);
     }
 
     private User user(Long id) {
