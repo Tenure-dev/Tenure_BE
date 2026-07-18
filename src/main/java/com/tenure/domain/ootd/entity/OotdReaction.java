@@ -58,4 +58,12 @@ public class OotdReaction {
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
     }
+
+    public static OotdReaction create(User user, Ootd ootd, OotdReactionType reactionType) {
+        OotdReaction reaction = new OotdReaction();
+        reaction.user = user;
+        reaction.ootd = ootd;
+        reaction.reactionType = reactionType;
+        return reaction;
+    }
 }
