@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -46,11 +47,11 @@ class OotdReactionListServiceTest {
     void getHeartedOotds_returnsHeartedOotdsInReactionCreatedAtOrderWithNextCursor() {
         User user = user(CURRENT_USER_ID);
         OotdReaction newest = reaction(30L, user, ootd(11L, "https://image.url/ootd-11.jpg"),
-                LocalDateTime.of(2026, 7, 14, 10, 0));
+                OotdReactionType.HEART, LocalDateTime.of(2026, 7, 14, 10, 0));
         OotdReaction middle = reaction(20L, user, ootd(10L, "https://image.url/ootd-10.jpg"),
-                LocalDateTime.of(2026, 7, 13, 10, 0));
+                OotdReactionType.HEART, LocalDateTime.of(2026, 7, 13, 10, 0));
         OotdReaction extra = reaction(10L, user, ootd(9L, "https://image.url/ootd-9.jpg"),
-                LocalDateTime.of(2026, 7, 12, 10, 0));
+                OotdReactionType.HEART, LocalDateTime.of(2026, 7, 12, 10, 0));
 
         when(ootdReactionRepository.findReactedOotds(
                 eq(CURRENT_USER_ID),
@@ -156,6 +157,86 @@ class OotdReactionListServiceTest {
                 .isEqualTo(CommonErrorCode.INVALID_REQUEST);
     }
 
+    @Test
+    void getSavedOotds_returnsSavedOotdsInReactionCreatedAtOrderWithNextCursor() {
+        User user = user(CURRENT_USER_ID);
+        OotdReaction newest = reaction(30L, user, ootd(11L, "https://image.url/ootd-11.jpg"),
+                OotdReactionType.SAVE, LocalDateTime.of(2026, 7, 14, 10, 0));
+        OotdReaction middle = reaction(20L, user, ootd(10L, "https://image.url/ootd-10.jpg"),
+                OotdReactionType.SAVE, LocalDateTime.of(2026, 7, 13, 10, 0));
+        OotdReaction extra = reaction(10L, user, ootd(9L, "https://image.url/ootd-9.jpg"),
+                OotdReactionType.SAVE, LocalDateTime.of(2026, 7, 12, 10, 0));
+
+        when(ootdReactionRepository.findReactedOotds(
+                eq(CURRENT_USER_ID),
+                eq(OotdReactionType.SAVE),
+                eq(OotdPublicationStatus.ACTIVE),
+                eq(null),
+                eq(null),
+                any(Pageable.class)
+        )).thenReturn(List.of(newest, middle, extra));
+
+        OotdReactionListResponse response = ootdReactionListService.getSavedOotds(CURRENT_USER_ID, null, null, 2);
+
+        assertThat(response.content()).hasSize(2);
+        assertThat(response.content().get(0).ootdId()).isEqualTo(11L);
+        assertThat(response.content().get(0).imageUrl()).isEqualTo("https://image.url/ootd-11.jpg");
+        assertThat(response.content().get(1).ootdId()).isEqualTo(10L);
+        assertThat(response.hasNext()).isTrue();
+        assertThat(response.nextCursorCreatedAt()).isEqualTo(middle.getCreatedAt());
+        assertThat(response.nextCursorId()).isEqualTo(middle.getId());
+    }
+
+    @Test
+    void getSavedOotds_delegatesWithSaveReactionTypeNotHeart() {
+        when(ootdReactionRepository.findReactedOotds(
+                eq(CURRENT_USER_ID),
+                eq(OotdReactionType.SAVE),
+                eq(OotdPublicationStatus.ACTIVE),
+                eq(null),
+                eq(null),
+                any(Pageable.class)
+        )).thenReturn(List.of());
+
+        ootdReactionListService.getSavedOotds(CURRENT_USER_ID, null, null, 20);
+
+        verify(ootdReactionRepository).findReactedOotds(
+                eq(CURRENT_USER_ID),
+                eq(OotdReactionType.SAVE),
+                eq(OotdPublicationStatus.ACTIVE),
+                eq(null),
+                eq(null),
+                any(Pageable.class)
+        );
+        verify(ootdReactionRepository, never()).findReactedOotds(
+                eq(CURRENT_USER_ID),
+                eq(OotdReactionType.HEART),
+                eq(OotdPublicationStatus.ACTIVE),
+                eq(null),
+                eq(null),
+                any(Pageable.class)
+        );
+    }
+
+    @Test
+    void getSavedOotds_returnsEmptyListWhenNoReactions() {
+        when(ootdReactionRepository.findReactedOotds(
+                eq(CURRENT_USER_ID),
+                eq(OotdReactionType.SAVE),
+                eq(OotdPublicationStatus.ACTIVE),
+                eq(null),
+                eq(null),
+                any(Pageable.class)
+        )).thenReturn(List.of());
+
+        OotdReactionListResponse response = ootdReactionListService.getSavedOotds(CURRENT_USER_ID, null, null, 20);
+
+        assertThat(response.content()).isEmpty();
+        assertThat(response.hasNext()).isFalse();
+        assertThat(response.nextCursorCreatedAt()).isNull();
+        assertThat(response.nextCursorId()).isNull();
+    }
+
     private User user(Long id) {
         User user = instantiate(User.class);
         ReflectionTestUtils.setField(user, "id", id);
@@ -169,12 +250,12 @@ class OotdReactionListServiceTest {
         return ootd;
     }
 
-    private OotdReaction reaction(Long id, User user, Ootd ootd, LocalDateTime createdAt) {
+    private OotdReaction reaction(Long id, User user, Ootd ootd, OotdReactionType reactionType, LocalDateTime createdAt) {
         OotdReaction reaction = instantiate(OotdReaction.class);
         ReflectionTestUtils.setField(reaction, "id", id);
         ReflectionTestUtils.setField(reaction, "user", user);
         ReflectionTestUtils.setField(reaction, "ootd", ootd);
-        ReflectionTestUtils.setField(reaction, "reactionType", OotdReactionType.HEART);
+        ReflectionTestUtils.setField(reaction, "reactionType", reactionType);
         ReflectionTestUtils.setField(reaction, "createdAt", createdAt);
         return reaction;
     }

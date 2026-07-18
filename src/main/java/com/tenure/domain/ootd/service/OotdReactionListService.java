@@ -34,6 +34,16 @@ public class OotdReactionListService {
         return getReactedOotds(currentUserId, OotdReactionType.HEART, cursorCreatedAt, cursorId, size);
     }
 
+    @Transactional(readOnly = true)
+    public OotdReactionListResponse getSavedOotds(
+            Long currentUserId,
+            LocalDateTime cursorCreatedAt,
+            Long cursorId,
+            Integer size
+    ) {
+        return getReactedOotds(currentUserId, OotdReactionType.SAVE, cursorCreatedAt, cursorId, size);
+    }
+
     private OotdReactionListResponse getReactedOotds(
             Long currentUserId,
             OotdReactionType reactionType,
