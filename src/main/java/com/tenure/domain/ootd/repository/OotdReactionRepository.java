@@ -22,4 +22,6 @@ public interface OotdReactionRepository extends JpaRepository<OotdReaction, Long
             @Param("ootdIds") Collection<Long> ootdIds,
             @Param("reactionType") OotdReactionType reactionType
     );
+
+    boolean existsByUser_IdAndOotd_IdAndReactionType(Long userId, Long ootdId, OotdReactionType reactionType);
 }
