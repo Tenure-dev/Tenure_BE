@@ -21,4 +21,6 @@ public interface FollowRelationshipRepository extends JpaRepository<FollowRelati
     List<Long> findFollowingIds(@Param("currentUserId") Long currentUserId,
                                 @Param("targetIds") List<Long> targetIds);
 
+    long countByFollowing_IdAndStatus(Long followingId, FollowStatus status);
+
 }

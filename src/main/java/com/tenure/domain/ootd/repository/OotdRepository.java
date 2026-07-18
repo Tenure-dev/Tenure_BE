@@ -293,4 +293,6 @@ public interface OotdRepository extends JpaRepository<Ootd, Long> {
             @Param("cursorId") Long cursorId,
             Pageable pageable
     );
+
+    long countByOwner_IdAndPublicationStatus(Long ownerUserId, OotdPublicationStatus publicationStatus);
 }

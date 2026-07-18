@@ -33,4 +33,6 @@ public interface ItemRepository extends JpaRepository<Item, Long> {
             @Param("itemStatus") ItemStatus itemStatus,
             Pageable pageable
     );
+
+    long countByOwner_Id(Long ownerUserId);
 }
