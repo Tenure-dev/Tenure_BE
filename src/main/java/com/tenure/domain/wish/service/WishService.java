@@ -2,17 +2,25 @@ package com.tenure.domain.wish.service;
 
 import com.tenure.domain.item.entity.Item;
 import com.tenure.domain.item.repository.ItemRepository;
+import com.tenure.domain.product.entity.Product;
+import com.tenure.domain.product.enums.ProductStatus;
+import com.tenure.domain.product.repository.ProductRepository;
 import com.tenure.domain.user.entity.User;
 import com.tenure.domain.user.repository.UserRepository;
 import com.tenure.domain.wish.dto.WishCreateResponse;
 import com.tenure.domain.wish.dto.WishDeleteResponse;
+import com.tenure.domain.wish.dto.WishListResponse;
 import com.tenure.domain.wish.entity.Wish;
 import com.tenure.domain.wish.exception.WishErrorCode;
 import com.tenure.domain.wish.repository.WishRepository;
 import com.tenure.global.exception.CustomException;
+import com.tenure.global.response.PageResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -21,6 +29,7 @@ public class WishService {
     private final WishRepository wishRepository;
     private final ItemRepository itemRepository;
     private final UserRepository userRepository;
+    private final ProductRepository productRepository;
 
     @Transactional
     public WishCreateResponse createWish(Long currentUserId, Long itemId) {
@@ -53,6 +62,35 @@ public class WishService {
         );
     }
 
+    @Transactional(readOnly = true)
+    public PageResponse<WishListResponse> getMyWishes(
+            Long currentUserId,
+            String query,
+            ProductStatus saleStatus,
+            Pageable pageable
+    ) {
+        User user = findUser(currentUserId);
+
+        return PageResponse.from(
+                wishRepository.findMyWishes(
+                        user.getId(),
+                        normalizeQuery(query),
+                        saleStatus,
+                        pageable
+                ),
+                wish -> {
+                    Product product = productRepository
+                            .findFirstByItemIdAndProductStatusInOrderByCreatedAtDesc(
+                                    wish.getItem().getId(),
+                                    List.of(ProductStatus.ON_SALE, ProductStatus.TRADING)
+                            )
+                            .orElse(null);
+
+                    return WishListResponse.of(wish, product);
+                }
+        );
+    }
+
     private Wish findWish(Long userId, Long itemId) {
         return wishRepository.findByUserIdAndItemId(userId, itemId)
                 .orElseThrow(() -> new CustomException(WishErrorCode.WISH_NOT_FOUND));
@@ -72,5 +110,12 @@ public class WishService {
         if (wishRepository.existsByUserIdAndItemId(userId, itemId)) {
             throw new CustomException(WishErrorCode.WISH_ALREADY_EXISTS);
         }
+    }
+
+    private String normalizeQuery(String query) {
+        if (query == null || query.isBlank()) {
+            return null;
+        }
+        return query.trim();
     }
 }

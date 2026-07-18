@@ -32,5 +32,12 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     boolean existsByItemIdAndProductStatus(Long itemId, ProductStatus productStatus);
     Optional<Product> findByItemIdAndProductStatusIn(Long itemId, List<ProductStatus> status);
+
+    Optional<Product> findFirstByItemIdAndProductStatusInOrderByCreatedAtDesc(
+            Long itemId,
+            Collection<ProductStatus> productStatuses
+    );
+
     List<Product> findByItemIdInAndProductStatus(Collection<Long> itemIds, ProductStatus productStatus);
+
 }
