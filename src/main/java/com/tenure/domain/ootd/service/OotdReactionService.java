@@ -49,6 +49,14 @@ public class OotdReactionService {
         removeReaction(currentUserId, ootd.getId(), OotdReactionType.HEART);
     }
 
+    @Transactional
+    public void unsaveOotd(Long currentUserId, Long ootdId) {
+        Ootd ootd = ootdRepository.findVisibleActiveById(ootdId, currentUserId, OotdPublicationStatus.ACTIVE)
+                .orElseThrow(() -> new CustomException(OotdErrorCode.OOTD_NOT_FOUND));
+
+        removeReaction(currentUserId, ootd.getId(), OotdReactionType.SAVE);
+    }
+
     private void addReaction(Long currentUserId, Long ootdId, OotdReactionType reactionType) {
         if (ootdReactionRepository.existsByUser_IdAndOotd_IdAndReactionType(currentUserId, ootdId, reactionType)) {
             return;
@@ -70,8 +78,9 @@ public class OotdReactionService {
     }
 
     private void decreaseCount(Long ootdId, OotdReactionType reactionType) {
-        if (reactionType == OotdReactionType.HEART) {
-            ootdRepository.decreaseHeartCount(ootdId);
+        switch (reactionType) {
+            case HEART -> ootdRepository.decreaseHeartCount(ootdId);
+            case SAVE -> ootdRepository.decreaseSaveCount(ootdId);
         }
     }
 }

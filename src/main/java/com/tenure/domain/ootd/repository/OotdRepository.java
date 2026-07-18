@@ -30,6 +30,10 @@ public interface OotdRepository extends JpaRepository<Ootd, Long> {
     @Query("update Ootd o set o.saveCount = o.saveCount + 1 where o.id = :ootdId")
     int increaseSaveCount(@Param("ootdId") Long ootdId);
 
+    @Modifying(clearAutomatically = true)
+    @Query("update Ootd o set o.saveCount = o.saveCount - 1 where o.id = :ootdId and o.saveCount > 0")
+    int decreaseSaveCount(@Param("ootdId") Long ootdId);
+
     @Query("select count(o) from Ootd o " +
             "where o.publicationStatus = com.tenure.domain.ootd.enums.OotdPublicationStatus.ACTIVE " +
             "and (:gender is null or o.owner.gender = :gender) " +
