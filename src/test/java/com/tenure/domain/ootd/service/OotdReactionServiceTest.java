@@ -217,6 +217,55 @@ class OotdReactionServiceTest {
         verify(ootdRepository, never()).decreaseHeartCount(OOTD_ID);
     }
 
+    @Test
+    void unsaveOotd_deletesReactionThenDecreasesSaveCountInThatOrderWhenReactionExisted() {
+        User owner = user(2L);
+        Ootd ootd = ootd(OOTD_ID, owner);
+
+        when(ootdRepository.findVisibleActiveById(OOTD_ID, CURRENT_USER_ID, OotdPublicationStatus.ACTIVE))
+                .thenReturn(Optional.of(ootd));
+        when(ootdReactionRepository.deleteByUserAndOotdAndReactionType(CURRENT_USER_ID, OOTD_ID, OotdReactionType.SAVE))
+                .thenReturn(1);
+
+        ootdReactionService.unsaveOotd(CURRENT_USER_ID, OOTD_ID);
+
+        InOrder inOrder = Mockito.inOrder(ootdReactionRepository, ootdRepository);
+        inOrder.verify(ootdReactionRepository).deleteByUserAndOotdAndReactionType(CURRENT_USER_ID, OOTD_ID, OotdReactionType.SAVE);
+        inOrder.verify(ootdRepository).decreaseSaveCount(OOTD_ID);
+        verify(ootdRepository, never()).decreaseHeartCount(OOTD_ID);
+    }
+
+    @Test
+    void unsaveOotd_skipsCountDecreaseWhenNoReactionExisted() {
+        User owner = user(2L);
+        Ootd ootd = ootd(OOTD_ID, owner);
+
+        when(ootdRepository.findVisibleActiveById(OOTD_ID, CURRENT_USER_ID, OotdPublicationStatus.ACTIVE))
+                .thenReturn(Optional.of(ootd));
+        when(ootdReactionRepository.deleteByUserAndOotdAndReactionType(CURRENT_USER_ID, OOTD_ID, OotdReactionType.SAVE))
+                .thenReturn(0);
+
+        assertThatCode(() -> ootdReactionService.unsaveOotd(CURRENT_USER_ID, OOTD_ID))
+                .doesNotThrowAnyException();
+
+        verify(ootdRepository, never()).decreaseSaveCount(OOTD_ID);
+    }
+
+    @Test
+    void unsaveOotd_throwsNotFoundWhenOotdIsNotVisible() {
+        when(ootdRepository.findVisibleActiveById(OOTD_ID, CURRENT_USER_ID, OotdPublicationStatus.ACTIVE))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> ootdReactionService.unsaveOotd(CURRENT_USER_ID, OOTD_ID))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(OotdErrorCode.OOTD_NOT_FOUND);
+
+        verify(ootdReactionRepository, never())
+                .deleteByUserAndOotdAndReactionType(CURRENT_USER_ID, OOTD_ID, OotdReactionType.SAVE);
+        verify(ootdRepository, never()).decreaseSaveCount(OOTD_ID);
+    }
+
     private User user(Long id) {
         User user = instantiate(User.class);
         ReflectionTestUtils.setField(user, "id", id);
