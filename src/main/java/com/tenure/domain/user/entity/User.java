@@ -140,4 +140,17 @@ public class User extends BaseTimeEntity {
             this.profileImageUrl = profileImageUrl;
         }
     }
+
+    // 계정 설정 부분 수정
+    public void updateAccountSettings(
+            Integer defaultShippingFee,
+            String settlementAccountJson
+    ) {
+        if (defaultShippingFee != null) {
+            this.defaultShippingFee = defaultShippingFee;
+        }
+        if (settlementAccountJson != null) {
+            this.settlementAccount = settlementAccountJson;
+        }
+    }
 }
