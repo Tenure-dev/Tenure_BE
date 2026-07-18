@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
+import java.util.Optional;
 
 public interface ChatRoomMemberRepository extends JpaRepository<ChatRoomMember, Long> {
 
@@ -69,4 +70,7 @@ public interface ChatRoomMemberRepository extends JpaRepository<ChatRoomMember, 
                                               @Param("cursor") LocalDateTime cursor,
                                               @Param("cursorId") Long cursorId,
                                               Pageable pageable);
+
+    //해당 채팅방의 사용자 조회
+    Optional<ChatRoomMember> findByUserIdAndChatRoomId(Long user_id, Long chatRoom_id);
 }
