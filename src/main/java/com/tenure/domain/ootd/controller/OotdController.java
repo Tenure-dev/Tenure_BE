@@ -22,6 +22,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -183,6 +184,28 @@ public class OotdController {
     public ResponseEntity<Void> heartOotd(@PathVariable Long ootdId) {
         Long currentUserId = currentUserProvider.getCurrentUserId();
         ootdReactionService.heartOotd(currentUserId, ootdId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @Operation(
+            summary = "OOTD 하트 취소",
+            description = "로그인 사용자가 등록했던 OOTD 하트(좋아요)를 취소합니다. 등록 이력이 없는 경우에도 동일하게 204를 반환합니다(멱등).",
+            parameters = {
+                    @Parameter(
+                            name = "X-USER-ID",
+                            in = ParameterIn.HEADER,
+                            required = true,
+                            description = "JWT 적용 전 Swagger/local testing용 임시 헤더.",
+                            example = "1"
+                    )
+            }
+    )
+    @ApiResponse(responseCode = "204", description = "하트 취소 성공 또는 등록 이력이 없어 멱등 처리됨")
+    @ApiResponse(responseCode = "404", description = "존재하지 않거나 비공개(ARCHIVED) 처리되었거나 차단 관계로 조회할 수 없는 OOTD")
+    @DeleteMapping("/{ootdId}/heart")
+    public ResponseEntity<Void> unheartOotd(@PathVariable Long ootdId) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        ootdReactionService.unheartOotd(currentUserId, ootdId);
         return ResponseEntity.noContent().build();
     }
 }
