@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import com.tenure.domain.address.dto.request.AddressUpdateRequest;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.DeleteMapping;
 
 
 @Tag(name = "Address", description = "배송지 API")
@@ -59,5 +60,13 @@ public class AddressController {
                 addressService.updateAddress(currentUserId, addressId, request),
                 "배송지가 수정되었습니다."
         );
+    }
+
+    @Operation(summary = "배송지 삭제", description = "본인 소유의 배송지를 삭제합니다. 기본 배송지는 삭제할 수 없습니다.")
+    @DeleteMapping("/{addressId}")
+    public BaseResponse<Void> deleteAddress(@PathVariable Long addressId) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        addressService.deleteAddress(currentUserId, addressId);
+        return BaseResponse.success(null, "배송지가 삭제되었습니다.");
     }
 }

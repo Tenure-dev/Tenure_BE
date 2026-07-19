@@ -68,11 +68,8 @@ public class AddressService {
         return AddressResponse.from(saved);
     }
 
-    /**
-     * 배송지 수정 (PATCH).
-     * 권한: 본인 소유만 (address.userId == currentUserId).
-     * isDefault=true로 오면 기존 기본을 해제하고 이걸 기본으로 (기본은 항상 1개).
-     */
+    // 배송지 수정
+    // 본인이 등록한 배송지만 수정 가능
     @Transactional
     public AddressResponse updateAddress(Long currentUserId, Long addressId, AddressUpdateRequest request) {
         DeliveryAddress address = getOwnedAddress(currentUserId, addressId);
@@ -106,5 +103,19 @@ public class AddressService {
             throw new CustomException(AddressErrorCode.ADDRESS_FORBIDDEN);
         }
         return address;
+    }
+
+    // 배송지 삭제
+    // 기본배송지는 삭제 불가. 다른 걸 기본으로 바꾼 뒤에 삭제해야 함
+    @Transactional
+    public void deleteAddress(Long currentUserId, Long addressId) {
+        DeliveryAddress address = getOwnedAddress(currentUserId, addressId);
+
+        // 기본배송지는 삭제 금지 (다른 배송지를 기본으로 바꾼 후 삭제 가능)
+        if (Boolean.TRUE.equals(address.getIsDefault())) {
+            throw new CustomException(AddressErrorCode.DEFAULT_ADDRESS_CANNOT_BE_DELETED);
+        }
+
+        addressRepository.delete(address);
     }
 }
