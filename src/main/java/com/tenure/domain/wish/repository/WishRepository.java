@@ -56,4 +56,6 @@ public interface WishRepository extends JpaRepository<Wish, Long> {
             @Param("saleStatus") ProductStatus saleStatus,
             Pageable pageable
     );
+
+    long countByUser_Id(Long userId);
 }
