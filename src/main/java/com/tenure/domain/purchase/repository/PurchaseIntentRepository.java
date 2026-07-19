@@ -3,15 +3,17 @@ package com.tenure.domain.purchase.repository;
 import com.tenure.domain.purchase.entity.PurchaseIntent;
 import com.tenure.domain.purchase.enums.PurchaseIntentStatus;
 import jakarta.persistence.LockModeType;
-import java.time.LocalDateTime;
-import java.util.Collection;
-import java.util.List;
-import java.util.Optional;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+
+import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
 
 public interface PurchaseIntentRepository extends JpaRepository<PurchaseIntent, Long> {
 
@@ -137,6 +139,30 @@ public interface PurchaseIntentRepository extends JpaRepository<PurchaseIntent, 
             @Param("statuses") Collection<PurchaseIntentStatus> statuses,
             @Param("cursorCreatedAt") LocalDateTime cursorCreatedAt,
             @Param("cursorIntentId") Long cursorIntentId,
+            Pageable pageable
+    );
+
+    @Query(
+            value = """
+                select intent
+                from PurchaseIntent intent
+                join fetch intent.product product
+                join fetch product.item item
+                join fetch intent.seller seller
+                where intent.buyer.id = :buyerUserId
+                  and intent.status in :statuses
+                order by intent.createdAt desc
+                """,
+            countQuery = """
+                select count(intent)
+                from PurchaseIntent intent
+                where intent.buyer.id = :buyerUserId
+                  and intent.status in :statuses
+                """
+    )
+    Page<PurchaseIntent> findMyPurchaseIntents(
+            @Param("buyerUserId") Long buyerUserId,
+            @Param("statuses") Collection<PurchaseIntentStatus> statuses,
             Pageable pageable
     );
 }
