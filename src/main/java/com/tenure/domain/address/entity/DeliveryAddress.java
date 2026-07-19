@@ -49,4 +49,32 @@ public class DeliveryAddress extends BaseTimeEntity {
 
     @Column(name = "is_default", nullable = false)
     private Boolean isDefault = false;
+
+    // 배송지 생성 정적 팩토리
+    public static DeliveryAddress create(
+            User user,
+            String receiverName,
+            String phone,
+            String addressLine1,
+            String addressLine2,
+            String postalCode,
+            String requestNote,
+            boolean isDefault
+    ) {
+        DeliveryAddress address = new DeliveryAddress();
+        address.user = user;
+        address.receiverName = receiverName;
+        address.phone = phone;
+        address.addressLine1 = addressLine1;
+        address.addressLine2 = addressLine2;
+        address.postalCode = postalCode;
+        address.requestNote = requestNote;
+        address.isDefault = isDefault;
+        return address;
+    }
+
+    // 기존 기본 배송지 해제
+    public void unmarkDefault() {
+        this.isDefault = false;
+    }
 }

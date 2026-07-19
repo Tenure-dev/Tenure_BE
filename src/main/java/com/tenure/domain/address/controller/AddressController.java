@@ -11,6 +11,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import com.tenure.domain.address.dto.request.AddressCreateRequest;
+import jakarta.validation.Valid;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+
 
 @Tag(name = "Address", description = "배송지 API")
 @RestController
@@ -26,5 +31,17 @@ public class AddressController {
     public BaseResponse<List<AddressResponse>> getMyAddresses() {
         Long currentUserId = currentUserProvider.getCurrentUserId();
         return BaseResponse.success(addressService.getMyAddresses(currentUserId));
+    }
+
+    @Operation(summary = "배송지 등록", description = "새 배송지를 등록합니다. 첫 배송지는 자동으로 기본 배송지가 됩니다.")
+    @PostMapping
+    public BaseResponse<AddressResponse> createAddress(
+            @Valid @RequestBody AddressCreateRequest request
+    ) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        return BaseResponse.success(
+                addressService.createAddress(currentUserId, request),
+                "배송지가 등록되었습니다."
+        );
     }
 }
