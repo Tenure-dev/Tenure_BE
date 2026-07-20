@@ -165,4 +165,28 @@ public interface PurchaseIntentRepository extends JpaRepository<PurchaseIntent, 
             @Param("statuses") Collection<PurchaseIntentStatus> statuses,
             Pageable pageable
     );
+
+    @Query(
+            value = """
+                select intent
+                from PurchaseIntent intent
+                join fetch intent.product product
+                join fetch product.item item
+                join fetch intent.buyer buyer
+                where intent.seller.id = :sellerUserId
+                  and intent.status in :statuses
+                order by intent.createdAt desc
+                """,
+            countQuery = """
+                select count(intent)
+                from PurchaseIntent intent
+                where intent.seller.id = :sellerUserId
+                  and intent.status in :statuses
+                """
+    )
+    Page<PurchaseIntent> findMySaleIntents(
+            @Param("sellerUserId") Long sellerUserId,
+            @Param("statuses") Collection<PurchaseIntentStatus> statuses,
+            Pageable pageable
+    );
 }

@@ -2,8 +2,11 @@ package com.tenure.domain.mypage.controller;
 
 import com.tenure.domain.mypage.dto.MyPagePurchaseResponse;
 import com.tenure.domain.mypage.dto.MyPageResponse;
+import com.tenure.domain.mypage.dto.MyPageSaleResponse;
 import com.tenure.domain.mypage.enums.MyPagePurchaseTab;
+import com.tenure.domain.mypage.enums.MyPageSalesTab;
 import com.tenure.domain.mypage.service.MyPagePurchaseService;
+import com.tenure.domain.mypage.service.MyPageSaleService;
 import com.tenure.domain.mypage.service.MyPageService;
 import com.tenure.global.response.BaseResponse;
 import com.tenure.global.response.PageResponse;
@@ -27,6 +30,7 @@ public class MyPageController {
     private final MyPageService myPageService;
     private final CurrentUserProvider currentUserProvider;
     private final MyPagePurchaseService myPagePurchaseService;
+    private final MyPageSaleService myPageSaleService;
 
     @Operation(
             summary = "마이페이지 조회",
@@ -72,5 +76,33 @@ public class MyPageController {
         );
 
         return BaseResponse.success(response, "구매 내역 조회에 성공했습니다.");
+    }
+
+    @Operation(
+            summary = "판매 내역 조회",
+            description = "로그인 사용자의 판매 내역을 탭 조건과 페이징 조건에 따라 조회합니다."
+    )
+    @Parameter(
+            name = "X-USER-ID",
+            description = "개발용 사용자 ID 헤더",
+            in = ParameterIn.HEADER,
+            example = "1"
+    )
+    @GetMapping("/my-page/sales")
+    public BaseResponse<PageResponse<MyPageSaleResponse>> getMySales(
+            @RequestParam(defaultValue = "ALL") MyPageSalesTab tab,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        Pageable pageable = PageRequest.of(page, size);
+
+        PageResponse<MyPageSaleResponse> response = myPageSaleService.getMySales(
+                currentUserId,
+                tab,
+                pageable
+        );
+
+        return BaseResponse.success(response, "판매 내역 조회에 성공했습니다.");
     }
 }

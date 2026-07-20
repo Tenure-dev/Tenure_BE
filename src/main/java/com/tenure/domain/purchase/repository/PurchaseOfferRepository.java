@@ -164,4 +164,27 @@ public interface PurchaseOfferRepository extends JpaRepository<PurchaseOffer, Lo
             @Param("statuses") Collection<PurchaseOfferStatus> statuses,
             Pageable pageable
     );
+
+    @Query(
+            value = """
+                select offer
+                from PurchaseOffer offer
+                join fetch offer.item item
+                join fetch offer.proposer proposer
+                where offer.owner.id = :ownerUserId
+                  and offer.status in :statuses
+                order by offer.createdAt desc
+                """,
+            countQuery = """
+                select count(offer)
+                from PurchaseOffer offer
+                where offer.owner.id = :ownerUserId
+                  and offer.status in :statuses
+                """
+    )
+    Page<PurchaseOffer> findMySaleOffers(
+            @Param("ownerUserId") Long ownerUserId,
+            @Param("statuses") Collection<PurchaseOfferStatus> statuses,
+            Pageable pageable
+    );
 }
