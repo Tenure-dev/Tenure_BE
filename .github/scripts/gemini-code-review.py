@@ -101,16 +101,16 @@ class GeminiCodeReview:
 
         return (
             diff[:max_size]
-            + "\n\n... diff가 길어 일부만 포함되었습니다. 위 범위 기준으로 파일 단위 요약 리뷰를 작성하세요."
+            + "\n\n... diff가 길어 일부만 포함했습니다. 이 범위 기준으로 파일 단위 요약 리뷰를 작성하세요."
         )
 
     def build_prompt(self, file_path: str, code: str, category: str) -> str:
         return f"""
-당신은 Wrap 프로젝트의 Spring Boot 백엔드 Pull Request를 리뷰하는 시니어 백엔드 개발자입니다.
+당신은 Tenure 프로젝트의 Spring Boot 백엔드 Pull Request를 리뷰하는 시니어 백엔드 개발자입니다.
 
 반드시 한국어로 답변하세요.
 리뷰 방식은 "전체 변경사항에 대한 파일 단위 요약 리뷰"입니다.
-아래 diff는 하나의 파일에 대한 변경사항입니다. 이 파일에서 무엇이 바뀌었고, 그 변경이 어떤 영향을 주는지 요약한 뒤 필요한 리뷰 의견만 작성하세요.
+아래 diff는 하나의 파일에 대한 변경사항입니다. 이 파일에서 무엇이 바뀌었고, 그 변경이 어떤 영향을 주는지 요약하고 필요한 리뷰 의견만 작성하세요.
 
 출력 형식은 반드시 아래 형식을 따르세요.
 
@@ -129,16 +129,21 @@ class GeminiCodeReview:
 - 제안할 내용이 없으면 `- 없음`으로 작성
 
 리뷰 기준:
-- 변경되지 않은 코드는 길게 설명하지 마세요.
+- 변경되지 않은 코드를 길게 설명하지 마세요.
 - 단순 칭찬은 작성하지 마세요.
 - 추측성 지적은 피하고 diff에서 근거가 보이는 내용만 작성하세요.
 - Java, Spring Boot, JPA, Spring Data Repository, Gradle 설정 관점에서 확인하세요.
 
 프로젝트 컨텍스트:
-- Wrap은 단기 프로젝트 운영 플랫폼입니다.
-- Mission은 Project의 goal, successCriteria 필드로 저장합니다.
-- Deliverable은 Task.deliverable로 표현합니다.
-- Task.assignee는 Member가 아니라 ProjectMember를 참조해야 합니다.
+- Tenure는 OOTD 사진 속 아이템 태그를 기반으로 위시, 판매 전환, 거래 의사, 구매 제안, 채팅, 거래까지 연결하는 패션 거래 서비스입니다.
+- 백엔드는 Spring Boot, JPA, PostgreSQL, Flyway, Swagger/OpenAPI 기반으로 구현합니다.
+- 모든 로그인 필요 API는 요청의 userId를 신뢰하지 않고 CurrentUserProvider.getCurrentUserId()로 현재 사용자 ID를 가져오는 구조를 유지해야 합니다.
+- 현재 로컬/개발 테스트에는 X-USER-ID fallback이 남아 있을 수 있지만, 배포 기준 인증은 Authorization: Bearer {{accessToken}} JWT 방식입니다.
+- 계정 공개 범위, 비공개 계정 접근 제한, 차단 관계, OOTD 보관 상태, 아이템 소유권, 거래 참여자 권한 검증이 누락되지 않았는지 확인해야 합니다.
+- 거래 의사/구매 제안/수락/만료/취소 로직은 데드락 방지를 위해 합의된 락 순서(Product 또는 Item 먼저, Intent/Offer 나중)를 지켜야 합니다.
+- 구매 제안은 사용자당 아이템별 1회 제한이며, 취소/거절/만료 후에도 기회가 복구되지 않습니다.
+- 판매 상품 수정/삭제/외부 판매 완료는 상품 상태와 아이템 상태 전이를 함께 확인해야 하며, 외부 판매 완료는 Trade와 아이템 기록 이전을 생성하지 않습니다.
+- 이미지 파일은 배포 기준으로 S3 저장을 고려하되, DB에는 이미지 URL 문자열을 저장하는 방향입니다.
 
 리뷰 분류: {category}
 파일: {file_path}
