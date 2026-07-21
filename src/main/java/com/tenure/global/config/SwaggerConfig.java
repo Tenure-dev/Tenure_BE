@@ -21,11 +21,11 @@ public class SwaggerConfig {
                         .description("""
                                 Tenure OOTD 기반 패션 거래 서비스 API 명세입니다.
 
-                                인증이 필요한 API는 최종적으로 Authorization 헤더에 Bearer JWT를 전달하는 방식으로 사용합니다.
+                                운영 인증 기준은 Authorization 헤더의 Bearer JWT입니다.
                                 예: Authorization: Bearer {accessToken}
 
-                                현재 JWT 전환 전까지 로컬/개발 환경에서는 기존 X-USER-ID 헤더를 임시 인증 fallback으로 함께 사용할 수 있습니다.
-                                운영 환경에서는 X-USER-ID를 사용하지 않고 Bearer JWT만 허용하는 방향으로 전환해야 합니다.
+                                local/dev 환경에서는 JWT 전환 전 Swagger 테스트를 위해 X-USER-ID 헤더 fallback을 임시 허용합니다.
+                                prod 환경에서는 X-USER-ID fallback을 허용하지 않으며, 보호 API는 Bearer JWT 인증이 필요합니다.
                                 """)
                         .version("v1"))
                 .servers(List.of(
