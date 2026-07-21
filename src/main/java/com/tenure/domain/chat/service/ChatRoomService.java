@@ -118,21 +118,29 @@ public class ChatRoomService {
 
     // 채팅방 목록 조회
     public ChatRoomListCursorResponse chatRoomList(Long currentUserId, ChatRoomFilterType type,
-                             LocalDateTime cursor, Long cursorId, int size)
+                             LocalDateTime cursor, LocalDateTime createdAtCursor, Long cursorId, int size)
     {
 
-        if(cursor == null) cursor = LocalDateTime.now();
-        if(cursorId == null) cursorId = Long.MAX_VALUE;
+        // 연락을 한번도 안한 채팅방이 cursor의 경계에 걸리게 된 경우
+        if(cursor == null && cursorId == null) {
+            cursor = LocalDateTime.now();
+            cursorId = Long.MAX_VALUE;
+        } else if(cursorId == null) { //cursor는 그냥 null로 지정
+            cursorId = Long.MAX_VALUE;
+        }
 
-        log.info("[채팅방 목록 조회] currentUserId = {}, type = {}, cursor = {}, cursorId = {}, size = {}", currentUserId, type, cursor, cursorId, size);
+        // null lastMessageAt 영역 커서: 없으면 now() (진입 전 = 전체 포함)
+        if(createdAtCursor == null) createdAtCursor = LocalDateTime.now();
+
+        log.info("[채팅방 목록 조회] currentUserId = {}, type = {}, cursor = {}, createdAtCursor = {}, cursorId = {}, size = {}", currentUserId, type, cursor, createdAtCursor, cursorId, size);
 
         PageRequest pageRequest = PageRequest.of(0, size);
 
         Slice<ChatRoomMember> chatRooms = switch (type) {
-            case BUYING -> chatRoomMemberRepository.findBuyingChatRooms(currentUserId, cursor, cursorId, pageRequest);
-            case SELLING -> chatRoomMemberRepository.findSellingChatRooms(currentUserId, cursor, cursorId, pageRequest);
-            case UNREAD -> chatRoomMemberRepository.findUnreadChatRooms(currentUserId, cursor, cursorId, pageRequest);
-            default -> chatRoomMemberRepository.findAllChatRooms(currentUserId, cursor, cursorId, pageRequest); //기본 전체 조회
+            case BUYING -> chatRoomMemberRepository.findBuyingChatRooms(currentUserId, cursor, createdAtCursor, cursorId, pageRequest);
+            case SELLING -> chatRoomMemberRepository.findSellingChatRooms(currentUserId, cursor, createdAtCursor, cursorId, pageRequest);
+            case UNREAD -> chatRoomMemberRepository.findUnreadChatRooms(currentUserId, cursor, createdAtCursor, cursorId, pageRequest);
+            default -> chatRoomMemberRepository.findAllChatRooms(currentUserId, cursor, createdAtCursor, cursorId, pageRequest); //기본 전체 조회
         };
 
         log.info("[채팅방 목록 조회] 조회 결과 = {}건, hasNext = {}", chatRooms.getContent().size(), chatRooms.hasNext());

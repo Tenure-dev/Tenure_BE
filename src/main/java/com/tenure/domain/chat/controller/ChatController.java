@@ -14,7 +14,6 @@ import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.repository.query.Param;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 
@@ -58,11 +57,12 @@ public class ChatController {
     public BaseResponse<ChatRoomListCursorResponse> chatList(
             @RequestParam(defaultValue = "ALL") ChatRoomFilterType type,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime cursor,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime createdAtCursor,
             @RequestParam(required = false) Long cursorId,
             @RequestParam(defaultValue = "20") int size
     ) {
         ChatRoomListCursorResponse chatRoomListCursorResponse = chatRoomService
-                .chatRoomList(currentUserProvider.getCurrentUserId(), type, cursor, cursorId, size);
+                .chatRoomList(currentUserProvider.getCurrentUserId(), type, cursor, createdAtCursor, cursorId, size);
 
         return BaseResponse.success(chatRoomListCursorResponse);
     }
