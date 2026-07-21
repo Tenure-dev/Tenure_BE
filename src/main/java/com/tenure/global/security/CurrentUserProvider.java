@@ -4,6 +4,8 @@ import com.tenure.global.exception.CommonErrorCode;
 import com.tenure.global.exception.CustomException;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -17,6 +19,7 @@ public class CurrentUserProvider {
     private static final String CURRENT_USER_ID_HEADER = "X-USER-ID";
 
     private final HttpServletRequest request;
+    private final Environment environment;
 
     public Long getCurrentUserId() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -45,6 +48,10 @@ public class CurrentUserProvider {
     }
 
     private Long getFromDevelopmentHeader() {
+        if (isProdProfile()) {
+            throw new CustomException(CommonErrorCode.UNAUTHORIZED);
+        }
+
         String headerValue = request.getHeader(CURRENT_USER_ID_HEADER);
         if (!StringUtils.hasText(headerValue)) {
             throw new CustomException(CommonErrorCode.UNAUTHORIZED);
@@ -55,5 +62,9 @@ public class CurrentUserProvider {
         } catch (NumberFormatException e) {
             throw new CustomException(CommonErrorCode.UNAUTHORIZED);
         }
+    }
+
+    private boolean isProdProfile() {
+        return environment.acceptsProfiles(Profiles.of("prod"));
     }
 }
