@@ -12,6 +12,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import com.tenure.domain.auth.dto.request.EmailVerifyRequest;
+import com.tenure.domain.auth.dto.response.UsernameCheckResponse;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+
 
 @Tag(name = "Auth", description = "인증 API")
 @RestController
@@ -33,5 +37,12 @@ public class AuthController {
     public BaseResponse<Void> verifyEmailCode(@Valid @RequestBody EmailVerifyRequest request) {
         authService.verifyEmailCode(request.email(), request.code());
         return BaseResponse.success(null, "이메일 인증이 완료되었습니다.");
+    }
+
+    @Operation(summary = "닉네임 중복 확인", description = "닉네임이 사용 가능한지 확인합니다. available=true면 사용 가능.")
+    @GetMapping("/username/check")
+    public BaseResponse<UsernameCheckResponse> checkUsername(@RequestParam String username) {
+        boolean available = authService.isUsernameAvailable(username);
+        return BaseResponse.success(new UsernameCheckResponse(available));
     }
 }

@@ -45,4 +45,12 @@ public class AuthService {
             throw new CustomException(AuthErrorCode.EMAIL_VERIFICATION_FAILED);
         }
     }
+
+    /**
+     * 닉네임 중복 확인.
+     * 이미 사용 중이면 available=false, 사용 가능하면 true.
+     */
+    public boolean isUsernameAvailable(String username) {
+        return !userRepository.existsByUsername(username);
+    }
 }
