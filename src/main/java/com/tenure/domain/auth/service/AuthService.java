@@ -33,4 +33,16 @@ public class AuthService {
         verificationStore.save(email, code);
         emailService.sendVerificationCode(email, code);
     }
+
+    /**
+     * 이메일 인증번호 확인.
+     * 저장된 번호와 일치하고 만료 안 됐으면 인증 완료 처리. 아니면 에러.
+     * (화면: 일치 -> "인증되었습니다", 불일치 -> "인증번호가 틀렸습니다")
+     */
+    public void verifyEmailCode(String email, String code) {
+        boolean verified = verificationStore.verify(email, code);
+        if (!verified) {
+            throw new CustomException(AuthErrorCode.EMAIL_VERIFICATION_FAILED);
+        }
+    }
 }
