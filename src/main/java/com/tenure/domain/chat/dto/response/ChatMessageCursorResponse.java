@@ -32,7 +32,7 @@ public class ChatMessageCursorResponse {
         }
 
         return new ChatMessageCursorResponse(
-                slice.map(ChatMessageResponse::from).toList(),
+                content.stream().map(ChatMessageResponse::from).toList(),
                 nextCursor,
                 nextCursorId,
                 hasNext
