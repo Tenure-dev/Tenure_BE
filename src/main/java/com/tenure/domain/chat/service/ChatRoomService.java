@@ -1,5 +1,6 @@
 package com.tenure.domain.chat.service;
 
+import com.tenure.domain.chat.dto.response.ChatMessageCursorResponse;
 import com.tenure.domain.chat.dto.response.ChatRoomListCursorResponse;
 import com.tenure.domain.chat.dto.response.ChatRoomResponse;
 import com.tenure.domain.chat.entity.ChatMessage;
@@ -49,6 +50,7 @@ public class ChatRoomService {
     private final UserBlockRepository userBlockRepository;
     private final ChatMessageRepository chatMessageRepository;
 
+    // 채팅방 조회 / 생성
     @Transactional
     public ChatRoomResponse findOrCreateChatRoom(Long buyerId, Long itemId) {
 
@@ -114,6 +116,7 @@ public class ChatRoomService {
         return ChatRoomResponse.from(chatRoom, owner, item, product);
     }
 
+    // 채팅방 목록 조회
     public ChatRoomListCursorResponse chatRoomList(Long currentUserId, ChatRoomFilterType type,
                              LocalDateTime cursor, Long cursorId, int size)
     {
@@ -159,6 +162,35 @@ public class ChatRoomService {
 
         chatRoomMember.updateLastRead(chatMessage);
 
+    }
+
+    // 채팅 내역 조회
+    public ChatMessageCursorResponse getMessages(Long currentUserId, Long chatRoomId
+            , LocalDateTime cursor, Long cursorId, int size) {
+
+        if(cursor == null) cursor = LocalDateTime.now();
+        if(cursorId == null) cursorId = Long.MAX_VALUE;
+
+        log.info("[채팅 내역 조회] currentUserId = {}, chatRoomId = {}", currentUserId, chatRoomId);
+
+        if (!chatRoomRepository.existsById(chatRoomId)) {
+            log.warn("[채팅 내역 조회] 채팅방을 찾을 수 없습니다. chatRoomId = {}", chatRoomId);
+            throw new CustomException(ChatErrorCode.CHAT_ROOM_NOT_FOUND);
+        }
+
+        if (chatRoomMemberRepository.findByUserIdAndChatRoomId(currentUserId, chatRoomId).isEmpty()) {
+            log.warn("[채팅 내역 조회] 해당 채팅방에 접근 권한이 없습니다. currentUserId = {}, chatRoomId = {}", currentUserId, chatRoomId);
+            throw new CustomException(ChatErrorCode.CHAT_FORBIDDEN);
+        }
+
+        
+        PageRequest request = PageRequest.of(0, size);
+
+        Slice<ChatMessage> chatMessages = chatMessageRepository
+                .findByChatMessages(chatRoomId, cursor, cursorId, request);
+
+        log.info("[채팅 내역 조회] 채팅 내역 조회 성공");
+        return ChatMessageCursorResponse.from(chatMessages);
     }
 
     //채팅방 생성 매서드

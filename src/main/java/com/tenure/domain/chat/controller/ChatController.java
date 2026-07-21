@@ -1,6 +1,7 @@
 package com.tenure.domain.chat.controller;
 
 import com.tenure.domain.chat.dto.request.ChatRoomRequest;
+import com.tenure.domain.chat.dto.response.ChatMessageCursorResponse;
 import com.tenure.domain.chat.dto.response.ChatRoomListCursorResponse;
 import com.tenure.domain.chat.dto.response.ChatRoomResponse;
 import com.tenure.domain.chat.enums.ChatRoomFilterType;
@@ -13,6 +14,7 @@ import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.repository.query.Param;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 
@@ -74,5 +76,23 @@ public class ChatController {
     public BaseResponse<Void> updateUnreadCount(@PathVariable Long chatRoomId) {
         chatRoomService.updateRead(currentUserProvider.getCurrentUserId(), chatRoomId);
         return BaseResponse.success(null);
+    }
+
+    @Operation(
+            summary = "채팅 내역 조회",
+            description = "채팅방의 메시지 목록을 커서 기반 페이지네이션으로 반환합니다. 최신 메시지부터 내려옵니다. TEXT 타입은 content만, IMAGE 타입은 contentImageUrl만 값이 있고 나머지는 null입니다."
+    )
+    @Parameter(name = "X-USER-ID", description = "개발용 사용자 ID 헤더", in = ParameterIn.HEADER, example = "1")
+    @GetMapping("/{chatRoomId}/messages")
+    public BaseResponse<ChatMessageCursorResponse> getMessages(
+            @PathVariable Long chatRoomId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime cursor,
+            @RequestParam(required = false) Long cursorId,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        ChatMessageCursorResponse messages = chatRoomService
+                .getMessages(currentUserProvider.getCurrentUserId(), chatRoomId, cursor, cursorId, size);
+
+        return BaseResponse.success(messages);
     }
 }
