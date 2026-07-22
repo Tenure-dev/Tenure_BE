@@ -70,6 +70,20 @@ public class SearchService {
 
 
     @Transactional
+    public void deleteAllRecentKeyword(Long currentUserId) {
+        log.info("[최근 검색어 전체 삭제] currentUserId = {}", currentUserId);
+        recentSearchKeywordRepository.deleteAllByUserId(currentUserId);
+        log.info("[최근 검색어 전체 삭제] 완료");
+    }
+
+    @Transactional
+    public void deleteAllRecentUser(Long currentUserId) {
+        log.info("[최근 본 사용자 전체 삭제] currentUserId = {}", currentUserId);
+        recentViewUserRepository.deleteAllByViewerId(currentUserId);
+        log.info("[최근 본 사용자 전체 삭제] 완료");
+    }
+
+    @Transactional
     public void deleteRecentKeyword(Long currentUserId, Long keywordId) {
 
         log.info("[최근 검색어 삭제 api] currentUserId = {}", currentUserId);
