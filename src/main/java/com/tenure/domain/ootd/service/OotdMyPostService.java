@@ -32,12 +32,10 @@ public class OotdMyPostService {
         validateCursor(cursorCreatedAt, cursorId);
         int resolvedSize = resolveSize(size);
 
-        List<Ootd> ootds = ootdRepository.findMyPosts(
-                currentUserId,
-                cursorCreatedAt,
-                cursorId,
-                PageRequest.of(0, resolvedSize + 1)
-        );
+        PageRequest pageRequest = PageRequest.of(0, resolvedSize + 1);
+        List<Ootd> ootds = cursorCreatedAt == null
+                ? ootdRepository.findMyPostsFirstPage(currentUserId, pageRequest)
+                : ootdRepository.findMyPosts(currentUserId, cursorCreatedAt, cursorId, pageRequest);
 
         boolean hasNext = ootds.size() > resolvedSize;
         List<Ootd> pageItems = hasNext ? ootds.subList(0, resolvedSize) : ootds;

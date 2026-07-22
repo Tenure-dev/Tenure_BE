@@ -54,14 +54,22 @@ public class OotdReactionListService {
         validateCursor(cursorCreatedAt, cursorId);
         int resolvedSize = resolveSize(size);
 
-        List<OotdReaction> reactions = ootdReactionRepository.findReactedOotds(
-                currentUserId,
-                reactionType,
-                OotdPublicationStatus.ACTIVE,
-                cursorCreatedAt,
-                cursorId,
-                PageRequest.of(0, resolvedSize + 1)
-        );
+        PageRequest pageRequest = PageRequest.of(0, resolvedSize + 1);
+        List<OotdReaction> reactions = cursorCreatedAt == null
+                ? ootdReactionRepository.findReactedOotdsFirstPage(
+                        currentUserId,
+                        reactionType,
+                        OotdPublicationStatus.ACTIVE,
+                        pageRequest
+                )
+                : ootdReactionRepository.findReactedOotds(
+                        currentUserId,
+                        reactionType,
+                        OotdPublicationStatus.ACTIVE,
+                        cursorCreatedAt,
+                        cursorId,
+                        pageRequest
+                );
 
         boolean hasNext = reactions.size() > resolvedSize;
         List<OotdReaction> pageItems = hasNext ? reactions.subList(0, resolvedSize) : reactions;

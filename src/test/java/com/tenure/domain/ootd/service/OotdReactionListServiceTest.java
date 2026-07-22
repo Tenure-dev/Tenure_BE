@@ -53,12 +53,10 @@ class OotdReactionListServiceTest {
         OotdReaction extra = reaction(10L, user, ootd(9L, "https://image.url/ootd-9.jpg"),
                 OotdReactionType.HEART, LocalDateTime.of(2026, 7, 12, 10, 0));
 
-        when(ootdReactionRepository.findReactedOotds(
+        when(ootdReactionRepository.findReactedOotdsFirstPage(
                 eq(CURRENT_USER_ID),
                 eq(OotdReactionType.HEART),
                 eq(OotdPublicationStatus.ACTIVE),
-                eq(null),
-                eq(null),
                 any(Pageable.class)
         )).thenReturn(List.of(newest, middle, extra));
 
@@ -75,12 +73,10 @@ class OotdReactionListServiceTest {
 
     @Test
     void getHeartedOotds_queriesOnlyActivePublicationStatusSoDeletedOrBlockedOotdsAreExcludedByTheQuery() {
-        when(ootdReactionRepository.findReactedOotds(
+        when(ootdReactionRepository.findReactedOotdsFirstPage(
                 eq(CURRENT_USER_ID),
                 eq(OotdReactionType.HEART),
                 eq(OotdPublicationStatus.ACTIVE),
-                eq(null),
-                eq(null),
                 any(Pageable.class)
         )).thenReturn(List.of());
 
@@ -88,24 +84,20 @@ class OotdReactionListServiceTest {
 
         // 삭제/차단 제외는 리포지토리 쿼리(publicationStatus + UserBlock not exists)에서 처리되므로,
         // 서비스는 ACTIVE 상태로만 조회를 위임하고 애플리케이션 레벨의 추가 필터링을 하지 않는다.
-        verify(ootdReactionRepository).findReactedOotds(
+        verify(ootdReactionRepository).findReactedOotdsFirstPage(
                 eq(CURRENT_USER_ID),
                 eq(OotdReactionType.HEART),
                 eq(OotdPublicationStatus.ACTIVE),
-                eq(null),
-                eq(null),
                 any(Pageable.class)
         );
     }
 
     @Test
     void getHeartedOotds_returnsEmptyListWhenNoReactions() {
-        when(ootdReactionRepository.findReactedOotds(
+        when(ootdReactionRepository.findReactedOotdsFirstPage(
                 eq(CURRENT_USER_ID),
                 eq(OotdReactionType.HEART),
                 eq(OotdPublicationStatus.ACTIVE),
-                eq(null),
-                eq(null),
                 any(Pageable.class)
         )).thenReturn(List.of());
 
@@ -167,12 +159,10 @@ class OotdReactionListServiceTest {
         OotdReaction extra = reaction(10L, user, ootd(9L, "https://image.url/ootd-9.jpg"),
                 OotdReactionType.SAVE, LocalDateTime.of(2026, 7, 12, 10, 0));
 
-        when(ootdReactionRepository.findReactedOotds(
+        when(ootdReactionRepository.findReactedOotdsFirstPage(
                 eq(CURRENT_USER_ID),
                 eq(OotdReactionType.SAVE),
                 eq(OotdPublicationStatus.ACTIVE),
-                eq(null),
-                eq(null),
                 any(Pageable.class)
         )).thenReturn(List.of(newest, middle, extra));
 
@@ -189,43 +179,35 @@ class OotdReactionListServiceTest {
 
     @Test
     void getSavedOotds_delegatesWithSaveReactionTypeNotHeart() {
-        when(ootdReactionRepository.findReactedOotds(
+        when(ootdReactionRepository.findReactedOotdsFirstPage(
                 eq(CURRENT_USER_ID),
                 eq(OotdReactionType.SAVE),
                 eq(OotdPublicationStatus.ACTIVE),
-                eq(null),
-                eq(null),
                 any(Pageable.class)
         )).thenReturn(List.of());
 
         ootdReactionListService.getSavedOotds(CURRENT_USER_ID, null, null, 20);
 
-        verify(ootdReactionRepository).findReactedOotds(
+        verify(ootdReactionRepository).findReactedOotdsFirstPage(
                 eq(CURRENT_USER_ID),
                 eq(OotdReactionType.SAVE),
                 eq(OotdPublicationStatus.ACTIVE),
-                eq(null),
-                eq(null),
                 any(Pageable.class)
         );
-        verify(ootdReactionRepository, never()).findReactedOotds(
+        verify(ootdReactionRepository, never()).findReactedOotdsFirstPage(
                 eq(CURRENT_USER_ID),
                 eq(OotdReactionType.HEART),
                 eq(OotdPublicationStatus.ACTIVE),
-                eq(null),
-                eq(null),
                 any(Pageable.class)
         );
     }
 
     @Test
     void getSavedOotds_returnsEmptyListWhenNoReactions() {
-        when(ootdReactionRepository.findReactedOotds(
+        when(ootdReactionRepository.findReactedOotdsFirstPage(
                 eq(CURRENT_USER_ID),
                 eq(OotdReactionType.SAVE),
                 eq(OotdPublicationStatus.ACTIVE),
-                eq(null),
-                eq(null),
                 any(Pageable.class)
         )).thenReturn(List.of());
 
