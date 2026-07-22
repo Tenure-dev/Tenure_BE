@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import com.tenure.domain.auth.dto.request.EmailVerifyRequest;
 
 @Tag(name = "Auth", description = "인증 API")
 @RestController
@@ -25,5 +26,12 @@ public class AuthController {
     public BaseResponse<Void> sendEmailVerification(@Valid @RequestBody EmailSendRequest request) {
         authService.sendEmailVerification(request.email());
         return BaseResponse.success(null, "인증번호가 발송되었습니다.");
+    }
+
+    @Operation(summary = "이메일 인증번호 확인", description = "발송된 인증번호가 맞는지 확인합니다.")
+    @PostMapping("/email/verify")
+    public BaseResponse<Void> verifyEmailCode(@Valid @RequestBody EmailVerifyRequest request) {
+        authService.verifyEmailCode(request.email(), request.code());
+        return BaseResponse.success(null, "이메일 인증이 완료되었습니다.");
     }
 }
