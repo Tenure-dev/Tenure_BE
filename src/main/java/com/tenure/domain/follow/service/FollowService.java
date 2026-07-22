@@ -63,4 +63,21 @@ public class FollowService {
         long followerCount = followRepository.countByFollowing_IdAndStatus(targetUserId, FollowStatus.ACCEPTED);
         return new FollowResponse(targetUserId, true, followerCount);
     }
+
+    // 언팔로우
+    @Transactional
+    public FollowResponse unfollow(Long currentUserId, Long targetUserId) {
+
+        // 팔로우 관계 조회. 없으면 404
+        FollowRelationship relationship = followRepository
+                .findByFollower_IdAndFollowing_Id(currentUserId, targetUserId)
+                .orElseThrow(() -> new CustomException(FollowErrorCode.FOLLOW_NOT_FOUND));
+
+        followRepository.delete(relationship);
+        log.info("언팔로우: {} -> {}", currentUserId, targetUserId);
+
+        // 갱신된 팔로워 수와 함께 응답
+        long followerCount = followRepository.countByFollowing_IdAndStatus(targetUserId, FollowStatus.ACCEPTED);
+        return new FollowResponse(targetUserId, false, followerCount);
+    }
 }
