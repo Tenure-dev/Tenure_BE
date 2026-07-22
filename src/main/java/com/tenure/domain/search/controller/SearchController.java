@@ -99,7 +99,7 @@ public class SearchController {
     @Operation(
             summary = "OOTD 검색",
             description = "키워드, 필터, 정렬 조건으로 공개된 OOTD를 검색합니다. " +
-                    "keyword와 categoryIds 모두 생략 시 조건에 맞는 전체 OOTD를 반환합니다. " +
+                    "keyword 또는 categoryIds 중 하나는 필수입니다. 모두 생략 시 에러를 반환합니다. " +
                     "정렬 기본값은 LATEST(최신순)이며 HEART(좋아요순), SAVE(저장순), VIEW(조회수순), RECOMMEND(추천순) 선택 가능합니다.",
             parameters = {
                     @Parameter(name = "X-USER-ID", in = ParameterIn.HEADER, required = true,
