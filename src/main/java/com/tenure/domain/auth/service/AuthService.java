@@ -53,4 +53,22 @@ public class AuthService {
     public boolean isUsernameAvailable(String username) {
         return !userRepository.existsByUsername(username);
     }
+
+    /**
+     * 비밀번호 재설정용 인증번호 발송.
+     * 회원가입 발송과 반대로, "가입된 이메일이어야만" 발송.
+     * 인증번호 저장소는 회원가입과 동일한 것을 사용 (이메일 -> 코드).
+     */
+    public void sendPasswordResetCode(String email) {
+        // 가입된 이메일인지 확인 (없는 계정의 비밀번호는 재설정할 수 없음)
+        if (!userRepository.existsByEmail(email)) {
+            throw new CustomException(AuthErrorCode.EMAIL_NOT_FOUND);
+        }
+
+        // 6자리 랜덤 인증번호 생성
+        String code = String.valueOf((int) (Math.random() * 900000) + 100000);
+
+        verificationStore.save(email, code);
+        emailService.sendPasswordResetCode(email, code);
+    }
 }
