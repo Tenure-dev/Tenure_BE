@@ -24,6 +24,9 @@ import com.tenure.domain.user.dto.SettlementAccountDto;
 import com.tenure.global.util.AesEncryptor;
 import com.tenure.domain.user.dto.response.PublicUserProfileResponse;
 import com.tenure.domain.user.repository.UserBlockRepository;
+import com.tenure.domain.auth.service.EmailVerificationStore;
+import com.tenure.domain.address.entity.DeliveryAddress;
+import com.tenure.domain.address.repository.DeliveryAddressRepository;
 
 
 @Slf4j
@@ -37,9 +40,10 @@ public class UserService {
     private final ObjectMapper objectMapper;
     private final AesEncryptor aesEncryptor;
     private final UserBlockRepository userBlockRepository;
+    private final EmailVerificationStore verificationStore;
+    private final DeliveryAddressRepository addressRepository;
 
     // 회원가입
-    // (검증 -> 암호화 -> 저장)을 하나의 트랜잭션으로 처리
     @Transactional
     public SignupResponse signup(SignupRequest request) {
 
@@ -48,17 +52,22 @@ public class UserService {
             throw new CustomException(UserErrorCode.PASSWORD_MISMATCH);
         }
 
-        // 2) 이메일 중복 검사
+        // 2) 이메일 인증 완료 여부 검증
+        if (!verificationStore.isVerified(request.email())) {
+            throw new CustomException(UserErrorCode.EMAIL_NOT_VERIFIED);
+        }
+
+        // 3) 이메일 중복 검사
         if (userRepository.existsByEmail(request.email())) {
             throw new CustomException(UserErrorCode.EMAIL_ALREADY_EXISTS);
         }
 
-        // 3) 닉네임 중복 검사
+        // 4) 닉네임 중복 검사
         if (userRepository.existsByUsername(request.username())) {
             throw new CustomException(UserErrorCode.USERNAME_ALREADY_EXISTS);
         }
 
-        // 4) User 생성 (비밀번호 BCrypt 암호화)
+        // 5) User 생성 (비밀번호 BCrypt 암호화)
         User user = User.createByEmail(
                 request.email(),
                 passwordEncoder.encode(request.password()),
@@ -66,14 +75,27 @@ public class UserService {
                 request.gender(),
                 request.heightCm(),
                 request.weightKg(),
-                null
+                request.profileImageUrl()   // 선택값, 없으면 null
         );
-
-        // 5) 저장
         User savedUser = userRepository.save(user);
-        log.info("회원가입 완료: userId={}, email={}", savedUser.getId(), savedUser.getEmail());
 
-        // 6) 응답 DTO 변환
+        // 6) 온보딩 주소를 첫 배송지이자 기본 배송지로 등록
+        DeliveryAddress address = DeliveryAddress.create(
+                savedUser,
+                savedUser.getUsername(),   // receiverName: 우선 닉네임 사용
+                "",                        // phone: 온보딩에서 안 받음
+                request.addressLine1(),
+                request.addressLine2(),
+                request.postalCode(),
+                null,                      // requestNote
+                true                       // isDefault: 첫 배송지이므로 기본
+        );
+        addressRepository.save(address);
+
+        // 7) 인증 정보 정리 (가입 완료됐으므로 저장소에서 제거)
+        verificationStore.remove(request.email());
+
+        log.info("회원가입 완료: userId={}, email={}", savedUser.getId(), savedUser.getEmail());
         return SignupResponse.from(savedUser);
     }
 
