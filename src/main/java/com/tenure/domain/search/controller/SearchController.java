@@ -71,6 +71,32 @@ public class SearchController {
     }
 
     @Operation(
+            summary = "최근 검색어 전체 삭제",
+            description = "내 최근 검색어를 모두 삭제합니다.",
+            parameters = {
+                    @Parameter(name = "X-USER-ID", in = ParameterIn.HEADER, required = true,
+                            description = "JWT 적용 전 Swagger 테스트용 현재 사용자 ID", example = "1")
+            })
+    @DeleteMapping("/recent-keywords")
+    public BaseResponse<Void> deleteAllRecentKeywords() {
+        searchService.deleteAllRecentKeyword(currentUserProvider.getCurrentUserId());
+        return BaseResponse.success(null);
+    }
+
+    @Operation(
+            summary = "최근 본 사용자 전체 삭제",
+            description = "최근 본 사용자 목록을 모두 삭제합니다.",
+            parameters = {
+                    @Parameter(name = "X-USER-ID", in = ParameterIn.HEADER, required = true,
+                            description = "JWT 적용 전 Swagger 테스트용 현재 사용자 ID", example = "1")
+            })
+    @DeleteMapping("/recent-users")
+    public BaseResponse<Void> deleteAllRecentUsers() {
+        searchService.deleteAllRecentUser(currentUserProvider.getCurrentUserId());
+        return BaseResponse.success(null);
+    }
+
+    @Operation(
             summary = "OOTD 검색",
             description = "키워드, 필터, 정렬 조건으로 공개된 OOTD를 검색합니다. " +
                     "keyword와 categoryIds 모두 생략 시 조건에 맞는 전체 OOTD를 반환합니다. " +

@@ -29,4 +29,8 @@ public interface RecentViewUserRepository extends JpaRepository<RecentViewUser, 
     @Query("delete from RecentViewUser r " +
             "where r.viewer.id = :currentUserId and r.viewed.id = :recentViewedUserId")
     void deleteRecentViewedUser(@Param("currentUserId") Long currentUserId, @Param("recentViewedUserId") Long recentViewedUserId);
+
+    @Modifying(clearAutomatically = true)
+    @Query("delete from RecentViewUser r where r.viewer.id = :viewerId")
+    void deleteAllByViewerId(@Param("viewerId") Long viewerId);
 }
