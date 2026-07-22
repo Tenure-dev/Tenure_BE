@@ -229,7 +229,7 @@ public class SearchService {
         log.debug("[OOTD 검색] 전체 조회 결과(total count) = {}건", count);
         log.debug("[OOTD 검색] 조회 {}건, hasNext = {}", ootds.getNumberOfElements(), ootds.hasNext());
 
-        return SearchOotdCursorResponse.from(ootds, sort, count, saveOotdIds, heartedOotdIds);
+        return SearchOotdCursorResponse.from(ootds, sort, count, heartedOotdIds, saveOotdIds);
     }
 
     //유저 검색
