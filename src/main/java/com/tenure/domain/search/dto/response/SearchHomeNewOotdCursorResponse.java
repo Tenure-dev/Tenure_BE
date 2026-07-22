@@ -13,7 +13,7 @@ import java.util.List;
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
 public class SearchHomeNewOotdCursorResponse {
 
-    private List<SearchOotdResponse> content;
+    private List<SearchHomeOotdResponse> content;
     private boolean hasNext;
     private LocalDateTime nextCursor;
     private Long nextCursorId;
@@ -30,8 +30,8 @@ public class SearchHomeNewOotdCursorResponse {
             nextCursorId = last.getId();
         }
 
-        List<SearchOotdResponse> content = ootds.stream()
-                .map(SearchOotdResponse::from)
+        List<SearchHomeOotdResponse> content = ootds.stream()
+                .map(SearchHomeOotdResponse::from)
                 .toList();
 
         return new SearchHomeNewOotdCursorResponse(content, hasNext, nextCursor, nextCursorId);
