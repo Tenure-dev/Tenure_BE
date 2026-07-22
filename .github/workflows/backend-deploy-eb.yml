@@ -1,0 +1,99 @@
+name: Backend Deploy to Elastic Beanstalk
+
+on:
+  push:
+    branches:
+      - develop
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: Tenure_DB
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d Tenure_DB"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+      JWT_SECRET: tenure-ci-jwt-secret-key-change-in-production-at-least-32bytes
+      ENCRYPTION_SECRET: tenure-local-aes-secret-key-32b!
+      STORAGE_BASE_DIR: ./uploads
+      STORAGE_BASE_URL: /files
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x ./gradlew
+
+      - name: Run tests
+        run: ./gradlew test
+
+      - name: Build JAR
+        run: ./gradlew bootJar
+
+      - name: Prepare Elastic Beanstalk bundle
+        run: |
+          set -euo pipefail
+          mkdir -p build/elasticbeanstalk
+          JAR_FILE="$(find build/libs -maxdepth 1 -name '*.jar' ! -name '*plain*' | head -n 1)"
+          cp "$JAR_FILE" build/elasticbeanstalk/application.jar
+          printf 'web: java -Dserver.port=$PORT -jar application.jar\n' > build/elasticbeanstalk/Procfile
+          cd build/elasticbeanstalk
+          zip -r "../tenure-be-${GITHUB_SHA}.zip" application.jar Procfile
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Upload bundle to S3
+        run: |
+          aws s3 cp \
+            "build/tenure-be-${GITHUB_SHA}.zip" \
+            "s3://${{ secrets.EB_ARTIFACT_BUCKET }}/tenure-be/tenure-be-${GITHUB_SHA}.zip"
+
+      - name: Create Elastic Beanstalk application version
+        env:
+          VERSION_LABEL: tenure-be-${{ github.run_number }}-${{ github.sha }}
+        run: |
+          aws elasticbeanstalk create-application-version \
+            --application-name "${{ secrets.EB_APPLICATION_NAME }}" \
+            --version-label "$VERSION_LABEL" \
+            --source-bundle S3Bucket="${{ secrets.EB_ARTIFACT_BUCKET }}",S3Key="tenure-be/tenure-be-${GITHUB_SHA}.zip"
+
+      - name: Deploy to Elastic Beanstalk
+        env:
+          VERSION_LABEL: tenure-be-${{ github.run_number }}-${{ github.sha }}
+        run: |
+          aws elasticbeanstalk update-environment \
+            --environment-name "${{ secrets.EB_ENVIRONMENT_NAME }}" \
+            --version-label "$VERSION_LABEL"
+          aws elasticbeanstalk wait environment-updated \
+            --environment-names "${{ secrets.EB_ENVIRONMENT_NAME }}"
