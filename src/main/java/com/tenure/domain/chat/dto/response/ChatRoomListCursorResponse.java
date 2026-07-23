@@ -15,6 +15,7 @@ public class ChatRoomListCursorResponse {
 
     private List<ChatRoomSummaryResponse> content;
     private LocalDateTime nextCursorLastMessageAt;
+    private LocalDateTime nextCursorCreatedAt;
     private Long nextCursorId;
     private boolean hasNext;
 
@@ -22,12 +23,14 @@ public class ChatRoomListCursorResponse {
         List<ChatRoomMember> chatRoomMembers = slice.getContent();
 
         LocalDateTime nextCursorLastMessageAt = null;
+        LocalDateTime nextCursorCreatedAt = null;
         Long nextCursorId = null;
         boolean hasNext = slice.hasNext();
 
         if(hasNext) {
             ChatRoomMember last = chatRoomMembers.get(chatRoomMembers.size() - 1); // 맨 마지막 결과물
             nextCursorLastMessageAt = last.getChatRoom().getLastMessageAt();
+            nextCursorCreatedAt = last.getChatRoom().getCreatedAt();
             nextCursorId = last.getChatRoom().getId();
         }
 
@@ -36,6 +39,7 @@ public class ChatRoomListCursorResponse {
                 slice.map(chatRoomMember ->
                         ChatRoomSummaryResponse.from(chatRoomMember, currentUserId)).toList(),
                 nextCursorLastMessageAt,
+                nextCursorCreatedAt,
                 nextCursorId,
                 hasNext
         );
