@@ -30,8 +30,8 @@ public class SwaggerConfig {
                         .version("v1"))
                 .servers(List.of(
                         new Server()
-                                .url("http://localhost:8080")
-                                .description("Local server")
+                                .url("/")
+                                .description("Current server")
                 ))
                 .addSecurityItem(new SecurityRequirement().addList("Authorization"))
                 .components(new Components()
