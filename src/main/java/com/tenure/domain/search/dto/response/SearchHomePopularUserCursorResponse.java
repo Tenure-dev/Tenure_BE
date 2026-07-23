@@ -11,7 +11,7 @@ import java.util.List;
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
 public class SearchHomePopularUserCursorResponse {
 
-    private List<SearchHomePopularUserResponse> content;
+    private List<SearchUserQueryDto> content;
     private boolean hasNext;
     private Long nextCursorFollowerCount;
     private Long nextCursorId;
@@ -28,10 +28,6 @@ public class SearchHomePopularUserCursorResponse {
             nextCursorId = last.getId();
         }
 
-        List<SearchHomePopularUserResponse> content = users.stream()
-                .map(SearchHomePopularUserResponse::from)
-                .toList();
-
-        return new SearchHomePopularUserCursorResponse(content, hasNext, nextCursorFollowerCount, nextCursorId);
+        return new SearchHomePopularUserCursorResponse(users, hasNext, nextCursorFollowerCount, nextCursorId);
     }
 }
