@@ -7,6 +7,8 @@ import com.tenure.domain.trade.enums.TradeStatus;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -186,4 +188,8 @@ public interface TradeRepository extends JpaRepository<Trade, Long> {
     );
 
     boolean existsByItemIdAndStatusNotIn(Long itemId, Collection<TradeStatus> statuses);
+
+    List<Trade> itemId(Long itemId);
+
+    Optional<Trade> findByItemId(Long id);
 }

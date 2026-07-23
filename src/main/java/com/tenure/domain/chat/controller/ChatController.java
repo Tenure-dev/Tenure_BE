@@ -68,6 +68,20 @@ public class ChatController {
     }
 
     @Operation(
+            summary = "채팅방 조회",
+            description = "채팅방 목록에서 채팅방 클릭 시 호출합니다. 구매자/판매자 여부와 거래 상태에 따른 버튼 정보를 함께 반환합니다."
+    )
+    @Parameter(name = "X-USER-ID", description = "개발용 사용자 ID 헤더", in = ParameterIn.HEADER, example = "1")
+    @GetMapping("/{chatRoomId}")
+    public BaseResponse<ChatRoomResponse> getChatRoom(@PathVariable Long chatRoomId) {
+
+        ChatRoomResponse chatRoomResponse = chatRoomService
+                .enterChatroom(currentUserProvider.getCurrentUserId(), chatRoomId);
+
+        return BaseResponse.success(chatRoomResponse);
+    }
+
+    @Operation(
             summary = "채팅방 읽음 처리",
             description = "채팅방 접속 시 호출합니다. 읽지 않은 메시지 수를 0으로 초기화합니다."
     )
