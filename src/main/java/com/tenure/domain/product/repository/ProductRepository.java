@@ -40,4 +40,6 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     List<Product> findByItemIdInAndProductStatus(Collection<Long> itemIds, ProductStatus productStatus);
 
+
+    Optional<Product> findByItemId(Long id);
 }

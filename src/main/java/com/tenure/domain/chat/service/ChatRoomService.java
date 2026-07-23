@@ -17,6 +17,9 @@ import com.tenure.domain.item.repository.ItemRepository;
 import com.tenure.domain.product.entity.Product;
 import com.tenure.domain.product.exception.ProductErrorCode;
 import com.tenure.domain.product.repository.ProductRepository;
+import com.tenure.domain.trade.entity.Trade;
+import com.tenure.domain.trade.exception.TradeErrorCode;
+import com.tenure.domain.trade.repository.TradeRepository;
 import com.tenure.domain.user.entity.User;
 import com.tenure.domain.user.exception.UserErrorCode;
 import com.tenure.domain.user.repository.UserBlockRepository;
@@ -49,6 +52,7 @@ public class ChatRoomService {
     private final ChatRoomMemberRepository chatRoomMemberRepository;
     private final UserBlockRepository userBlockRepository;
     private final ChatMessageRepository chatMessageRepository;
+    private final TradeRepository tradeRepository;
 
     // 채팅방 조회 / 생성
     @Transactional
@@ -113,7 +117,8 @@ public class ChatRoomService {
 
 
 
-        return ChatRoomResponse.from(chatRoom, owner, item, product);
+        Long tradeId = tradeRepository.findByItemId(itemId).map(Trade::getId).orElse(null);
+        return ChatRoomResponse.from(chatRoom, item, product, buyerId, tradeId);
     }
 
     // 채팅방 목록 조회
@@ -137,6 +142,38 @@ public class ChatRoomService {
 
         log.info("[채팅방 목록 조회] 조회 결과 = {}건, hasNext = {}", chatRooms.getContent().size(), chatRooms.hasNext());
         return ChatRoomListCursorResponse.from(chatRooms, currentUserId);
+    }
+
+    //채팅방 목록에서 채팅방 접속
+    public ChatRoomResponse enterChatroom(Long currentUserId, Long chatRoomId) {
+
+        // 채팅방 존재 확인
+        ChatRoom chatRoom = chatRoomRepository.findById(chatRoomId)
+                .orElseThrow(() -> {
+                    log.warn("[채팅방 조회] 채팅방을 찾을 수 없습니다. chatRoomId = {}", chatRoomId);
+                    return new CustomException(ChatErrorCode.CHAT_ROOM_NOT_FOUND);
+                });
+
+        // 채팅방 권한 체크
+        if(!chatRoomMemberRepository.existsByUserIdAndChatRoomId(currentUserId, chatRoomId)) {
+            log.warn("[채팅방 조회] 채팅방 접근 권한이 없습니다. currentUserId = {}, chatRoomId = {}", currentUserId, chatRoomId);
+            throw  new CustomException(ChatErrorCode.CHAT_FORBIDDEN);
+        }
+
+        Item item = chatRoom.getItem();
+
+        //해당 아이템의 product 조회
+        Product product = productRepository.findByItemId(item.getId())
+                .orElseThrow(() -> {
+                    log.warn("[채팅방 조회] 상품을 찾을 수 없습니다. itemId = {}", item.getId());
+                    return new CustomException(ProductErrorCode.PRODUCT_NOT_FOUND);
+                });
+
+        //아이템에 대한 거래가 성사됐는지 판단
+        Long tradeId = tradeRepository
+                .findByItemId(item.getId()).map(Trade::getId).orElse(null);
+
+        return ChatRoomResponse.from(chatRoom, item, product, currentUserId, tradeId);
     }
 
     //채팅방 접속 시 unreadCount 업데이트
