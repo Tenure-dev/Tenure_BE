@@ -41,7 +41,6 @@ public class PurchaseOfferController {
 
     private final PurchaseOfferService purchaseOfferService;
     private final CurrentUserProvider currentUserProvider;
-
     @Operation(
             summary = "Create purchase offer",
             description = "Creates a one-time purchase offer for an owned, non-sale item.",
