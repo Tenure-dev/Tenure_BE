@@ -15,15 +15,17 @@ import com.tenure.domain.product.repository.ProductRepository;
 import com.tenure.domain.tag.enums.TagStatus;
 import com.tenure.domain.tag.repository.OotdTagRepository;
 import com.tenure.domain.user.entity.User;
+import com.tenure.domain.user.exception.UserErrorCode;
 import com.tenure.domain.user.repository.UserRepository;
 import com.tenure.global.exception.CustomException;
 import com.tenure.global.response.PageResponse;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Service
 @RequiredArgsConstructor
@@ -38,6 +40,9 @@ public class ItemService {
     private final CategoryRepository categoryRepository; //categoryLarge/categorySmall로 Category 찾기
     private final UserRepository userRepository; //currentUserID로 User 찾기
     private final ItemHistoryRepository itemHistoryRepository;
+
+    private static final String AI_PENDING_CATEGORY_NAME = "AI 분류 대기";
+    private static final int DETAIL_CATEGORY_DEPTH = 2;
 
     @Transactional
     public ItemCreateResponse createItem(Long currentUserId, ItemCreateRequest request) {
@@ -226,5 +231,40 @@ public class ItemService {
                 itemHistoryRepository.findByItemIdOrderByStartedAtDesc(itemId, pageable),
                 ItemHistoryResponse::from
         );
+    }
+
+    @Transactional
+    public ItemTagDraftCreateResponse createTagDraftItem(
+            Long currentUserId,
+            ItemTagDraftCreateRequest request
+    ) {
+        validateFirstOwnedAt(request.firstOwnedAt());
+
+        User owner = findUser(currentUserId);
+        Category category = findAiPendingCategory();
+
+        Item item = Item.create(
+                owner,
+                category,
+                request.brandName(),
+                request.itemName(),
+                request.wearingTarget(),
+                null,
+                null,
+                request.firstOwnedAt(),
+                null
+        );
+
+        Item savedItem = itemRepository.save(item);
+        itemHistoryRepository.save(
+                ItemHistory.ofFirstRegistration(savedItem, owner, resolveFirstRegisteredStartedAt(savedItem))
+        );
+
+        return ItemTagDraftCreateResponse.of(savedItem);
+    }
+
+    private Category findAiPendingCategory() {
+        return categoryRepository.findByNameAndDepthAndIsActiveTrue(AI_PENDING_CATEGORY_NAME, DETAIL_CATEGORY_DEPTH)
+                .orElseThrow(() -> new CustomException(ItemErrorCode.CATEGORY_NOT_FOUND));
     }
 }
