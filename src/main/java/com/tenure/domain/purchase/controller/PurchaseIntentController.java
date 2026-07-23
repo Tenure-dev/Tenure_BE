@@ -13,7 +13,6 @@ import com.tenure.global.response.BaseResponse;
 import com.tenure.global.security.CurrentUserProvider;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -46,15 +45,6 @@ public class PurchaseIntentController {
     @Operation(
             summary = "판매 상품 거래 의사 전송",
             description = "판매중 상품에 대한 거래 의사를 전송하고 결제 승인을 AUTHORIZED 상태로 시뮬레이션합니다.",
-            parameters = {
-                    @Parameter(
-                            name = "X-USER-ID",
-                            in = ParameterIn.HEADER,
-                            required = true,
-                            description = "JWT 적용 전 Swagger 테스트용 현재 사용자 ID. JWT 적용 후에는 SecurityContext 값을 사용합니다.",
-                            example = "2"
-                    )
-            },
             requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
                     required = true,
                     content = @Content(
@@ -97,13 +87,6 @@ public class PurchaseIntentController {
             summary = "내가 보낸 거래 의사 목록 조회",
             description = "로그인 사용자가 판매중 상품에 보낸 거래 의사 목록을 커서 기반으로 조회합니다. SENT 만료 요청은 조회 시 EXPIRED와 RELEASED로 보정합니다.",
             parameters = {
-                    @Parameter(
-                            name = "X-USER-ID",
-                            in = ParameterIn.HEADER,
-                            required = true,
-                            description = "JWT 적용 전 Swagger 테스트용 현재 사용자 ID. JWT 적용 후에는 SecurityContext 값을 사용합니다.",
-                            example = "2"
-                    ),
                     @Parameter(
                             name = "statuses",
                             description = "조회할 상태 목록. 예: statuses=SENT 또는 statuses=SENT,EXPIRED. 생략 시 전체 상태",
@@ -156,13 +139,6 @@ public class PurchaseIntentController {
             description = "로그인 판매자가 판매중 상품에 대해 받은 거래 의사 목록을 커서 기반으로 조회합니다. SENT 만료 요청은 조회 시 EXPIRED와 RELEASED로 보정합니다.",
             parameters = {
                     @Parameter(
-                            name = "X-USER-ID",
-                            in = ParameterIn.HEADER,
-                            required = true,
-                            description = "JWT 적용 전 Swagger 테스트용 현재 사용자 ID. JWT 적용 후에는 SecurityContext 값을 사용합니다.",
-                            example = "1"
-                    ),
-                    @Parameter(
                             name = "statuses",
                             description = "조회할 상태 목록. 예: statuses=SENT 또는 statuses=SENT,EXPIRED. 생략 시 전체 상태",
                             example = "SENT"
@@ -211,16 +187,7 @@ public class PurchaseIntentController {
 
     @Operation(
             summary = "거래 의사 상세 조회",
-            description = "구매자 본인 또는 판매자가 거래 의사 응답 대기 상세를 조회합니다. SENT 상태가 만료된 경우 조회 시점에 EXPIRED와 RELEASED로 갱신합니다.",
-            parameters = {
-                    @Parameter(
-                            name = "X-USER-ID",
-                            in = ParameterIn.HEADER,
-                            required = true,
-                            description = "JWT 적용 전 Swagger 테스트용 현재 사용자 ID. JWT 적용 후에는 SecurityContext 값을 사용합니다.",
-                            example = "2"
-                    )
-            }
+            description = "구매자 본인 또는 판매자가 거래 의사 응답 대기 상세를 조회합니다. SENT 상태가 만료된 경우 조회 시점에 EXPIRED와 RELEASED로 갱신합니다."
     )
     @ApiResponse(
             responseCode = "200",
@@ -241,16 +208,7 @@ public class PurchaseIntentController {
 
     @Operation(
             summary = "거래 의사 거절",
-            description = "판매자가 응답 대기 중인 거래 의사를 거절하고 결제 승인 상태를 RELEASED로 변경합니다.",
-            parameters = {
-                    @Parameter(
-                            name = "X-USER-ID",
-                            in = ParameterIn.HEADER,
-                            required = true,
-                            description = "JWT 적용 전 Swagger 테스트용 현재 사용자 ID. JWT 적용 후에는 SecurityContext 값을 사용합니다.",
-                            example = "1"
-                    )
-            }
+            description = "판매자가 응답 대기 중인 거래 의사를 거절하고 결제 승인 상태를 RELEASED로 변경합니다."
     )
     @ApiResponse(
             responseCode = "200",
@@ -271,16 +229,7 @@ public class PurchaseIntentController {
 
     @Operation(
             summary = "Cancel purchase intent",
-            description = "The buyer cancels a SENT purchase intent and releases the mock payment authorization.",
-            parameters = {
-                    @Parameter(
-                            name = "X-USER-ID",
-                            in = ParameterIn.HEADER,
-                            required = true,
-                            description = "Temporary current user id for Swagger/local testing before JWT is fully connected.",
-                            example = "2"
-                    )
-            }
+            description = "The buyer cancels a SENT purchase intent and releases the mock payment authorization."
     )
     @ApiResponse(
             responseCode = "200",
