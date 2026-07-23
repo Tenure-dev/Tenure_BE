@@ -9,7 +9,6 @@ import com.tenure.domain.chat.enums.ChatRoomFilterType;
 import com.tenure.domain.chat.service.ChatRoomService;
 import com.tenure.global.response.BaseResponse;
 import com.tenure.global.security.CurrentUserProvider;
-import com.tenure.global.storage.ImageStorageService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
@@ -17,6 +16,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -30,7 +30,7 @@ public class ChatController {
 
     private final CurrentUserProvider currentUserProvider;
     private final ChatRoomService chatRoomService;
-    private final ImageStorageService localImageStoreService;
+
 
     @Operation(
             summary = "채팅방 생성 또는 조회",
@@ -114,11 +114,17 @@ public class ChatController {
         return BaseResponse.success(messages);
     }
 
-    @PostMapping("/images")
+    @Operation(
+            summary = "채팅 이미지 업로드",
+            description = "채팅방에서 이미지 전송 시 호출합니다. 이미지를 업로드하고 URL을 반환합니다. 반환된 URL을 WebSocket 메시지의 imageUrl 필드에 담아 전송하세요."
+    )
+    @Parameter(name = "X-USER-ID", description = "개발용 사용자 ID 헤더", in = ParameterIn.HEADER, example = "1")
+    @PostMapping(value = "/{chatRoomId}/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public BaseResponse<ChatImageUploadResponse> uploadChatImage(
+            @PathVariable Long chatRoomId,
             @RequestParam("image") MultipartFile image
     ) {
-        String url = localImageStoreService.store(image, "chat");
+        String url = chatRoomService.uploadImage(currentUserProvider.getCurrentUserId(), chatRoomId, image);
         ChatImageUploadResponse imageUrl = ChatImageUploadResponse.from(url);
         return BaseResponse.success(imageUrl);
     }

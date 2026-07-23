@@ -25,6 +25,7 @@ import com.tenure.domain.user.exception.UserErrorCode;
 import com.tenure.domain.user.repository.UserBlockRepository;
 import com.tenure.domain.user.repository.UserRepository;
 import com.tenure.global.exception.CustomException;
+import com.tenure.global.storage.ImageStorageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -32,6 +33,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -53,8 +55,15 @@ public class ChatRoomService {
     private final UserBlockRepository userBlockRepository;
     private final ChatMessageRepository chatMessageRepository;
     private final TradeRepository tradeRepository;
+    private final ImageStorageService localImageStoreService;
+
+    // 채팅 이미지 전송시 허용되는 형식
+    private static final List<String> ALLOWED_IMAGE_TYPES = List.of(
+            "image/jpeg", "image/png", "image/gif", "image/webp", "image/heic"
+    );
 
     // 채팅방 조회 / 생성
+
     @Transactional
     public ChatRoomResponse findOrCreateChatRoom(Long buyerId, Long itemId) {
 
@@ -120,8 +129,8 @@ public class ChatRoomService {
         Long tradeId = tradeRepository.findByItemId(itemId).map(Trade::getId).orElse(null);
         return ChatRoomResponse.from(chatRoom, item, product, buyerId, tradeId);
     }
-
     // 채팅방 목록 조회
+
     public ChatRoomListCursorResponse chatRoomList(Long currentUserId, ChatRoomFilterType type,
                              LocalDateTime cursor, LocalDateTime createdAtCursor, Long cursorId, int size)
     {
@@ -144,8 +153,8 @@ public class ChatRoomService {
         log.info("[채팅방 목록 조회] 조회 결과 = {}건, hasNext = {}", chatRooms.getContent().size(), chatRooms.hasNext());
         return ChatRoomListCursorResponse.from(chatRooms, currentUserId);
     }
-
     //채팅방 목록에서 채팅방 접속
+
     public ChatRoomResponse enterChatroom(Long currentUserId, Long chatRoomId) {
 
         // 채팅방 존재 확인
@@ -221,7 +230,7 @@ public class ChatRoomService {
             throw new CustomException(ChatErrorCode.CHAT_FORBIDDEN);
         }
 
-        
+
         PageRequest request = PageRequest.of(0, size);
 
         Slice<ChatMessage> chatMessages = chatMessageRepository
@@ -240,4 +249,25 @@ public class ChatRoomService {
     }
 
 
+    //채팅 이미지 업로드
+    public String uploadImage(Long currentUserId, Long chatRoomId, MultipartFile image) {
+
+        if(!chatRoomRepository.existsById(chatRoomId)) {
+            log.warn("[채팅 이미지 업로드] 채팅방을 찾을 수 없습니다. chatRoomId = {}", chatRoomId);
+            throw new CustomException(ChatErrorCode.CHAT_ROOM_NOT_FOUND);
+        }
+
+        if(!chatRoomMemberRepository.existsByUserIdAndChatRoomId(currentUserId, chatRoomId)) {
+            log.warn("[채팅 이미지 업로드] 채팅방 접근 권한이 없습니다. currentUserId = {}, chatRoomId = {}", currentUserId, chatRoomId);
+            throw new CustomException(ChatErrorCode.CHAT_FORBIDDEN);
+        }
+
+        if(!ALLOWED_IMAGE_TYPES.contains(image.getContentType())) {
+            log.warn("[채팅 이미지 업로드] 지원하지 않는 이미지 형식입니다. contentType = {}", image.getContentType());
+            throw new CustomException(ChatErrorCode.INVALID_IMAGE_TYPE);
+        }
+
+        // 반환 url: /files/chat/{chatRoomId}/{UUID}.확장자
+        return localImageStoreService.store(image, "chat/" + chatRoomId);
+    }
 }
