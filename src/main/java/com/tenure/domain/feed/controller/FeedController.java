@@ -5,8 +5,6 @@ import com.tenure.domain.feed.service.FeedService;
 import com.tenure.global.response.BaseResponse;
 import com.tenure.global.security.CurrentUserProvider;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -30,16 +28,7 @@ public class FeedController {
 
     @Operation(
             summary = "Get OOTD feed",
-            description = "Returns OOTD cards without price or sale information. Supports all/following tabs and cursor pagination.",
-            parameters = {
-                    @Parameter(
-                            name = "X-USER-ID",
-                            in = ParameterIn.HEADER,
-                            required = true,
-                            description = "Temporary current user id for Swagger/local testing before JWT is fully connected.",
-                            example = "1"
-                    )
-            }
+            description = "Returns OOTD cards without price or sale information. Supports all/following tabs and cursor pagination."
     )
     @ApiResponse(
             responseCode = "200",
