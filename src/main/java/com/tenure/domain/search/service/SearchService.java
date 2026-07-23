@@ -2,6 +2,9 @@ package com.tenure.domain.search.service;
 
 import com.tenure.domain.follow.repository.FollowRelationshipRepository;
 import com.tenure.domain.item.enums.ItemStatus;
+import com.tenure.domain.ootd.enums.OotdReactionType;
+import com.tenure.domain.ootd.repository.OotdReactionRepository;
+import com.tenure.domain.search.enums.ItemStatusFilter;
 import com.tenure.domain.ootd.entity.Ootd;
 import com.tenure.domain.ootd.enums.OotdPublicationStatus;
 import com.tenure.domain.ootd.repository.OotdRepository;
@@ -46,6 +49,7 @@ public class SearchService {
     private final OotdTagRepository ootdTagRepository;
     private final FollowRelationshipRepository followRelationshipRepository;
     private final UserRepository userRepository;
+    private final OotdReactionRepository ootdReactionRepository;
 
     //최근 검색 and 최근 본 사용자 조회
     public SearchRecentResponse getRecent(Long currentUserId) {
@@ -130,7 +134,7 @@ public class SearchService {
             String keyword, UserGender gender,
             Integer heightMin, Integer heightMax,
             Integer weightMin, Integer weightMax,
-            List<Long> categoryIds, ItemStatus itemStatus, SearchSortType sort,
+            List<Long> categoryIds, ItemStatusFilter itemStatusFilter, SearchSortType sort,
             LocalDateTime cursor, Long cursorId,
             Integer cursorValue,
             int size
@@ -156,45 +160,76 @@ public class SearchService {
             throw new CustomException(SearchErrorCode.KEYWORD_OR_CATEGORY_REQUIRED);
         }
 
-
-        log.debug("[OOTD 검색] gender = {}, heightMin = {}, heightMax = {}, weightMin = {}, weightMax = {}, categoryIds = {}, itemStatus = {}, cursor = {}, cursorId = {}",
-                gender, heightMin, heightMax, weightMin, weightMax, categoryIds, itemStatus, cursor, cursorId);
+        log.debug("[OOTD 검색] gender = {}, heightMin = {}, heightMax = {}, weightMin = {}, weightMax = {}, categoryIds = {}, itemStatusFilter = {}, cursor = {}, cursorId = {}",
+                gender, heightMin, heightMax, weightMin, weightMax, categoryIds, itemStatusFilter, cursor, cursorId);
 
         PageRequest pageRequest = PageRequest.of(0, size);
 
-        Slice<Ootd> ootds = null;
+        // 판매중만 여부 판단
+        boolean onSaleOnly = (itemStatusFilter == ItemStatusFilter.ON_SALE_ONLY);
 
-        // 추천 기준이 명확치 않아 일단 최신순으로 처리
-        // 정렬기준: 최신 순, 추천 순
-        if(sort.equals(SearchSortType.LATEST) || sort.equals(SearchSortType.RECOMMEND)) {
+        ItemStatus itemStatus = (itemStatusFilter == ItemStatusFilter.ON_SALE_INCLUDED) ? ItemStatus.ON_SALE : null;
 
-            if(cursor == null) cursor = LocalDateTime.now();
-            if(cursorId == null) cursorId = Long.MAX_VALUE;
+        Slice<Ootd> ootds;
+        Long count;
 
-            //repository 조회 후 최신순 정렬
-            ootds = ootdRepository
-                    .searchOotdsByLatest(keyword, gender, heightMin, heightMax,
-                            weightMin, weightMax, categoryIds,
-                            itemStatus, cursor, cursorId, pageRequest);
+        if (onSaleOnly) {
+            // 판매중만: 모든 CONFIRMED 태그 아이템이 ON_SALE인 OOTD
+            // 추천순 기준이 명확치 않아 최신순으로 일단 정렬 (최신순, 추천순)
+            if (sort.equals(SearchSortType.LATEST) || sort.equals(SearchSortType.RECOMMEND)) {
+                if (cursor == null) cursor = LocalDateTime.now();
+                if (cursorId == null) cursorId = Long.MAX_VALUE;
 
-        } else { // 정렬 기준: 조회수 순, 좋아요 순,
-            if(cursorValue == null) cursorValue = Integer.MAX_VALUE;
-            if(cursorId == null) cursorId = Long.MAX_VALUE;
+                ootds = ootdRepository.searchOotdsByLatestOnSaleOnly(
+                        keyword, gender, heightMin, heightMax, weightMin, weightMax, categoryIds,
+                        cursor, cursorId, pageRequest);
 
-            //repository 조회 후 조회수 or 좋아요 정렬
-            ootds = ootdRepository.searchOotdsByCount(keyword, gender, heightMin, heightMax,
-                    weightMin, weightMax, categoryIds,
-                    itemStatus, sort.name(), cursorValue, cursorId, pageRequest);
+            } else { // 좋아요순, 저장순 정렬
+                if (cursorValue == null) cursorValue = Integer.MAX_VALUE;
+                if (cursorId == null) cursorId = Long.MAX_VALUE;
+                ootds = ootdRepository.searchOotdsByCountOnSaleOnly(
+                        keyword, gender, heightMin, heightMax, weightMin, weightMax, categoryIds,
+                        sort.name(), cursorValue, cursorId, pageRequest);
+            }
+
+            // 전체 몇건인지 조회(판매중만)
+            count = ootdRepository.searchOotdsTotalCountOnSaleOnly(
+                    keyword, gender, heightMin, heightMax, weightMin, weightMax, categoryIds);
+        } else {
+            // 전체(null) + 판매중포함(ON_SALE)
+            if (sort.equals(SearchSortType.LATEST) || sort.equals(SearchSortType.RECOMMEND)) {
+
+                if (cursor == null) cursor = LocalDateTime.now();
+                if (cursorId == null) cursorId = Long.MAX_VALUE;
+
+                ootds = ootdRepository.searchOotdsByLatest(
+                        keyword, gender, heightMin, heightMax, weightMin, weightMax, categoryIds,
+                        itemStatus, cursor, cursorId, pageRequest);
+            } else {
+
+                if (cursorValue == null) cursorValue = Integer.MAX_VALUE;
+                if (cursorId == null) cursorId = Long.MAX_VALUE;
+
+                ootds = ootdRepository.searchOotdsByCount(
+                        keyword, gender, heightMin, heightMax, weightMin, weightMax, categoryIds,
+                        itemStatus, sort.name(), cursorValue, cursorId, pageRequest);
+            }
+            count = ootdRepository.searchOotdsTotalCount(
+                    keyword, gender, heightMin, heightMax, weightMin, weightMax, categoryIds, itemStatus);
         }
 
-        //검색 total count 조회
-        Long count = ootdRepository.searchOotdsTotalCount(keyword, gender, heightMin, heightMax,
-                weightMin, weightMax, categoryIds, itemStatus);
-        log.debug("[OOTD 검색] 전체 조회 결과(total count) = {}건", count);
+        List<Long> ootdsId = ootds.map(Ootd::getId).toList();
+        Set<Long> saveOotdIds = ootdReactionRepository
+                .findReactedOotdIds(currentUserId, ootdsId, OotdReactionType.SAVE);
 
+        Set<Long> heartedOotdIds = ootdReactionRepository
+                .findReactedOotdIds(currentUserId, ootdsId, OotdReactionType.HEART);
+
+
+        log.debug("[OOTD 검색] 전체 조회 결과(total count) = {}건", count);
         log.debug("[OOTD 검색] 조회 {}건, hasNext = {}", ootds.getNumberOfElements(), ootds.hasNext());
 
-        return SearchOotdCursorResponse.from(ootds, sort, count);
+        return SearchOotdCursorResponse.from(ootds, sort, count, heartedOotdIds, saveOotdIds);
     }
 
     //유저 검색

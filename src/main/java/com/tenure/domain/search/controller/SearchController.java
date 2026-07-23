@@ -1,6 +1,6 @@
 package com.tenure.domain.search.controller;
 
-import com.tenure.domain.item.enums.ItemStatus;
+import com.tenure.domain.search.enums.ItemStatusFilter;
 import com.tenure.domain.search.dto.response.*;
 import com.tenure.domain.search.enums.SearchSortType;
 import com.tenure.domain.search.service.SearchService;
@@ -114,7 +114,7 @@ public class SearchController {
             @RequestParam(required = false) Integer weightMin,
             @RequestParam(required = false) Integer weightMax,
             @RequestParam(required = false) List<Long> categoryIds,
-            @RequestParam(required = false) ItemStatus itemStatus,
+            @RequestParam(required = false) ItemStatusFilter itemStatusFilter,
             @RequestParam(defaultValue = "LATEST") SearchSortType sort,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime cursor,
             @RequestParam(required = false) Long cursorId,
@@ -126,7 +126,7 @@ public class SearchController {
         SearchOotdCursorResponse searchOotdCursorResponse = searchService
                 .searchOotds(currentUserProvider.getCurrentUserId(),
                         keyword, gender, heightMin, heightMax,
-                        weightMin, weightMax, categoryIds, itemStatus, sort,
+                        weightMin, weightMax, categoryIds, itemStatusFilter, sort,
                         cursor, cursorId, cursorValue, size);
 
         return BaseResponse.success(searchOotdCursorResponse);

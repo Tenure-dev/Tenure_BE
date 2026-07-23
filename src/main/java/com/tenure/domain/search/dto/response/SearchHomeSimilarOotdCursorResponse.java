@@ -11,7 +11,7 @@ import java.util.List;
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
 public class SearchHomeSimilarOotdCursorResponse {
 
-    private List<SearchOotdResponse> content;
+    private List<SearchHomeOotdResponse> content;
     private boolean hasNext;
     private Integer nextCursorPriority;
     private Long nextCursorId;
@@ -32,8 +32,8 @@ public class SearchHomeSimilarOotdCursorResponse {
             nextCursorId = ootds.get(ootds.size() - 1).getId();
         }
 
-        List<SearchOotdResponse> content = ootds.stream()
-                .map(SearchOotdResponse::from)
+        List<SearchHomeOotdResponse> content = ootds.stream()
+                .map(SearchHomeOotdResponse::from)
                 .toList();
 
         return new SearchHomeSimilarOotdCursorResponse(content, hasNext, nextCursorPriority, nextCursorId);
