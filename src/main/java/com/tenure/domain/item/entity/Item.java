@@ -158,5 +158,6 @@ public class Item extends BaseTimeEntity {
     public void transferOwnership(User newOwner) {
         this.owner = newOwner;
         this.itemStatus = ItemStatus.OWNED;
+        this.purchaseOfferEnabled = false;
     }
 }

@@ -19,6 +19,7 @@ import com.tenure.domain.trade.exception.TradeErrorCode;
 import com.tenure.domain.trade.repository.TradeRepository;
 import com.tenure.domain.user.entity.User;
 import com.tenure.domain.user.repository.UserRepository;
+import com.tenure.domain.wish.repository.WishRepository;
 import com.tenure.global.exception.CustomException;
 import java.time.LocalDateTime;
 import java.util.Arrays;
@@ -162,6 +163,7 @@ public enum TradeTransition {
             context.itemHistoryRepository().flush();
             context.itemHistoryRepository().save(ItemHistory.ofTenureTrade(item, buyer, tradeRef, transferredAt));
 
+            removeBuyerWish(context, item, buyerUserId);
             cancelSentOffers(context, itemId);
         }
 
@@ -173,6 +175,14 @@ public enum TradeTransition {
                             "소유 이력 불변식 위반: 열린 행이 없습니다. itemId=%d".formatted(itemId)
                     ));
             openHistory.close(EndReason.TENURE_TRADE, endedAt);
+        }
+
+        // Item 락을 이미 잡은 뒤이므로 락 순서 규약 위반이 아니다.
+        private void removeBuyerWish(Context context, Item item, Long buyerUserId) {
+            int deleted = context.wishRepository().deleteByUserIdAndItemId(buyerUserId, item.getId());
+            if (deleted > 0) {
+                item.decreaseWishCount();
+            }
         }
 
         // Item 락을 이미 잡은 뒤이므로 락 순서 규약 위반이 아니다.
@@ -257,6 +267,7 @@ public enum TradeTransition {
             UserRepository userRepository,
             PurchaseOfferRepository purchaseOfferRepository,
             ItemHistoryRepository itemHistoryRepository,
+            WishRepository wishRepository,
             ApplicationEventPublisher eventPublisher,
             Trade trade
     ) {
