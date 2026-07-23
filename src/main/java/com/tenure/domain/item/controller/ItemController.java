@@ -177,4 +177,16 @@ public class ItemController {
 
         return BaseResponse.success(response, "아이템 히스토리 조회에 성공했습니다.");
     }
+
+    // 아이템 간편 등록(OOTD 아이템)
+    @PostMapping("/items/tag-draft")
+    @Operation(summary = "태그 작성용 간편 아이템 등록")
+    public BaseResponse<ItemTagDraftCreateResponse> createTagDraftItem(
+            @Valid @RequestBody ItemTagDraftCreateRequest request
+    ) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        ItemTagDraftCreateResponse response = itemService.createTagDraftItem(currentUserId, request);
+
+        return BaseResponse.success(response, "태그 작성용 간편 아이템 등록에 성공했습니다.");
+    }
 }
