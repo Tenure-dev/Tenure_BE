@@ -17,6 +17,7 @@ public class ChatRoomResponse {
 
     private Long chatRoomId;
     private String opponentUsername; //상대방 이름
+    private String opponentProfileImage; // 상대방 프로필 이미지
     private String itemImageUrl;
     private String brandName;
     private String itemName;
@@ -36,7 +37,11 @@ public class ChatRoomResponse {
                 ? chatRoom.getSeller().getUsername()
                 : chatRoom.getBuyer().getUsername();
 
-        return new ChatRoomResponse(chatRoom.getId(), opponentUsername, item.getRepresentativeImageUrl(),
+        String opponentProfileImage = isBuyer
+                ? chatRoom.getSeller().getProfileImageUrl()
+                : chatRoom.getBuyer().getProfileImageUrl();
+
+        return new ChatRoomResponse(chatRoom.getId(), opponentUsername, opponentProfileImage, item.getRepresentativeImageUrl(),
                 item.getBrandName(), item.getItemName(), product.getProductStatus(), product.getPrice(),
                 item.getLastWornAt(), isBuyer, tradeId, product.getId()
         );
