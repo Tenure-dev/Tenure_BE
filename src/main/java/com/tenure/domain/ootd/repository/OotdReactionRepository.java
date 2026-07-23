@@ -57,6 +57,29 @@ public interface OotdReactionRepository extends JpaRepository<OotdReaction, Long
                     where (block.blocker.id = :userId and block.blocked.id = owner.id)
                        or (block.blocker.id = owner.id and block.blocked.id = :userId)
                   )
+            order by reaction.createdAt desc, reaction.id desc
+            """)
+    List<OotdReaction> findReactedOotdsFirstPage(
+            @Param("userId") Long userId,
+            @Param("reactionType") OotdReactionType reactionType,
+            @Param("publicationStatus") OotdPublicationStatus publicationStatus,
+            Pageable pageable
+    );
+
+    @Query("""
+            select reaction
+            from OotdReaction reaction
+            join fetch reaction.ootd ootd
+            join ootd.owner owner
+            where reaction.user.id = :userId
+              and reaction.reactionType = :reactionType
+              and ootd.publicationStatus = :publicationStatus
+              and not exists (
+                    select 1
+                    from UserBlock block
+                    where (block.blocker.id = :userId and block.blocked.id = owner.id)
+                       or (block.blocker.id = owner.id and block.blocked.id = :userId)
+                  )
               and (
                     :cursorCreatedAt is null
                     or reaction.createdAt < :cursorCreatedAt

@@ -65,10 +65,8 @@ class OotdMyPostServiceTest {
                 LocalDateTime.of(2026, 7, 12, 10, 0)
         );
 
-        when(ootdRepository.findMyPosts(
+        when(ootdRepository.findMyPostsFirstPage(
                 eq(CURRENT_USER_ID),
-                eq(null),
-                eq(null),
                 any(Pageable.class)
         )).thenReturn(List.of(active, archived, extra));
 

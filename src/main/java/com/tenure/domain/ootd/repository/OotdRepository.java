@@ -280,6 +280,17 @@ public interface OotdRepository extends JpaRepository<Ootd, Long> {
             select ootd
             from Ootd ootd
             where ootd.owner.id = :ownerUserId
+            order by ootd.createdAt desc, ootd.id desc
+            """)
+    List<Ootd> findMyPostsFirstPage(
+            @Param("ownerUserId") Long ownerUserId,
+            Pageable pageable
+    );
+
+    @Query("""
+            select ootd
+            from Ootd ootd
+            where ootd.owner.id = :ownerUserId
               and (
                     :cursorCreatedAt is null
                     or ootd.createdAt < :cursorCreatedAt
