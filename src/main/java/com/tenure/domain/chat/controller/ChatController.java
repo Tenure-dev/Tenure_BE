@@ -1,6 +1,7 @@
 package com.tenure.domain.chat.controller;
 
 import com.tenure.domain.chat.dto.request.ChatRoomRequest;
+import com.tenure.domain.chat.dto.response.ChatImageUploadResponse;
 import com.tenure.domain.chat.dto.response.ChatMessageCursorResponse;
 import com.tenure.domain.chat.dto.response.ChatRoomListCursorResponse;
 import com.tenure.domain.chat.dto.response.ChatRoomResponse;
@@ -15,7 +16,9 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 
@@ -27,6 +30,7 @@ public class ChatController {
 
     private final CurrentUserProvider currentUserProvider;
     private final ChatRoomService chatRoomService;
+
 
     @Operation(
             summary = "채팅방 생성 또는 조회",
@@ -68,6 +72,20 @@ public class ChatController {
     }
 
     @Operation(
+            summary = "채팅방 조회",
+            description = "채팅방 목록에서 채팅방 클릭 시 호출합니다. 구매자/판매자 여부와 거래 상태에 따른 버튼 정보를 함께 반환합니다."
+    )
+    @Parameter(name = "X-USER-ID", description = "개발용 사용자 ID 헤더", in = ParameterIn.HEADER, example = "1")
+    @GetMapping("/{chatRoomId}")
+    public BaseResponse<ChatRoomResponse> getChatRoom(@PathVariable Long chatRoomId) {
+
+        ChatRoomResponse chatRoomResponse = chatRoomService
+                .enterChatroom(currentUserProvider.getCurrentUserId(), chatRoomId);
+
+        return BaseResponse.success(chatRoomResponse);
+    }
+
+    @Operation(
             summary = "채팅방 읽음 처리",
             description = "채팅방 접속 시 호출합니다. 읽지 않은 메시지 수를 0으로 초기화합니다."
     )
@@ -94,5 +112,20 @@ public class ChatController {
                 .getMessages(currentUserProvider.getCurrentUserId(), chatRoomId, cursor, cursorId, size);
 
         return BaseResponse.success(messages);
+    }
+
+    @Operation(
+            summary = "채팅 이미지 업로드",
+            description = "채팅방에서 이미지 전송 시 호출합니다. 이미지를 업로드하고 URL을 반환합니다. 반환된 URL을 WebSocket 메시지의 imageUrl 필드에 담아 전송하세요."
+    )
+    @Parameter(name = "X-USER-ID", description = "개발용 사용자 ID 헤더", in = ParameterIn.HEADER, example = "1")
+    @PostMapping(value = "/{chatRoomId}/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public BaseResponse<ChatImageUploadResponse> uploadChatImage(
+            @PathVariable Long chatRoomId,
+            @RequestParam("image") MultipartFile image
+    ) {
+        String url = chatRoomService.uploadImage(currentUserProvider.getCurrentUserId(), chatRoomId, image);
+        ChatImageUploadResponse imageUrl = ChatImageUploadResponse.from(url);
+        return BaseResponse.success(imageUrl);
     }
 }
