@@ -15,4 +15,6 @@ public interface CategoryRepository extends JpaRepository<Category, Long> {
             Category parent,
             Integer depth
     );
+
+    Optional<Category> findByNameAndDepth(String name, Integer depth);
 }
