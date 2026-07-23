@@ -123,21 +123,22 @@ public class ChatRoomService {
 
     // 채팅방 목록 조회
     public ChatRoomListCursorResponse chatRoomList(Long currentUserId, ChatRoomFilterType type,
-                             LocalDateTime cursor, Long cursorId, int size)
+                             LocalDateTime cursor, LocalDateTime createdAtCursor, Long cursorId, int size)
     {
 
         if(cursor == null) cursor = LocalDateTime.now();
         if(cursorId == null) cursorId = Long.MAX_VALUE;
+        if(createdAtCursor == null) createdAtCursor = LocalDateTime.now();
 
-        log.info("[채팅방 목록 조회] currentUserId = {}, type = {}, cursor = {}, cursorId = {}, size = {}", currentUserId, type, cursor, cursorId, size);
+        log.info("[채팅방 목록 조회] currentUserId = {}, type = {}, cursor = {}, createdAtCursor = {}, cursorId = {}, size = {}", currentUserId, type, cursor, createdAtCursor, cursorId, size);
 
         PageRequest pageRequest = PageRequest.of(0, size);
 
         Slice<ChatRoomMember> chatRooms = switch (type) {
-            case BUYING -> chatRoomMemberRepository.findBuyingChatRooms(currentUserId, cursor, cursorId, pageRequest);
-            case SELLING -> chatRoomMemberRepository.findSellingChatRooms(currentUserId, cursor, cursorId, pageRequest);
-            case UNREAD -> chatRoomMemberRepository.findUnreadChatRooms(currentUserId, cursor, cursorId, pageRequest);
-            default -> chatRoomMemberRepository.findAllChatRooms(currentUserId, cursor, cursorId, pageRequest); //기본 전체 조회
+            case BUYING -> chatRoomMemberRepository.findBuyingChatRooms(currentUserId, cursor, createdAtCursor, cursorId, pageRequest);
+            case SELLING -> chatRoomMemberRepository.findSellingChatRooms(currentUserId, cursor, createdAtCursor, cursorId, pageRequest);
+            case UNREAD -> chatRoomMemberRepository.findUnreadChatRooms(currentUserId, cursor, createdAtCursor, cursorId, pageRequest);
+            default -> chatRoomMemberRepository.findAllChatRooms(currentUserId, cursor, createdAtCursor, cursorId, pageRequest); //기본 전체 조회
         };
 
         log.info("[채팅방 목록 조회] 조회 결과 = {}건, hasNext = {}", chatRooms.getContent().size(), chatRooms.hasNext());

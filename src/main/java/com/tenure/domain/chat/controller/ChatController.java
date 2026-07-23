@@ -1,6 +1,7 @@
 package com.tenure.domain.chat.controller;
 
 import com.tenure.domain.chat.dto.request.ChatRoomRequest;
+import com.tenure.domain.chat.dto.response.ChatImageUploadResponse;
 import com.tenure.domain.chat.dto.response.ChatMessageCursorResponse;
 import com.tenure.domain.chat.dto.response.ChatRoomListCursorResponse;
 import com.tenure.domain.chat.dto.response.ChatRoomResponse;
@@ -8,15 +9,16 @@ import com.tenure.domain.chat.enums.ChatRoomFilterType;
 import com.tenure.domain.chat.service.ChatRoomService;
 import com.tenure.global.response.BaseResponse;
 import com.tenure.global.security.CurrentUserProvider;
+import com.tenure.global.storage.ImageStorageService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.repository.query.Param;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 
@@ -28,6 +30,7 @@ public class ChatController {
 
     private final CurrentUserProvider currentUserProvider;
     private final ChatRoomService chatRoomService;
+    private final ImageStorageService localImageStoreService;
 
     @Operation(
             summary = "채팅방 생성 또는 조회",
@@ -58,11 +61,12 @@ public class ChatController {
     public BaseResponse<ChatRoomListCursorResponse> chatList(
             @RequestParam(defaultValue = "ALL") ChatRoomFilterType type,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime cursor,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime createdAtCursor,
             @RequestParam(required = false) Long cursorId,
             @RequestParam(defaultValue = "20") int size
     ) {
         ChatRoomListCursorResponse chatRoomListCursorResponse = chatRoomService
-                .chatRoomList(currentUserProvider.getCurrentUserId(), type, cursor, cursorId, size);
+                .chatRoomList(currentUserProvider.getCurrentUserId(), type, cursor, createdAtCursor, cursorId, size);
 
         return BaseResponse.success(chatRoomListCursorResponse);
     }
@@ -108,5 +112,14 @@ public class ChatController {
                 .getMessages(currentUserProvider.getCurrentUserId(), chatRoomId, cursor, cursorId, size);
 
         return BaseResponse.success(messages);
+    }
+
+    @PostMapping("/images")
+    public BaseResponse<ChatImageUploadResponse> uploadChatImage(
+            @RequestParam("image") MultipartFile image
+    ) {
+        String url = localImageStoreService.store(image, "chat");
+        ChatImageUploadResponse imageUrl = ChatImageUploadResponse.from(url);
+        return BaseResponse.success(imageUrl);
     }
 }
