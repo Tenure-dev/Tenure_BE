@@ -145,6 +145,19 @@ public class SearchController {
         return BaseResponse.success(null);
     }
 
+    @Operation(
+            summary = "최근 본 유저 저장",
+            description = "검색 결과에서 유저 클릭 시 최근 본 기록을 저장합니다. 이미 본 유저면 lastViewedAt만 갱신합니다.",
+            parameters = {
+                    @Parameter(name = "X-USER-ID", in = ParameterIn.HEADER, required = true,
+                            description = "JWT 적용 전 Swagger 테스트용 현재 사용자 ID", example = "1")
+            })
+    @PostMapping("/recent-users/{userId}")
+    public BaseResponse<Void> saveRecentUser(@PathVariable Long userId) {
+        searchService.saveRecentUser(currentUserProvider.getCurrentUserId(), userId);
+        return BaseResponse.success(null);
+    }
+
 
     @Operation(
             summary = "유저 검색",
@@ -254,6 +267,4 @@ public class SearchController {
                 .getPopularUsers(cursorFollowerCount, cursorId, currentUserProvider.getCurrentUserId(), size);
         return BaseResponse.success(response);
     }
-
-
 }

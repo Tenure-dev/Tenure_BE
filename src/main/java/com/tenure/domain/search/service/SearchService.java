@@ -300,6 +300,36 @@ public class SearchService {
                 );
     }
 
+    // 최근 본 유저 저장
+    @Transactional
+    public void saveRecentUser(Long currentUserId, Long viewedUserId) {
+        log.info("[최근 본 유저 저장 api] currentUserId = {}, viewedUserId = {}", currentUserId, viewedUserId);
+
+        if (viewedUserId == null || viewedUserId <= 0) {
+            log.warn("[최근 본 유저 저장 api] 유효하지 않은 viewedUserId = {}", viewedUserId);
+            throw new CustomException(SearchErrorCode.INVALID_USER_ID);
+        }
+
+        User viewer = userRepository.getReferenceById(currentUserId);
+        User viewed = userRepository.findById(viewedUserId)
+                .orElseThrow(() -> {
+                    log.warn("[최근 본 유저 저장 api] 해당 유저를 찾을 수 없습니다. viewedUserId = {}", viewedUserId);
+                    return new CustomException(UserErrorCode.USER_NOT_FOUND);
+                });
+
+        recentViewUserRepository.findByViewed_Id(currentUserId, viewedUserId)
+                .ifPresentOrElse(
+                        view -> {
+                            view.touch();
+                            log.debug("[최근 본 유저 갱신] viewerId = {}, viewedId = {}", currentUserId, viewedUserId);
+                        },
+                        () -> {
+                            recentViewUserRepository.save(RecentViewUser.of(viewer, viewed));
+                            log.debug("[최근 본 유저 신규 저장] viewerId = {}, viewedId = {}", currentUserId, viewedUserId);
+                        }
+                );
+    }
+
     // 검색 홈 — 4개 섹션 통합 초기 로딩
     public SearchHomeResponse getHome(Long currentUserId) {
         log.info("[검색 홈 api] currentUserId = {}", currentUserId);
