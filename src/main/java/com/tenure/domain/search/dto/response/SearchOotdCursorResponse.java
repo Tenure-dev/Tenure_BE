@@ -9,6 +9,7 @@ import org.springframework.data.domain.Slice;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 
 @Getter
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
@@ -21,7 +22,8 @@ public class SearchOotdCursorResponse {
     private boolean hasNext;
     private Long count;
 
-    public static SearchOotdCursorResponse from(Slice<Ootd> slice, SearchSortType sort, Long count) {
+    public static SearchOotdCursorResponse from(Slice<Ootd> slice, SearchSortType sort,
+                                                        Long count, Set<Long> heartedOotdIds, Set<Long> saveOotdIds) {
         List<Ootd> ootds = slice.getContent();
 
         boolean hasNext = slice.hasNext();
@@ -44,7 +46,7 @@ public class SearchOotdCursorResponse {
         }
 
         List<SearchOotdResponse> content = ootds.stream()
-                .map(ootd -> new SearchOotdResponse(ootd.getId(), ootd.getImageUrl()))
+                .map(ootd -> SearchOotdResponse.from(ootd, heartedOotdIds, saveOotdIds))
                 .toList();
 
         return new SearchOotdCursorResponse(content, nextCursorCreatedAt,

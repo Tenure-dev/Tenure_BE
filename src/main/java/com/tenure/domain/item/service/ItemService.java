@@ -264,7 +264,7 @@ public class ItemService {
     }
 
     private Category findAiPendingCategory() {
-        return categoryRepository.findByNameAndDepth(AI_PENDING_CATEGORY_NAME, DETAIL_CATEGORY_DEPTH)
+        return categoryRepository.findByNameAndDepthAndIsActiveTrue(AI_PENDING_CATEGORY_NAME, DETAIL_CATEGORY_DEPTH)
                 .orElseThrow(() -> new CustomException(ItemErrorCode.CATEGORY_NOT_FOUND));
     }
 }
