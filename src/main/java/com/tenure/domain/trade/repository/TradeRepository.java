@@ -189,7 +189,5 @@ public interface TradeRepository extends JpaRepository<Trade, Long> {
 
     boolean existsByItemIdAndStatusNotIn(Long itemId, Collection<TradeStatus> statuses);
 
-    List<Trade> itemId(Long itemId);
-
-    Optional<Trade> findByItemId(Long id);
+    Optional<Trade> findByItemId(Long itemId);
 }
