@@ -91,4 +91,10 @@ public class Ootd extends BaseTimeEntity {
             this.archivedAt = null;
         }
     }
+
+    // 작성자가 게시물을 삭제할 때 호출한다(soft delete). ARCHIVED(AI 태그 리뷰 임시 비공개)와는
+    // 무관한 별개 상태 전이이며, 자식 데이터(태그·반응·최근 조회 등)는 건드리지 않는다.
+    public void delete() {
+        this.publicationStatus = OotdPublicationStatus.DELETED;
+    }
 }

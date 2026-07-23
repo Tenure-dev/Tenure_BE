@@ -390,6 +390,7 @@ public interface OotdRepository extends JpaRepository<Ootd, Long> {
             select ootd
             from Ootd ootd
             where ootd.owner.id = :ownerUserId
+              and ootd.publicationStatus <> com.tenure.domain.ootd.enums.OotdPublicationStatus.DELETED
             order by ootd.createdAt desc, ootd.id desc
             """)
     List<Ootd> findMyPostsFirstPage(
@@ -401,6 +402,7 @@ public interface OotdRepository extends JpaRepository<Ootd, Long> {
             select ootd
             from Ootd ootd
             where ootd.owner.id = :ownerUserId
+              and ootd.publicationStatus <> com.tenure.domain.ootd.enums.OotdPublicationStatus.DELETED
               and (
                     :cursorCreatedAt is null
                     or ootd.createdAt < :cursorCreatedAt

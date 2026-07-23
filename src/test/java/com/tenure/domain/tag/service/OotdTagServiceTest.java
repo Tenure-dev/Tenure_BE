@@ -368,6 +368,19 @@ class OotdTagServiceTest {
         verify(ootdTagRepository, never()).saveAll(anyList());
     }
 
+    @Test
+    void saveAiTags_skipsWhenOotdIsDeleted() {
+        User owner = user(OWNER_ID);
+        Ootd ootd = ootd(OOTD_ID, owner);
+        ReflectionTestUtils.setField(ootd, "publicationStatus", OotdPublicationStatus.DELETED);
+
+        when(ootdRepository.findById(OOTD_ID)).thenReturn(Optional.of(ootd));
+
+        ootdTagService.saveAiTags(OOTD_ID, List.of(aiTagResult("블루종 자켓", BigDecimal.valueOf(0.9))));
+
+        verify(ootdTagRepository, never()).saveAll(anyList());
+    }
+
     private OotdTagCreateRequest request(Long itemId, String status) {
         return new OotdTagCreateRequest(
                 itemId,
