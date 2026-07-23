@@ -29,4 +29,8 @@ public interface RecentSearchKeywordRepository extends JpaRepository<RecentSearc
     @Query("delete from RecentSearchKeyword r " +
             "where r.user.id = :currentUserId and r.keyword = :keyword")
     void deleteRecentSearchKeywordByKeyword(@Param("currentUserId") Long currentUserId, @Param("keyword") String keyword);
+
+    @Modifying(clearAutomatically = true)
+    @Query("delete from RecentSearchKeyword r where r.user.id = :userId")
+    void deleteAllByUserId(@Param("userId") Long userId);
 }

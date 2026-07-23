@@ -1,0 +1,8 @@
+spring:
+  mail:
+    username: test@example.com
+    password: test-password
+
+logging:
+  level:
+    com.tenure: INFO

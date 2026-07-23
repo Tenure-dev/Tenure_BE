@@ -33,7 +33,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
             "u.id, u.username, u.profileImageUrl, " +
             "(select count(uf) from FollowRelationship uf " +
             "where uf.following.id = u.id and uf.status = com.tenure.domain.follow.enums.FollowStatus.ACCEPTED), " +
-            "0L) " +
+            "(select count(o) from Ootd o " +
+            "where o.owner.id = u.id and o.publicationStatus = com.tenure.domain.ootd.enums.OotdPublicationStatus.ACTIVE)) " +
             "from User u " +
             "where not exists (select 1 from UserBlock block " +
             "   where (block.blocker.id = :currentUserId and block.blocked.id = u.id) " +

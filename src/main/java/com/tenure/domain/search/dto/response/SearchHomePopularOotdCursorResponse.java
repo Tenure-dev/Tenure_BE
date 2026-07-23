@@ -12,7 +12,7 @@ import java.util.List;
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
 public class SearchHomePopularOotdCursorResponse {
 
-    private List<SearchOotdResponse> content;
+    private List<SearchHomeOotdResponse> content;
     private boolean hasNext;
     private Integer nextCursorValue;   // 하트 순
     private Integer nextCursorSaveValue; // 저장 순
@@ -33,8 +33,8 @@ public class SearchHomePopularOotdCursorResponse {
             nextCursorId = last.getId();
         }
 
-        List<SearchOotdResponse> content = ootds.stream()
-                .map(SearchOotdResponse::from)
+        List<SearchHomeOotdResponse> content = ootds.stream()
+                .map(SearchHomeOotdResponse::from)
                 .toList();
 
         return new SearchHomePopularOotdCursorResponse(content, hasNext, nextCursorValue, nextCursorSaveValue, nextCursorId);

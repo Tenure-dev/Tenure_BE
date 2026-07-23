@@ -17,6 +17,7 @@ import com.tenure.domain.trade.enums.TradeViewerMode;
 import com.tenure.domain.trade.exception.TradeErrorCode;
 import com.tenure.domain.trade.repository.TradeRepository;
 import com.tenure.domain.user.repository.UserRepository;
+import com.tenure.domain.wish.repository.WishRepository;
 import com.tenure.global.exception.CustomException;
 import com.tenure.global.response.PageResponse;
 import java.util.ArrayList;
@@ -42,6 +43,7 @@ public class TradeService {
     private final UserRepository userRepository;
     private final PurchaseOfferRepository purchaseOfferRepository;
     private final ItemHistoryRepository itemHistoryRepository;
+    private final WishRepository wishRepository;
     private final ApplicationEventPublisher eventPublisher;
 
     @Transactional(readOnly = true)
@@ -128,7 +130,7 @@ public class TradeService {
 
         transition.applySideEffects(new TradeTransition.Context(
                 tradeRepository, productRepository, itemRepository, userRepository,
-                purchaseOfferRepository, itemHistoryRepository, eventPublisher, afterPrimaryUpdate
+                purchaseOfferRepository, itemHistoryRepository, wishRepository, eventPublisher, afterPrimaryUpdate
         ));
 
         return tradeRepository.findById(trade.getId())

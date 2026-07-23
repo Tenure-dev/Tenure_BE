@@ -1,6 +1,6 @@
 package com.tenure.domain.search.controller;
 
-import com.tenure.domain.item.enums.ItemStatus;
+import com.tenure.domain.search.enums.ItemStatusFilter;
 import com.tenure.domain.search.dto.response.*;
 import com.tenure.domain.search.enums.SearchSortType;
 import com.tenure.domain.search.service.SearchService;
@@ -71,9 +71,35 @@ public class SearchController {
     }
 
     @Operation(
+            summary = "최근 검색어 전체 삭제",
+            description = "내 최근 검색어를 모두 삭제합니다.",
+            parameters = {
+                    @Parameter(name = "X-USER-ID", in = ParameterIn.HEADER, required = true,
+                            description = "JWT 적용 전 Swagger 테스트용 현재 사용자 ID", example = "1")
+            })
+    @DeleteMapping("/recent-keywords")
+    public BaseResponse<Void> deleteAllRecentKeywords() {
+        searchService.deleteAllRecentKeyword(currentUserProvider.getCurrentUserId());
+        return BaseResponse.success(null);
+    }
+
+    @Operation(
+            summary = "최근 본 사용자 전체 삭제",
+            description = "최근 본 사용자 목록을 모두 삭제합니다.",
+            parameters = {
+                    @Parameter(name = "X-USER-ID", in = ParameterIn.HEADER, required = true,
+                            description = "JWT 적용 전 Swagger 테스트용 현재 사용자 ID", example = "1")
+            })
+    @DeleteMapping("/recent-users")
+    public BaseResponse<Void> deleteAllRecentUsers() {
+        searchService.deleteAllRecentUser(currentUserProvider.getCurrentUserId());
+        return BaseResponse.success(null);
+    }
+
+    @Operation(
             summary = "OOTD 검색",
             description = "키워드, 필터, 정렬 조건으로 공개된 OOTD를 검색합니다. " +
-                    "keyword와 categoryIds 모두 생략 시 조건에 맞는 전체 OOTD를 반환합니다. " +
+                    "keyword 또는 categoryIds 중 하나는 필수입니다. 모두 생략 시 에러를 반환합니다. " +
                     "정렬 기본값은 LATEST(최신순)이며 HEART(좋아요순), SAVE(저장순), VIEW(조회수순), RECOMMEND(추천순) 선택 가능합니다.",
             parameters = {
                     @Parameter(name = "X-USER-ID", in = ParameterIn.HEADER, required = true,
@@ -88,7 +114,7 @@ public class SearchController {
             @RequestParam(required = false) Integer weightMin,
             @RequestParam(required = false) Integer weightMax,
             @RequestParam(required = false) List<Long> categoryIds,
-            @RequestParam(required = false) ItemStatus itemStatus,
+            @RequestParam(required = false) ItemStatusFilter itemStatusFilter,
             @RequestParam(defaultValue = "LATEST") SearchSortType sort,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime cursor,
             @RequestParam(required = false) Long cursorId,
@@ -100,11 +126,38 @@ public class SearchController {
         SearchOotdCursorResponse searchOotdCursorResponse = searchService
                 .searchOotds(currentUserProvider.getCurrentUserId(),
                         keyword, gender, heightMin, heightMax,
-                        weightMin, weightMax, categoryIds, itemStatus, sort,
+                        weightMin, weightMax, categoryIds, itemStatusFilter, sort,
                         cursor, cursorId, cursorValue, size);
 
         return BaseResponse.success(searchOotdCursorResponse);
     }
+
+    @Operation(
+            summary = "최근 본 OOTD 저장",
+            description = "검색 결과에서 OOTD 클릭 시 최근 본 기록을 저장합니다. 이미 본 OOTD면 lastViewedAt만 갱신합니다.",
+            parameters = {
+                    @Parameter(name = "X-USER-ID", in = ParameterIn.HEADER, required = true,
+                            description = "JWT 적용 전 Swagger 테스트용 현재 사용자 ID", example = "1")
+            })
+    @PostMapping("/recent-ootds/{ootdId}")
+    public BaseResponse<Void> saveRecentOotd(@PathVariable Long ootdId) {
+        searchService.saveRecentOotd(currentUserProvider.getCurrentUserId(), ootdId);
+        return BaseResponse.success(null);
+    }
+
+    @Operation(
+            summary = "최근 본 유저 저장",
+            description = "검색 결과에서 유저 클릭 시 최근 본 기록을 저장합니다. 이미 본 유저면 lastViewedAt만 갱신합니다.",
+            parameters = {
+                    @Parameter(name = "X-USER-ID", in = ParameterIn.HEADER, required = true,
+                            description = "JWT 적용 전 Swagger 테스트용 현재 사용자 ID", example = "1")
+            })
+    @PostMapping("/recent-users/{userId}")
+    public BaseResponse<Void> saveRecentUser(@PathVariable Long userId) {
+        searchService.saveRecentUser(currentUserProvider.getCurrentUserId(), userId);
+        return BaseResponse.success(null);
+    }
+
 
     @Operation(
             summary = "유저 검색",
