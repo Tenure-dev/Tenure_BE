@@ -3,7 +3,9 @@ package com.tenure.domain.search.service;
 import com.tenure.domain.follow.repository.FollowRelationshipRepository;
 import com.tenure.domain.item.enums.ItemStatus;
 import com.tenure.domain.ootd.enums.OotdReactionType;
+import com.tenure.domain.ootd.exception.OotdErrorCode;
 import com.tenure.domain.ootd.repository.OotdReactionRepository;
+import com.tenure.domain.search.entity.RecentViewOotd;
 import com.tenure.domain.search.enums.ItemStatusFilter;
 import com.tenure.domain.ootd.entity.Ootd;
 import com.tenure.domain.ootd.enums.OotdPublicationStatus;
@@ -19,6 +21,7 @@ import com.tenure.domain.search.repository.RecentViewUserRepository;
 import com.tenure.domain.tag.entity.OotdTag;
 import com.tenure.domain.tag.enums.TagStatus;
 import com.tenure.domain.tag.repository.OotdTagRepository;
+import com.tenure.domain.user.exception.UserErrorCode;
 import org.springframework.data.domain.Pageable;
 import com.tenure.domain.user.entity.User;
 import com.tenure.domain.user.enums.UserGender;
@@ -263,6 +266,38 @@ public class SearchService {
 
         log.info("[유저 검색 api] 유저 검색 완료");
         return SearchUserCursorResponse.from(searchUsers, followingIds);
+    }
+
+    // 최근 본 Ootd 저장
+    @Transactional
+    public void saveRecentOotd(Long currentUserId, Long ootdId) {
+
+        log.info("[최근 본 ootd 저장 api] currentUseId = {}, ootdId = {}", currentUserId, ootdId);
+
+        if (ootdId == null || ootdId <= 0) {
+            log.warn("[최근 본 ootd 저장 api] 유효하지 않은 ootdId = {}", ootdId);
+            throw new CustomException(SearchErrorCode.INVALID_OOTD_ID);
+        }
+
+        User viewer = userRepository.getReferenceById(currentUserId);
+
+        Ootd ootd = ootdRepository.findById(ootdId)
+                .orElseThrow(() -> {
+                    log.warn("[최근 본 ootd 저장 api] 해당 ootd를 찾을 수 없습니다. ootdId = {}", ootdId);
+                    return new CustomException(OotdErrorCode.OOTD_NOT_FOUND);
+                });
+
+        recentViewOotdRepository.findByViewerIdAndOotdId(currentUserId, ootdId)
+                .ifPresentOrElse(
+                        view -> {
+                            view.touch(); // 조회된 엔티티의 touch() 호출
+                            log.debug("[최근 본 ootd 갱신] viewerId = {}, ootdId = {}", currentUserId, ootdId);
+                        },
+                        () -> {
+                            recentViewOotdRepository.save(RecentViewOotd.of(viewer, ootd));
+                            log.debug("[최근 본 ootd 신규 저장] viewerId = {}, ootdId = {}", currentUserId, ootdId);
+                        }
+                );
     }
 
     // 검색 홈 — 4개 섹션 통합 초기 로딩

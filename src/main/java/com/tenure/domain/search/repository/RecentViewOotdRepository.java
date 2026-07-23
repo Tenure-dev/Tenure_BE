@@ -14,4 +14,7 @@ public interface RecentViewOotdRepository extends JpaRepository<RecentViewOotd, 
             "where r.viewer.id = :userId " +
             "order by r.lastViewedAt desc limit 1")
     Optional<Long> findLatestViewedOotdId(@Param("userId") Long userId);
+
+    //
+    Optional<RecentViewOotd> findByViewerIdAndOotdId(Long viewerId, Long ootdId);
 }
