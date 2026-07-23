@@ -133,6 +133,20 @@ public class SearchController {
     }
 
     @Operation(
+            summary = "최근 본 OOTD 저장",
+            description = "검색 결과에서 OOTD 클릭 시 최근 본 기록을 저장합니다. 이미 본 OOTD면 lastViewedAt만 갱신합니다.",
+            parameters = {
+                    @Parameter(name = "X-USER-ID", in = ParameterIn.HEADER, required = true,
+                            description = "JWT 적용 전 Swagger 테스트용 현재 사용자 ID", example = "1")
+            })
+    @PostMapping("/recent-ootds/{ootdId}")
+    public BaseResponse<Void> saveRecentOotd(@PathVariable Long ootdId) {
+        searchService.saveRecentOotd(currentUserProvider.getCurrentUserId(), ootdId);
+        return BaseResponse.success(null);
+    }
+
+
+    @Operation(
             summary = "유저 검색",
             description = "username으로 사용자를 검색합니다. keyword는 필수이며 prefix 방식으로 검색됩니다.",
             parameters = {
@@ -240,4 +254,6 @@ public class SearchController {
                 .getPopularUsers(cursorFollowerCount, cursorId, currentUserProvider.getCurrentUserId(), size);
         return BaseResponse.success(response);
     }
+
+
 }
