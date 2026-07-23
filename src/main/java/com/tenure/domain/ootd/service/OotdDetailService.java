@@ -10,7 +10,6 @@ import com.tenure.domain.ootd.exception.OotdErrorCode;
 import com.tenure.domain.ootd.repository.OotdReactionRepository;
 import com.tenure.domain.ootd.repository.OotdRepository;
 import com.tenure.domain.product.entity.Product;
-import com.tenure.domain.product.enums.ProductStatus;
 import com.tenure.domain.product.repository.ProductRepository;
 import com.tenure.domain.tag.entity.OotdTag;
 import com.tenure.domain.tag.enums.TagStatus;
@@ -18,11 +17,12 @@ import com.tenure.domain.tag.repository.OotdTagRepository;
 import com.tenure.domain.user.entity.User;
 import com.tenure.domain.user.enums.AccountVisibility;
 import com.tenure.global.exception.CustomException;
+import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -54,9 +54,18 @@ public class OotdDetailService {
                 .findReactedOotdIds(currentUserId, List.of(ootdId), OotdReactionType.SAVE)
                 .contains(ootdId);
 
-        Map<Long, Product> onSaleProductsByItemId = findOnSaleProductsByItemId(tags);
+        Map<Long, Product> latestProductByItemId = findLatestProductByItemId(tags);
 
-        return OotdDetailResponse.of(ootd, hearted, saved, tags, onSaleProductsByItemId);
+        long followerCount = followRelationshipRepository.countByFollowing_IdAndStatus(
+                ootd.getOwner().getId(),
+                FollowStatus.ACCEPTED
+        );
+        long feedCount = ootdRepository.countByOwner_IdAndPublicationStatus(
+                ootd.getOwner().getId(),
+                OotdPublicationStatus.ACTIVE
+        );
+
+        return OotdDetailResponse.of(ootd, hearted, saved, tags, latestProductByItemId, followerCount, feedCount);
     }
 
     private void validateOotdVisibility(User owner, Long currentUserId) {
@@ -74,7 +83,7 @@ public class OotdDetailService {
         }
     }
 
-    private Map<Long, Product> findOnSaleProductsByItemId(List<OotdTag> tags) {
+    private Map<Long, Product> findLatestProductByItemId(List<OotdTag> tags) {
         Set<Long> itemIds = tags.stream()
                 .map(tag -> tag.getItem().getId())
                 .collect(Collectors.toCollection(LinkedHashSet::new));
@@ -82,15 +91,14 @@ public class OotdDetailService {
             return Map.of();
         }
 
-        List<Product> onSaleProducts = productRepository.findByItemIdInAndProductStatus(
-                itemIds,
-                ProductStatus.ON_SALE
-        );
-        return onSaleProducts.stream()
-                .collect(Collectors.toMap(
+        List<Product> products = productRepository.findByItemIdIn(itemIds);
+        return products.stream()
+                .collect(Collectors.groupingBy(
                         product -> product.getItem().getId(),
-                        Function.identity(),
-                        (first, second) -> first
+                        Collectors.collectingAndThen(
+                                Collectors.maxBy(Comparator.comparing(Product::getCreatedAt)),
+                                Optional::get
+                        )
                 ));
     }
 }

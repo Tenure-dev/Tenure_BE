@@ -12,6 +12,7 @@ import com.tenure.domain.follow.enums.FollowStatus;
 import com.tenure.domain.follow.repository.FollowRelationshipRepository;
 import com.tenure.domain.item.entity.Category;
 import com.tenure.domain.item.entity.Item;
+import com.tenure.domain.item.enums.ItemStatus;
 import com.tenure.domain.ootd.dto.OotdDetailResponse;
 import com.tenure.domain.ootd.entity.Ootd;
 import com.tenure.domain.ootd.enums.OotdPublicationStatus;
@@ -30,6 +31,7 @@ import com.tenure.domain.user.enums.AccountVisibility;
 import com.tenure.global.exception.CustomException;
 import java.lang.reflect.Constructor;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -85,7 +87,7 @@ class OotdDetailServiceTest {
         OotdTag tag1 = tag(1L, ootd, onSaleItem);
         OotdTag tag2 = tag(2L, ootd, onSaleItem);
         OotdTag tag3 = tag(3L, ootd, offSaleItem);
-        Product onSaleProduct = product(200L, onSaleItem, 50000);
+        Product onSaleProduct = product(200L, onSaleItem, 50000, ProductStatus.ON_SALE, LocalDateTime.now());
 
         when(ootdRepository.findVisibleActiveById(OOTD_ID, currentUserId, OotdPublicationStatus.ACTIVE))
                 .thenReturn(Optional.of(ootd));
@@ -95,24 +97,139 @@ class OotdDetailServiceTest {
                 .thenReturn(Set.of(OOTD_ID));
         when(ootdReactionRepository.findReactedOotdIds(currentUserId, List.of(OOTD_ID), OotdReactionType.SAVE))
                 .thenReturn(Set.of());
-        when(productRepository.findByItemIdInAndProductStatus(anyCollection(), eq(ProductStatus.ON_SALE)))
+        when(productRepository.findByItemIdIn(anyCollection()))
                 .thenReturn(List.of(onSaleProduct));
+        when(followRelationshipRepository.countByFollowing_IdAndStatus(2L, FollowStatus.ACCEPTED))
+                .thenReturn(42L);
+        when(ootdRepository.countByOwner_IdAndPublicationStatus(2L, OotdPublicationStatus.ACTIVE))
+                .thenReturn(17L);
 
         OotdDetailResponse response = ootdDetailService.getOotdDetail(currentUserId, OOTD_ID);
 
         assertThat(response.ootdId()).isEqualTo(OOTD_ID);
         assertThat(response.author().userId()).isEqualTo(2L);
+        assertThat(response.author().followerCount()).isEqualTo(42L);
+        assertThat(response.author().feedCount()).isEqualTo(17L);
         assertThat(response.hearted()).isTrue();
         assertThat(response.saved()).isFalse();
         assertThat(response.tags()).hasSize(3);
         assertThat(response.tags().get(0).onSale()).isTrue();
         assertThat(response.tags().get(0).price()).isEqualTo(50000);
+        assertThat(response.tags().get(0).itemStatus()).isEqualTo(ItemStatus.OWNED);
+        assertThat(response.tags().get(0).purchaseOfferEnabled()).isTrue();
+        assertThat(response.tags().get(0).productStatus()).isEqualTo(ProductStatus.ON_SALE);
         assertThat(response.tags().get(1).onSale()).isTrue();
         assertThat(response.tags().get(1).itemId()).isEqualTo(10L);
         assertThat(response.tags().get(2).onSale()).isFalse();
         assertThat(response.tags().get(2).price()).isNull();
+        assertThat(response.tags().get(2).productStatus()).isNull();
         assertThat(response.tags().get(0).item().categoryLarge()).isEqualTo("아우터");
         assertThat(response.tags().get(0).item().categorySmall()).isEqualTo("블루종");
+    }
+
+    @Test
+    void getOotdDetail_marksTagAsNotOnSaleWhenLatestProductIsSold() {
+        Long currentUserId = 1L;
+        User owner = user(2L, AccountVisibility.PUBLIC);
+        Ootd ootd = ootd(OOTD_ID, owner);
+        Category outer = category(1L, "아우터", null);
+        Item soldItem = item(10L, outer, "Nike", "Black Jacket");
+        OotdTag tag1 = tag(1L, ootd, soldItem);
+        Product soldProduct = product(200L, soldItem, 50000, ProductStatus.SOLD, LocalDateTime.now());
+
+        when(ootdRepository.findVisibleActiveById(OOTD_ID, currentUserId, OotdPublicationStatus.ACTIVE))
+                .thenReturn(Optional.of(ootd));
+        when(ootdTagRepository.findConfirmedItemTagsByOotdId(OOTD_ID, TagStatus.CONFIRMED))
+                .thenReturn(List.of(tag1));
+        when(ootdReactionRepository.findReactedOotdIds(currentUserId, List.of(OOTD_ID), OotdReactionType.HEART))
+                .thenReturn(Set.of());
+        when(ootdReactionRepository.findReactedOotdIds(currentUserId, List.of(OOTD_ID), OotdReactionType.SAVE))
+                .thenReturn(Set.of());
+        when(productRepository.findByItemIdIn(anyCollection()))
+                .thenReturn(List.of(soldProduct));
+        when(followRelationshipRepository.countByFollowing_IdAndStatus(2L, FollowStatus.ACCEPTED))
+                .thenReturn(0L);
+        when(ootdRepository.countByOwner_IdAndPublicationStatus(2L, OotdPublicationStatus.ACTIVE))
+                .thenReturn(0L);
+
+        OotdDetailResponse response = ootdDetailService.getOotdDetail(currentUserId, OOTD_ID);
+
+        assertThat(response.tags()).hasSize(1);
+        assertThat(response.tags().get(0).onSale()).isFalse();
+        assertThat(response.tags().get(0).price()).isNull();
+        assertThat(response.tags().get(0).productStatus()).isEqualTo(ProductStatus.SOLD);
+    }
+
+    @Test
+    void getOotdDetail_picksMostRecentProductByCreatedAtWhenItemHasMultipleProducts() {
+        Long currentUserId = 1L;
+        User owner = user(2L, AccountVisibility.PUBLIC);
+        Ootd ootd = ootd(OOTD_ID, owner);
+        Category outer = category(1L, "아우터", null);
+        Item resoldItem = item(10L, outer, "Nike", "Black Jacket");
+        OotdTag tag1 = tag(1L, ootd, resoldItem);
+        Product olderSoldProduct = product(
+                200L, resoldItem, 40000, ProductStatus.SOLD, LocalDateTime.now().minusDays(10)
+        );
+        Product newerOnSaleProduct = product(
+                201L, resoldItem, 55000, ProductStatus.ON_SALE, LocalDateTime.now()
+        );
+
+        when(ootdRepository.findVisibleActiveById(OOTD_ID, currentUserId, OotdPublicationStatus.ACTIVE))
+                .thenReturn(Optional.of(ootd));
+        when(ootdTagRepository.findConfirmedItemTagsByOotdId(OOTD_ID, TagStatus.CONFIRMED))
+                .thenReturn(List.of(tag1));
+        when(ootdReactionRepository.findReactedOotdIds(currentUserId, List.of(OOTD_ID), OotdReactionType.HEART))
+                .thenReturn(Set.of());
+        when(ootdReactionRepository.findReactedOotdIds(currentUserId, List.of(OOTD_ID), OotdReactionType.SAVE))
+                .thenReturn(Set.of());
+        when(productRepository.findByItemIdIn(anyCollection()))
+                .thenReturn(List.of(olderSoldProduct, newerOnSaleProduct));
+        when(followRelationshipRepository.countByFollowing_IdAndStatus(2L, FollowStatus.ACCEPTED))
+                .thenReturn(0L);
+        when(ootdRepository.countByOwner_IdAndPublicationStatus(2L, OotdPublicationStatus.ACTIVE))
+                .thenReturn(0L);
+
+        OotdDetailResponse response = ootdDetailService.getOotdDetail(currentUserId, OOTD_ID);
+
+        assertThat(response.tags()).hasSize(1);
+        assertThat(response.tags().get(0).onSale()).isTrue();
+        assertThat(response.tags().get(0).price()).isEqualTo(55000);
+        assertThat(response.tags().get(0).productStatus()).isEqualTo(ProductStatus.ON_SALE);
+    }
+
+    @Test
+    void getOotdDetail_returnsNullProductStatusWhenItemHasNoProduct() {
+        Long currentUserId = 1L;
+        User owner = user(2L, AccountVisibility.PUBLIC);
+        Ootd ootd = ootd(OOTD_ID, owner);
+        Category outer = category(1L, "아우터", null);
+        Item neverListedItem = item(20L, outer, "Adidas", "Windbreaker");
+        OotdTag tag1 = tag(1L, ootd, neverListedItem);
+
+        when(ootdRepository.findVisibleActiveById(OOTD_ID, currentUserId, OotdPublicationStatus.ACTIVE))
+                .thenReturn(Optional.of(ootd));
+        when(ootdTagRepository.findConfirmedItemTagsByOotdId(OOTD_ID, TagStatus.CONFIRMED))
+                .thenReturn(List.of(tag1));
+        when(ootdReactionRepository.findReactedOotdIds(currentUserId, List.of(OOTD_ID), OotdReactionType.HEART))
+                .thenReturn(Set.of());
+        when(ootdReactionRepository.findReactedOotdIds(currentUserId, List.of(OOTD_ID), OotdReactionType.SAVE))
+                .thenReturn(Set.of());
+        when(productRepository.findByItemIdIn(anyCollection()))
+                .thenReturn(List.of());
+        when(followRelationshipRepository.countByFollowing_IdAndStatus(2L, FollowStatus.ACCEPTED))
+                .thenReturn(0L);
+        when(ootdRepository.countByOwner_IdAndPublicationStatus(2L, OotdPublicationStatus.ACTIVE))
+                .thenReturn(0L);
+
+        OotdDetailResponse response = ootdDetailService.getOotdDetail(currentUserId, OOTD_ID);
+
+        assertThat(response.tags()).hasSize(1);
+        assertThat(response.tags().get(0).onSale()).isFalse();
+        assertThat(response.tags().get(0).price()).isNull();
+        assertThat(response.tags().get(0).productStatus()).isNull();
+        assertThat(response.tags().get(0).itemStatus()).isEqualTo(ItemStatus.OWNED);
+        assertThat(response.tags().get(0).purchaseOfferEnabled()).isTrue();
     }
 
     @Test
@@ -133,7 +250,7 @@ class OotdDetailServiceTest {
         OotdDetailResponse response = ootdDetailService.getOotdDetail(currentUserId, OOTD_ID);
 
         assertThat(response.tags()).isEmpty();
-        verify(productRepository, never()).findByItemIdInAndProductStatus(anyCollection(), eq(ProductStatus.ON_SALE));
+        verify(productRepository, never()).findByItemIdIn(anyCollection());
     }
 
     @Test
@@ -293,11 +410,13 @@ class OotdDetailServiceTest {
         return tag;
     }
 
-    private Product product(Long id, Item item, Integer price) {
+    private Product product(Long id, Item item, Integer price, ProductStatus productStatus, LocalDateTime createdAt) {
         Product product = instantiate(Product.class);
         ReflectionTestUtils.setField(product, "id", id);
         ReflectionTestUtils.setField(product, "item", item);
         ReflectionTestUtils.setField(product, "price", price);
+        ReflectionTestUtils.setField(product, "productStatus", productStatus);
+        ReflectionTestUtils.setField(product, "createdAt", createdAt);
         return product;
     }
 
