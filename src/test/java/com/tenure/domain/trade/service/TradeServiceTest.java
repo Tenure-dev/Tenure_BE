@@ -42,6 +42,7 @@ import com.tenure.domain.trade.exception.TradeErrorCode;
 import com.tenure.domain.trade.repository.TradeRepository;
 import com.tenure.domain.user.entity.User;
 import com.tenure.domain.user.repository.UserRepository;
+import com.tenure.domain.wish.repository.WishRepository;
 import com.tenure.global.exception.CustomException;
 import com.tenure.global.response.PageResponse;
 import java.lang.reflect.Constructor;
@@ -90,6 +91,9 @@ class TradeServiceTest {
     private ItemHistoryRepository itemHistoryRepository;
 
     @Mock
+    private WishRepository wishRepository;
+
+    @Mock
     private ApplicationEventPublisher eventPublisher;
 
     private TradeService tradeService;
@@ -98,7 +102,7 @@ class TradeServiceTest {
     void setUp() {
         tradeService = new TradeService(
                 tradeRepository, productRepository, itemRepository, userRepository,
-                purchaseOfferRepository, itemHistoryRepository, eventPublisher
+                purchaseOfferRepository, itemHistoryRepository, wishRepository, eventPublisher
         );
     }
 
@@ -581,9 +585,12 @@ class TradeServiceTest {
         User seller = user(2L);
         User buyer = user(CURRENT_USER_ID);
         ReflectionTestUtils.setField(item, "owner", seller);
+        ReflectionTestUtils.setField(item, "purchaseOfferEnabled", true);
+        ReflectionTestUtils.setField(item, "wishCount", 1);
         when(itemRepository.findByIdForUpdate(itemId)).thenReturn(Optional.of(item));
         when(userRepository.getReferenceById(CURRENT_USER_ID)).thenReturn(buyer);
         when(tradeRepository.getReferenceById(220L)).thenReturn(transferredTrade);
+        when(wishRepository.deleteByUserIdAndItemId(CURRENT_USER_ID, itemId)).thenReturn(1);
         when(purchaseOfferRepository.findSentByItemIdForUpdate(itemId, PurchaseOfferStatus.SENT)).thenReturn(List.of());
         ItemHistory openHistory = ItemHistory.ofFirstRegistration(item, seller, LocalDateTime.now().minusDays(10));
         when(itemHistoryRepository.findByItemIdAndEndedAtIsNull(itemId)).thenReturn(Optional.of(openHistory));
@@ -592,6 +599,9 @@ class TradeServiceTest {
 
         assertThat(item.getOwner()).isEqualTo(buyer);
         assertThat(item.getItemStatus()).isEqualTo(ItemStatus.OWNED);
+        assertThat(item.getPurchaseOfferEnabled()).isFalse();
+        assertThat(item.getWishCount()).isZero();
+        verify(wishRepository).deleteByUserIdAndItemId(CURRENT_USER_ID, itemId);
 
         assertThat(openHistory.getEndReason()).isEqualTo(EndReason.TENURE_TRADE);
         assertThat(openHistory.getEndedAt()).isNotNull();

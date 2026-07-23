@@ -6,6 +6,7 @@ import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -14,6 +15,17 @@ public interface WishRepository extends JpaRepository<Wish, Long> {
     boolean existsByUserIdAndItemId(Long userId, Long itemId);
 
     Optional<Wish> findByUserIdAndItemId(Long userId, Long itemId);
+
+    @Modifying
+    @Query("""
+            delete from Wish wish
+            where wish.user.id = :userId
+              and wish.item.id = :itemId
+            """)
+    int deleteByUserIdAndItemId(
+            @Param("userId") Long userId,
+            @Param("itemId") Long itemId
+    );
 
     @Query(
             value = """
