@@ -4,6 +4,7 @@ import com.tenure.domain.item.entity.Item;
 import com.tenure.domain.item.repository.ItemRepository;
 import com.tenure.domain.ootd.ai.AiTagResult;
 import com.tenure.domain.ootd.entity.Ootd;
+import com.tenure.domain.ootd.enums.OotdPublicationStatus;
 import com.tenure.domain.ootd.repository.OotdRepository;
 import com.tenure.domain.tag.dto.request.OotdTagCreateRequest;
 import com.tenure.domain.tag.dto.response.OotdTagResponse;
@@ -45,6 +46,10 @@ public class OotdTagService {
         Ootd ootd = ootdRepository.findById(ootdId).orElse(null);
         if (ootd == null) {
             log.warn("AI 태그 저장 실패 - OOTD를 찾을 수 없습니다. ootdId={}", ootdId);
+            return;
+        }
+        if (ootd.getPublicationStatus() == OotdPublicationStatus.DELETED) {
+            log.info("AI 태그 저장 스킵 - OOTD가 삭제되었습니다. ootdId={}", ootdId);
             return;
         }
 

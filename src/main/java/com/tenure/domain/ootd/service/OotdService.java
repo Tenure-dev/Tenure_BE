@@ -2,6 +2,7 @@ package com.tenure.domain.ootd.service;
 
 import com.tenure.domain.ootd.dto.OotdCreateResponse;
 import com.tenure.domain.ootd.entity.Ootd;
+import com.tenure.domain.ootd.enums.OotdPublicationStatus;
 import com.tenure.domain.ootd.enums.OotdSource;
 import com.tenure.domain.ootd.event.OotdCreatedEvent;
 import com.tenure.domain.ootd.exception.OotdErrorCode;
@@ -44,6 +45,22 @@ public class OotdService {
         eventPublisher.publishEvent(new OotdCreatedEvent(ootd.getId(), owner.getId(), imageUrl));
 
         return OotdCreateResponse.of(ootd);
+    }
+
+    @Transactional
+    public void deleteOotd(Long currentUserId, Long ootdId) {
+        Ootd ootd = ootdRepository.findVisibleActiveById(ootdId, currentUserId, OotdPublicationStatus.ACTIVE)
+                .orElseThrow(() -> new CustomException(OotdErrorCode.OOTD_NOT_FOUND));
+
+        validateOwner(ootd, currentUserId);
+
+        ootd.delete();
+    }
+
+    private void validateOwner(Ootd ootd, Long currentUserId) {
+        if (!ootd.getOwner().getId().equals(currentUserId)) {
+            throw new CustomException(OotdErrorCode.OOTD_OWNER_ONLY);
+        }
     }
 
     private void validateImage(MultipartFile image) {
