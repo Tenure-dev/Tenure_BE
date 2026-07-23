@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -103,6 +104,9 @@ class OotdDetailServiceTest {
                 .thenReturn(42L);
         when(ootdRepository.countByOwner_IdAndPublicationStatus(2L, OotdPublicationStatus.ACTIVE))
                 .thenReturn(17L);
+        when(followRelationshipRepository.existsByFollower_IdAndFollowing_IdAndStatus(
+                currentUserId, 2L, FollowStatus.ACCEPTED
+        )).thenReturn(false);
 
         OotdDetailResponse response = ootdDetailService.getOotdDetail(currentUserId, OOTD_ID);
 
@@ -110,6 +114,7 @@ class OotdDetailServiceTest {
         assertThat(response.author().userId()).isEqualTo(2L);
         assertThat(response.author().followerCount()).isEqualTo(42L);
         assertThat(response.author().feedCount()).isEqualTo(17L);
+        assertThat(response.author().following()).isFalse();
         assertThat(response.hearted()).isTrue();
         assertThat(response.saved()).isFalse();
         assertThat(response.tags()).hasSize(3);
@@ -233,6 +238,54 @@ class OotdDetailServiceTest {
     }
 
     @Test
+    void getOotdDetail_returnsFollowingTrueWhenViewerFollowsPublicAuthor() {
+        Long currentUserId = 1L;
+        User owner = user(2L, AccountVisibility.PUBLIC);
+        Ootd ootd = ootd(OOTD_ID, owner);
+
+        when(ootdRepository.findVisibleActiveById(OOTD_ID, currentUserId, OotdPublicationStatus.ACTIVE))
+                .thenReturn(Optional.of(ootd));
+        when(followRelationshipRepository.existsByFollower_IdAndFollowing_IdAndStatus(
+                currentUserId, 2L, FollowStatus.ACCEPTED
+        )).thenReturn(true);
+        when(ootdTagRepository.findConfirmedItemTagsByOotdId(OOTD_ID, TagStatus.CONFIRMED))
+                .thenReturn(List.of());
+        when(ootdReactionRepository.findReactedOotdIds(currentUserId, List.of(OOTD_ID), OotdReactionType.HEART))
+                .thenReturn(Set.of());
+        when(ootdReactionRepository.findReactedOotdIds(currentUserId, List.of(OOTD_ID), OotdReactionType.SAVE))
+                .thenReturn(Set.of());
+
+        OotdDetailResponse response = ootdDetailService.getOotdDetail(currentUserId, OOTD_ID);
+
+        assertThat(response.author().following()).isTrue();
+        verify(followRelationshipRepository, times(1))
+                .existsByFollower_IdAndFollowing_IdAndStatus(currentUserId, 2L, FollowStatus.ACCEPTED);
+    }
+
+    @Test
+    void getOotdDetail_returnsFollowingFalseWhenViewerDoesNotFollowPublicAuthor() {
+        Long currentUserId = 1L;
+        User owner = user(2L, AccountVisibility.PUBLIC);
+        Ootd ootd = ootd(OOTD_ID, owner);
+
+        when(ootdRepository.findVisibleActiveById(OOTD_ID, currentUserId, OotdPublicationStatus.ACTIVE))
+                .thenReturn(Optional.of(ootd));
+        when(followRelationshipRepository.existsByFollower_IdAndFollowing_IdAndStatus(
+                currentUserId, 2L, FollowStatus.ACCEPTED
+        )).thenReturn(false);
+        when(ootdTagRepository.findConfirmedItemTagsByOotdId(OOTD_ID, TagStatus.CONFIRMED))
+                .thenReturn(List.of());
+        when(ootdReactionRepository.findReactedOotdIds(currentUserId, List.of(OOTD_ID), OotdReactionType.HEART))
+                .thenReturn(Set.of());
+        when(ootdReactionRepository.findReactedOotdIds(currentUserId, List.of(OOTD_ID), OotdReactionType.SAVE))
+                .thenReturn(Set.of());
+
+        OotdDetailResponse response = ootdDetailService.getOotdDetail(currentUserId, OOTD_ID);
+
+        assertThat(response.author().following()).isFalse();
+    }
+
+    @Test
     void getOotdDetail_returnsEmptyTagsAndSkipsProductLookupWhenNoConfirmedTags() {
         Long currentUserId = 1L;
         User owner = user(2L, AccountVisibility.PUBLIC);
@@ -271,6 +324,7 @@ class OotdDetailServiceTest {
         OotdDetailResponse response = ootdDetailService.getOotdDetail(currentUserId, OOTD_ID);
 
         assertThat(response.ootdId()).isEqualTo(OOTD_ID);
+        assertThat(response.author().following()).isFalse();
         verify(followRelationshipRepository, never())
                 .existsByFollower_IdAndFollowing_IdAndStatus(eq(currentUserId), eq(currentUserId), eq(FollowStatus.ACCEPTED));
     }
@@ -332,6 +386,9 @@ class OotdDetailServiceTest {
         OotdDetailResponse response = ootdDetailService.getOotdDetail(currentUserId, OOTD_ID);
 
         assertThat(response.ootdId()).isEqualTo(OOTD_ID);
+        assertThat(response.author().following()).isTrue();
+        verify(followRelationshipRepository, times(1))
+                .existsByFollower_IdAndFollowing_IdAndStatus(currentUserId, owner.getId(), FollowStatus.ACCEPTED);
     }
 
     @Test

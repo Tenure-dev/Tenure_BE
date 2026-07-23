@@ -43,7 +43,7 @@ public class OotdDetailService {
         Ootd ootd = ootdRepository.findVisibleActiveById(ootdId, currentUserId, OotdPublicationStatus.ACTIVE)
                 .orElseThrow(() -> new CustomException(OotdErrorCode.OOTD_NOT_FOUND));
 
-        validateOotdVisibility(ootd.getOwner(), currentUserId);
+        boolean following = validateVisibilityAndResolveFollowing(ootd.getOwner(), currentUserId);
 
         List<OotdTag> tags = ootdTagRepository.findConfirmedItemTagsByOotdId(ootdId, TagStatus.CONFIRMED);
 
@@ -65,22 +65,37 @@ public class OotdDetailService {
                 OotdPublicationStatus.ACTIVE
         );
 
-        return OotdDetailResponse.of(ootd, hearted, saved, tags, latestProductByItemId, followerCount, feedCount);
+        return OotdDetailResponse.of(
+                ootd,
+                hearted,
+                saved,
+                tags,
+                latestProductByItemId,
+                followerCount,
+                feedCount,
+                following
+        );
     }
 
-    private void validateOotdVisibility(User owner, Long currentUserId) {
-        if (owner.getId().equals(currentUserId) || owner.getAccountVisibility() == AccountVisibility.PUBLIC) {
-            return;
+    // 팔로우 여부(following)와 비공개 계정 접근 가능 여부를 같은 exists 조회 결과로 함께 판단한다.
+    // 본인 글이면 조회 자체를 스킵(following=false 고정), 공개 계정도 following 값이 필요해
+    // 이제 항상 조회가 발생하므로 별도 쿼리를 다시 날리지 않도록 결과를 재사용한다.
+    private boolean validateVisibilityAndResolveFollowing(User owner, Long currentUserId) {
+        if (owner.getId().equals(currentUserId)) {
+            return false;
         }
 
-        boolean acceptedFollower = followRelationshipRepository.existsByFollower_IdAndFollowing_IdAndStatus(
+        boolean following = followRelationshipRepository.existsByFollower_IdAndFollowing_IdAndStatus(
                 currentUserId,
                 owner.getId(),
                 FollowStatus.ACCEPTED
         );
-        if (!acceptedFollower) {
+
+        if (owner.getAccountVisibility() != AccountVisibility.PUBLIC && !following) {
             throw new CustomException(OotdErrorCode.PRIVATE_OOTD_ACCESS_DENIED);
         }
+
+        return following;
     }
 
     private Map<Long, Product> findLatestProductByItemId(List<OotdTag> tags) {

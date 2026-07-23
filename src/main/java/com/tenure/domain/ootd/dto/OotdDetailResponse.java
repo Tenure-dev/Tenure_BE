@@ -63,7 +63,8 @@ public record OotdDetailResponse(
             List<OotdTag> tags,
             Map<Long, Product> latestProductByItemId,
             long followerCount,
-            long feedCount
+            long feedCount,
+            boolean following
     ) {
         return new OotdDetailResponse(
                 ootd.getId(),
@@ -71,7 +72,7 @@ public record OotdDetailResponse(
                 ootd.getSource(),
                 ootd.getTagStatus(),
                 ootd.getTagConfirmedAt(),
-                Author.from(ootd.getOwner(), followerCount, feedCount),
+                Author.from(ootd.getOwner(), followerCount, feedCount, following),
                 ootd.getHeartCount(),
                 ootd.getSaveCount(),
                 ootd.getViewCount(),
@@ -98,16 +99,20 @@ public record OotdDetailResponse(
             long followerCount,
 
             @Schema(description = "작성자의 활성 피드(게시물) 수", example = "17")
-            long feedCount
+            long feedCount,
+
+            @Schema(description = "현재 요청자가 작성자를 팔로우 중인지 여부", example = "true")
+            boolean following
     ) {
 
-        static Author from(User owner, long followerCount, long feedCount) {
+        static Author from(User owner, long followerCount, long feedCount, boolean following) {
             return new Author(
                     owner.getId(),
                     owner.getUsername(),
                     owner.getProfileImageUrl(),
                     followerCount,
-                    feedCount
+                    feedCount,
+                    following
             );
         }
     }
