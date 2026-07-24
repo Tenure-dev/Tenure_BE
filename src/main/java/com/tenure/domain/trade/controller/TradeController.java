@@ -43,13 +43,6 @@ public class TradeController {
                     + "role을 지정하면 해당 역할의 거래만, 지정하지 않으면 참여한 모든 거래를 반환합니다.",
             parameters = {
                     @Parameter(
-                            name = "X-USER-ID",
-                            in = ParameterIn.HEADER,
-                            required = true,
-                            description = "JWT 적용 전 Swagger 테스트용 현재 사용자 ID. JWT 적용 후에는 SecurityContext 값을 사용합니다.",
-                            example = "1"
-                    ),
-                    @Parameter(
                             name = "role",
                             in = ParameterIn.QUERY,
                             description = "조회할 역할. BUYER면 구매한 거래, SELLER면 판매한 거래만 조회하며 미지정 시 참여한 모든 거래를 조회합니다.",
@@ -133,16 +126,7 @@ public class TradeController {
     @Operation(
             summary = "거래 상세 조회",
             description = "거래 상세를 조회합니다. 현재 사용자가 거래의 구매자 또는 판매자가 아니면 거래 존재 여부 노출을 막기 위해 "
-                    + "404 TRADE_404를 반환합니다.",
-            parameters = {
-                    @Parameter(
-                            name = "X-USER-ID",
-                            in = ParameterIn.HEADER,
-                            required = true,
-                            description = "JWT 적용 전 Swagger 테스트용 현재 사용자 ID. JWT 적용 후에는 SecurityContext 값을 사용합니다.",
-                            example = "2"
-                    )
-            }
+                    + "404 TRADE_404를 반환합니다."
     )
     @ApiResponse(
             responseCode = "200",
@@ -200,15 +184,6 @@ public class TradeController {
             description = "거래 상태를 다음 단계로 전이합니다. status만 필수이며 deliveryCarrier/trackingNumber/"
                     + "customDeliveryCarrierName은 SHIPPED 전이에서만 사용합니다. SETTLED, COMPLETED, TRANSFERRED는 "
                     + "직접 요청할 수 없는 상태로 409를 반환합니다.",
-            parameters = {
-                    @Parameter(
-                            name = "X-USER-ID",
-                            in = ParameterIn.HEADER,
-                            required = true,
-                            description = "JWT 적용 전 Swagger 테스트용 현재 사용자 ID. JWT 적용 후에는 SecurityContext 값을 사용합니다.",
-                            example = "1"
-                    )
-            },
             requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
                     required = true,
                     content = @Content(
