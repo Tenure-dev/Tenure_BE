@@ -9,6 +9,7 @@ import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tenure.domain.address.entity.DeliveryAddress;
 import com.tenure.domain.address.repository.DeliveryAddressRepository;
 import com.tenure.domain.common.enums.FeePolicy;
@@ -104,7 +105,7 @@ class PurchaseIntentServiceTest {
     }
 
     @Test
-    void createPurchaseIntent_createsAuthorizedIntentWithSellerPaysFee() {
+    void createPurchaseIntent_createsAuthorizedIntentWithSellerPaysFee() throws Exception {
         User seller = user(SELLER_ID, UserGrade.BASIC);
         User buyer = user(BUYER_ID, UserGrade.BASIC);
         Item item = item(ITEM_ID, seller);
@@ -127,12 +128,15 @@ class PurchaseIntentServiceTest {
 
         assertThat(response.intentId()).isEqualTo(123L);
         assertThat(response.status()).isEqualTo(PurchaseIntentStatus.SENT);
+        assertThat(response.remainingSeconds()).isBetween(86399L, 86400L);
         assertThat(response.amounts().productAmount()).isEqualTo(360000);
-        assertThat(response.amounts().shippingFee()).isEqualTo(5000);
+        assertThat(response.amounts().deliveryFee()).isEqualTo(5000);
         assertThat(response.amounts().buyerServiceFee()).isZero();
-        assertThat(response.amounts().sellerServiceFee()).isEqualTo(21600);
         assertThat(response.amounts().buyerPaymentAmount()).isEqualTo(365000);
-        assertThat(response.amounts().sellerSettlementAmount()).isEqualTo(343400);
+
+        String responseJson = new ObjectMapper().findAndRegisterModules().writeValueAsString(response);
+        assertThat(responseJson).contains("productAmount", "deliveryFee", "buyerServiceFee", "buyerPaymentAmount");
+        assertThat(responseJson).doesNotContain("sellerServiceFee", "sellerSettlementAmount");
 
         ArgumentCaptor<PurchaseIntent> captor = ArgumentCaptor.forClass(PurchaseIntent.class);
         verify(purchaseIntentRepository).save(captor.capture());
@@ -140,6 +144,8 @@ class PurchaseIntentServiceTest {
         assertThat(savedIntent.getPaymentAuthorizationStatus()).isEqualTo(PaymentAuthorizationStatus.AUTHORIZED);
         assertThat(savedIntent.getPaymentAuthorizationId()).startsWith("mock_auth_");
         assertThat(savedIntent.getFeeRateSnapshot()).isEqualByComparingTo("0.0600");
+        assertThat(savedIntent.getSellerServiceFee()).isEqualTo(21600);
+        assertThat(savedIntent.getSellerSettlementAmount()).isEqualTo(343400);
         assertThat(savedIntent.getDeliveryReceiverName()).isEqualTo("Buyer");
         assertThat(savedIntent.getDeliveryAddressLine1()).isEqualTo("Seoul Gangnam");
     }
@@ -201,10 +207,15 @@ class PurchaseIntentServiceTest {
 
         assertThat(expiredIntent.getStatus()).isEqualTo(PurchaseIntentStatus.EXPIRED);
         assertThat(expiredIntent.getPaymentAuthorizationStatus()).isEqualTo(PaymentAuthorizationStatus.RELEASED);
+        assertThat(response.remainingSeconds()).isBetween(86399L, 86400L);
         assertThat(response.amounts().buyerServiceFee()).isEqualTo(10800);
-        assertThat(response.amounts().sellerServiceFee()).isZero();
         assertThat(response.amounts().buyerPaymentAmount()).isEqualTo(375800);
-        assertThat(response.amounts().sellerSettlementAmount()).isEqualTo(365000);
+
+        ArgumentCaptor<PurchaseIntent> captor = ArgumentCaptor.forClass(PurchaseIntent.class);
+        verify(purchaseIntentRepository).save(captor.capture());
+        PurchaseIntent savedIntent = captor.getValue();
+        assertThat(savedIntent.getSellerServiceFee()).isZero();
+        assertThat(savedIntent.getSellerSettlementAmount()).isEqualTo(365000);
     }
 
     @Test
@@ -231,10 +242,15 @@ class PurchaseIntentServiceTest {
                 request(true)
         );
 
+        assertThat(response.remainingSeconds()).isBetween(86399L, 86400L);
         assertThat(response.amounts().buyerServiceFee()).isEqualTo(500);
-        assertThat(response.amounts().sellerServiceFee()).isEqualTo(501);
         assertThat(response.amounts().buyerPaymentAmount()).isEqualTo(33868);
-        assertThat(response.amounts().sellerSettlementAmount()).isEqualTo(32867);
+
+        ArgumentCaptor<PurchaseIntent> captor = ArgumentCaptor.forClass(PurchaseIntent.class);
+        verify(purchaseIntentRepository).save(captor.capture());
+        PurchaseIntent savedIntent = captor.getValue();
+        assertThat(savedIntent.getSellerServiceFee()).isEqualTo(501);
+        assertThat(savedIntent.getSellerSettlementAmount()).isEqualTo(32867);
     }
 
     @Test
