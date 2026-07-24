@@ -14,9 +14,11 @@ import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.ChannelInterceptor;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.stereotype.Component;
 import org.springframework.util.AntPathMatcher;
 
+import java.util.Collections;
 import java.util.Map;
 
 @Slf4j
@@ -54,7 +56,8 @@ public class StompHandler implements ChannelInterceptor {
             }
 
             Long currentUserId = jwtProvider.getUserId(jwtToken);
-            accessor.getSessionAttributes().put("currentUserId", currentUserId);
+            accessor.setUser(new UsernamePasswordAuthenticationToken(currentUserId.toString(),
+                    null, Collections.emptyList()));
         }
         
         //구독요청일 경우(채팅방 접속)
@@ -68,7 +71,7 @@ public class StompHandler implements ChannelInterceptor {
                 return message;
             }
 
-            Long currentUserId = (Long) accessor.getSessionAttributes().get("currentUserId");
+            Long currentUserId = Long.valueOf(accessor.getUser().getName());
             Long chatRoomId = getChatRoomId(destination);
 
             // 해당 채팅방에 접근 권한 검사

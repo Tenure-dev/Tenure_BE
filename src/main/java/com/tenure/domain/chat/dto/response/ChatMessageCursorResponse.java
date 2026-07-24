@@ -17,8 +17,9 @@ public class ChatMessageCursorResponse {
     private LocalDateTime nextCursor;
     private Long nextCursorId;
     private boolean hasNext;
+    private Long opponentLastReadMessageId;
 
-    public static ChatMessageCursorResponse from(Slice<ChatMessage> slice) {
+    public static ChatMessageCursorResponse from(Slice<ChatMessage> slice, Long currentUserId, Long opponentLastReadMessageId) {
         List<ChatMessage> content = slice.getContent();
         boolean hasNext = slice.hasNext();
 
@@ -31,11 +32,19 @@ public class ChatMessageCursorResponse {
             nextCursorId = lastMessage.getId();
         }
 
+        // unreadCount: 상대방이 내 메시지를 안읽었으면 1, 읽었으면 0
+        List<ChatMessageResponse> chatMessages = content.stream().map(m -> {
+            int unreadCount = m.getSender().getId().equals(currentUserId)
+                    && m.getId() > opponentLastReadMessageId ? 1 : 0;
+            return ChatMessageResponse.from(m, unreadCount);
+        }).toList();
+
         return new ChatMessageCursorResponse(
-                content.stream().map(ChatMessageResponse::from).toList(),
+                chatMessages,
                 nextCursor,
                 nextCursorId,
-                hasNext
+                hasNext,
+                opponentLastReadMessageId
         );
 
     }
