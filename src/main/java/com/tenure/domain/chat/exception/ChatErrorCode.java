@@ -13,6 +13,7 @@ public enum ChatErrorCode implements ErrorCode {
     CHAT_FORBIDDEN("CHAT_403", "채팅방에 접근할 권한이 없습니다.", HttpStatus.FORBIDDEN),
     CHAT_BLOCKED("CHAT_403_BLOCKED", "차단된 사용자와는 채팅할 수 없습니다.", HttpStatus.FORBIDDEN),
     CHAT_CREATION_NOT_ALLOWED("CHAT_400", "채팅방을 생성할 수 없습니다.", HttpStatus.BAD_REQUEST),
+    INVALID_MESSAGE_CONTENT("CHAT_400_CONTENT", "메시지 내용이 올바르지 않습니다.", HttpStatus.BAD_REQUEST),
     INVALID_IMAGE_TYPE("CHAT_400_IMAGE", "지원하지 않는 이미지 형식입니다. (jpeg, png, gif, webp, heic만 허용)", HttpStatus.BAD_REQUEST);
 
     private final String code;

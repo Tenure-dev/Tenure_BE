@@ -17,7 +17,6 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
             "order by cm.createdAt desc limit 1")
     Optional<ChatMessage> findByRecentMessage(@Param("chatRoomId") Long chatRoomId);
 
-
     // 채팅 내역 조회
     @Query("select cm from ChatMessage cm join fetch cm.sender " +
             "where cm.chatRoom.id = :chatRoomId " +
@@ -28,4 +27,6 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
                                           @Param("cursorId") Long cursorId,
                                           Pageable pageable
     );
+
+
 }

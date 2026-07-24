@@ -18,7 +18,6 @@ import com.tenure.domain.product.entity.Product;
 import com.tenure.domain.product.exception.ProductErrorCode;
 import com.tenure.domain.product.repository.ProductRepository;
 import com.tenure.domain.trade.entity.Trade;
-import com.tenure.domain.trade.exception.TradeErrorCode;
 import com.tenure.domain.trade.repository.TradeRepository;
 import com.tenure.domain.user.entity.User;
 import com.tenure.domain.user.exception.UserErrorCode;
@@ -135,8 +134,15 @@ public class ChatRoomService {
                              LocalDateTime cursor, LocalDateTime createdAtCursor, Long cursorId, int size)
     {
 
-        if(cursor == null) cursor = LocalDateTime.now();
-        if(cursorId == null) cursorId = Long.MAX_VALUE;
+        // 연락을 한번도 안한 채팅방이 cursor의 경계에 걸리게 된 경우
+        if(cursor == null && cursorId == null) {
+            cursor = LocalDateTime.now();
+            cursorId = Long.MAX_VALUE;
+        } else if(cursorId == null) { //cursor는 그냥 null로 지정
+            cursorId = Long.MAX_VALUE;
+        }
+
+        // null lastMessageAt 영역 커서: 없으면 now() (진입 전 = 전체 포함)
         if(createdAtCursor == null) createdAtCursor = LocalDateTime.now();
 
         log.info("[채팅방 목록 조회] currentUserId = {}, type = {}, cursor = {}, createdAtCursor = {}, cursorId = {}, size = {}", currentUserId, type, cursor, createdAtCursor, cursorId, size);

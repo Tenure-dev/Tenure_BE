@@ -12,6 +12,8 @@ import java.util.Optional;
 
 public interface ChatRoomMemberRepository extends JpaRepository<ChatRoomMember, Long> {
 
+    boolean existsByUserIdAndChatRoomId(Long userId, Long chatRoomId);
+
     // 전체 채팅방
     @Query("select crm from ChatRoomMember crm " +
             "join fetch crm.chatRoom c " +
@@ -76,7 +78,5 @@ public interface ChatRoomMemberRepository extends JpaRepository<ChatRoomMember, 
                                               Pageable pageable);
 
     //해당 채팅방의 사용자 조회
-    Optional<ChatRoomMember> findByUserIdAndChatRoomId(Long user_id, Long chatRoom_id);
-
-    boolean existsByUserIdAndChatRoomId(Long userId, Long chatRoomId);
+    Optional<ChatRoomMember> findByUserIdAndChatRoomId(Long userId, Long chatRoomId);
 }
