@@ -49,16 +49,7 @@ public class OotdController {
 
     @Operation(
             summary = "My OOTD posts",
-            description = "Returns my OOTD posts as a flat latest list for my page monthly gallery. Includes active and archived posts.",
-            parameters = {
-                    @Parameter(
-                            name = "X-USER-ID",
-                            in = ParameterIn.HEADER,
-                            required = true,
-                            description = "Temporary current user id for Swagger/local testing before JWT is fully connected.",
-                            example = "1"
-                    )
-            }
+            description = "Returns my OOTD posts as a flat latest list for my page monthly gallery. Includes active and archived posts."
     )
     @ApiResponse(
             responseCode = "200",
@@ -112,16 +103,7 @@ public class OotdController {
 
     @Operation(
             summary = "Related OOTDs",
-            description = "Returns simple MVP related OOTD sections: similarMood, sameItems, and recommended.",
-            parameters = {
-                    @Parameter(
-                            name = "X-USER-ID",
-                            in = ParameterIn.HEADER,
-                            required = true,
-                            description = "Temporary current user id for Swagger/local testing before JWT is fully connected.",
-                            example = "1"
-                    )
-            }
+            description = "Returns simple MVP related OOTD sections: similarMood, sameItems, and recommended."
     )
     @ApiResponse(
             responseCode = "200",
