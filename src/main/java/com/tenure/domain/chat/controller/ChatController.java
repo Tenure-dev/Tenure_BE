@@ -10,8 +10,6 @@ import com.tenure.domain.chat.service.ChatRoomService;
 import com.tenure.global.response.BaseResponse;
 import com.tenure.global.security.CurrentUserProvider;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -36,12 +34,6 @@ public class ChatController {
             summary = "채팅방 생성 또는 조회",
             description = "아이템 상세 페이지에서 채팅하기 버튼 클릭 시 호출합니다. 이미 채팅방이 존재하면 기존 채팅방을 반환합니다."
     )
-    @Parameter(
-            name = "X-USER-ID",
-            description = "개발용 사용자 ID 헤더",
-            in = ParameterIn.HEADER,
-            example = "1"
-    )
     @PostMapping
     public BaseResponse<ChatRoomResponse> findOrCreateChatRoom(@RequestBody @Valid ChatRoomRequest chatRoomRequest) {
 
@@ -56,7 +48,6 @@ public class ChatController {
             summary = "채팅방 목록 조회",
             description = "현재 사용자의 채팅방 목록을 커서 기반 페이지네이션으로 반환합니다. type: ALL(전체), BUYING(구매 채팅), SELLING(판매 채팅), UNREAD(읽지 않음)"
     )
-    @Parameter(name = "X-USER-ID", description = "개발용 사용자 ID 헤더", in = ParameterIn.HEADER, example = "1")
     @GetMapping
     public BaseResponse<ChatRoomListCursorResponse> chatList(
             @RequestParam(defaultValue = "ALL") ChatRoomFilterType type,
@@ -75,7 +66,6 @@ public class ChatController {
             summary = "채팅방 조회",
             description = "채팅방 목록에서 채팅방 클릭 시 호출합니다. 구매자/판매자 여부와 거래 상태에 따른 버튼 정보를 함께 반환합니다."
     )
-    @Parameter(name = "X-USER-ID", description = "개발용 사용자 ID 헤더", in = ParameterIn.HEADER, example = "1")
     @GetMapping("/{chatRoomId}")
     public BaseResponse<ChatRoomResponse> getChatRoom(@PathVariable Long chatRoomId) {
 
@@ -89,7 +79,6 @@ public class ChatController {
             summary = "채팅방 읽음 처리",
             description = "채팅방 접속 시 호출합니다. 읽지 않은 메시지 수를 0으로 초기화합니다."
     )
-    @Parameter(name = "X-USER-ID", description = "개발용 사용자 ID 헤더", in = ParameterIn.HEADER, example = "1")
     @PostMapping("/{chatRoomId}/read")
     public BaseResponse<Void> updateUnreadCount(@PathVariable Long chatRoomId) {
         chatRoomService.updateRead(currentUserProvider.getCurrentUserId(), chatRoomId);
@@ -100,7 +89,6 @@ public class ChatController {
             summary = "채팅 내역 조회",
             description = "채팅방의 메시지 목록을 커서 기반 페이지네이션으로 반환합니다. 최신 메시지부터 내려옵니다. TEXT 타입은 content만, IMAGE 타입은 contentImageUrl만 값이 있고 나머지는 null입니다."
     )
-    @Parameter(name = "X-USER-ID", description = "개발용 사용자 ID 헤더", in = ParameterIn.HEADER, example = "1")
     @GetMapping("/{chatRoomId}/messages")
     public BaseResponse<ChatMessageCursorResponse> getMessages(
             @PathVariable Long chatRoomId,
@@ -118,7 +106,6 @@ public class ChatController {
             summary = "채팅 이미지 업로드",
             description = "채팅방에서 이미지 전송 시 호출합니다. 이미지를 업로드하고 URL을 반환합니다. 반환된 URL을 WebSocket 메시지의 imageUrl 필드에 담아 전송하세요."
     )
-    @Parameter(name = "X-USER-ID", description = "개발용 사용자 ID 헤더", in = ParameterIn.HEADER, example = "1")
     @PostMapping(value = "/{chatRoomId}/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public BaseResponse<ChatImageUploadResponse> uploadChatImage(
             @PathVariable Long chatRoomId,
