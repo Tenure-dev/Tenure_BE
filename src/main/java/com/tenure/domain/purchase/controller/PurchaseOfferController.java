@@ -13,7 +13,6 @@ import com.tenure.global.response.BaseResponse;
 import com.tenure.global.security.CurrentUserProvider;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -42,13 +41,9 @@ public class PurchaseOfferController {
 
     private final PurchaseOfferService purchaseOfferService;
     private final CurrentUserProvider currentUserProvider;
-
     @Operation(
             summary = "Create purchase offer",
             description = "Creates a one-time purchase offer for an owned, non-sale item.",
-            parameters = {
-                    @Parameter(name = "X-USER-ID", in = ParameterIn.HEADER, required = true, example = "2")
-            },
             requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
                     required = true,
                     content = @Content(
@@ -80,7 +75,10 @@ public class PurchaseOfferController {
                 .body(BaseResponse.success(response, "Purchase offer created."));
     }
 
-    @Operation(summary = "Get purchase offer detail")
+    @Operation(
+            summary = "Get purchase offer detail",
+            description = "Returns a purchase offer waiting detail. Only the proposer or item owner can read it."
+    )
     @ApiResponse(responseCode = "200", content = @Content(schema = @Schema(implementation = PurchaseOfferDetailResponse.class)))
     @GetMapping("/purchase-offers/{offerId}")
     public BaseResponse<PurchaseOfferDetailResponse> getPurchaseOfferDetail(@PathVariable Long offerId) {
@@ -89,7 +87,32 @@ public class PurchaseOfferController {
         return BaseResponse.success(response, "Query succeeded.");
     }
 
-    @Operation(summary = "Get sent purchase offers")
+    @Operation(
+            summary = "Get sent purchase offers",
+            description = "Returns purchase offers sent by the current proposer. Expired SENT offers are corrected to EXPIRED and RELEASED during lookup.",
+            parameters = {
+                    @Parameter(
+                            name = "statuses",
+                            description = "Status list to filter. Example: statuses=SENT or statuses=SENT,EXPIRED. If omitted, all statuses are returned.",
+                            example = "SENT"
+                    ),
+                    @Parameter(
+                            name = "cursorCreatedAt",
+                            description = "Created-at cursor for the next page.",
+                            example = "2026-07-12T10:00:00+09:00"
+                    ),
+                    @Parameter(
+                            name = "cursorOfferId",
+                            description = "Purchase offer ID cursor for the next page.",
+                            example = "123"
+                    ),
+                    @Parameter(
+                            name = "size",
+                            description = "Page size. Default 20, max 50.",
+                            example = "20"
+                    )
+            }
+    )
     @ApiResponse(responseCode = "200", content = @Content(schema = @Schema(implementation = PurchaseOfferSentListResponse.class)))
     @GetMapping("/purchase-offers/sent")
     public BaseResponse<PurchaseOfferSentListResponse> getSentPurchaseOffers(
@@ -111,7 +134,32 @@ public class PurchaseOfferController {
         return BaseResponse.success(response, "Query succeeded.");
     }
 
-    @Operation(summary = "Get received purchase offers")
+    @Operation(
+            summary = "Get received purchase offers",
+            description = "Returns purchase offers received by the current item owner. Expired SENT offers are corrected to EXPIRED and RELEASED during lookup.",
+            parameters = {
+                    @Parameter(
+                            name = "statuses",
+                            description = "Status list to filter. Example: statuses=SENT or statuses=SENT,EXPIRED. If omitted, all statuses are returned.",
+                            example = "SENT"
+                    ),
+                    @Parameter(
+                            name = "cursorCreatedAt",
+                            description = "Created-at cursor for the next page.",
+                            example = "2026-07-12T10:00:00+09:00"
+                    ),
+                    @Parameter(
+                            name = "cursorOfferId",
+                            description = "Purchase offer ID cursor for the next page.",
+                            example = "123"
+                    ),
+                    @Parameter(
+                            name = "size",
+                            description = "Page size. Default 20, max 50.",
+                            example = "20"
+                    )
+            }
+    )
     @ApiResponse(responseCode = "200", content = @Content(schema = @Schema(implementation = PurchaseOfferReceivedListResponse.class)))
     @GetMapping("/purchase-offers/received")
     public BaseResponse<PurchaseOfferReceivedListResponse> getReceivedPurchaseOffers(
@@ -133,7 +181,10 @@ public class PurchaseOfferController {
         return BaseResponse.success(response, "Query succeeded.");
     }
 
-    @Operation(summary = "Reject purchase offer")
+    @Operation(
+            summary = "Reject purchase offer",
+            description = "The item owner rejects a SENT purchase offer and releases the mock payment authorization. The one-time offer chance is not restored."
+    )
     @ApiResponse(responseCode = "200", content = @Content(schema = @Schema(implementation = PurchaseOfferRejectResponse.class)))
     @PostMapping("/purchase-offers/{offerId}/reject")
     public BaseResponse<PurchaseOfferRejectResponse> rejectPurchaseOffer(@PathVariable Long offerId) {
