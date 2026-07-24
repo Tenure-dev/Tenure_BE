@@ -39,11 +39,17 @@ public record OotdMyPostItemResponse(
         @Schema(description = "Save count", example = "4")
         Integer saveCount,
 
+        @Schema(description = "Whether current user hearted this OOTD", example = "true")
+        boolean hearted,
+
+        @Schema(description = "Whether current user saved this OOTD", example = "false")
+        boolean saved,
+
         @Schema(description = "Created date time", example = "2026-07-14T10:00:00")
         LocalDateTime createdAt
 ) {
 
-    public static OotdMyPostItemResponse of(Ootd ootd) {
+    public static OotdMyPostItemResponse of(Ootd ootd, boolean hearted, boolean saved) {
         return new OotdMyPostItemResponse(
                 ootd.getId(),
                 ootd.getImageUrl(),
@@ -55,6 +61,8 @@ public record OotdMyPostItemResponse(
                 ootd.getArchivedAt(),
                 ootd.getHeartCount(),
                 ootd.getSaveCount(),
+                hearted,
+                saved,
                 ootd.getCreatedAt()
         );
     }
