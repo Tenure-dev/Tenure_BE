@@ -28,7 +28,7 @@ public class ChatMessageController {
             @Valid @Payload ChatMessageRequest chatMessageRequest,
             SimpMessageHeaderAccessor headerAccessor
             ) {
-        Long currentUserId = (Long) headerAccessor.getSessionAttributes().get("currentUserId");
+        Long currentUserId = Long.valueOf(headerAccessor.getUser().getName());
 
         // 트랜잭션 커밋 후 브로드캐스트 (커밋 전 전송 시 수신자 REST 조회에서 메시지 누락 방지)
         ChatMessageResponse response = chatMessageService.sendMessage(chatRoomId, currentUserId, chatMessageRequest);
