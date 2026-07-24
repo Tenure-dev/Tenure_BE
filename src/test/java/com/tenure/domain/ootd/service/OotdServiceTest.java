@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 
 import com.tenure.domain.ootd.dto.OotdCreateResponse;
 import com.tenure.domain.ootd.entity.Ootd;
+import com.tenure.domain.ootd.enums.OotdPublicationStatus;
 import com.tenure.domain.ootd.event.OotdCreatedEvent;
 import com.tenure.domain.ootd.exception.OotdErrorCode;
 import com.tenure.domain.ootd.repository.OotdRepository;
@@ -35,6 +36,7 @@ import org.springframework.web.multipart.MultipartFile;
 class OotdServiceTest {
 
     private static final Long CURRENT_USER_ID = 1L;
+    private static final Long OOTD_ID = 100L;
 
     @Mock
     private OotdRepository ootdRepository;
@@ -118,10 +120,69 @@ class OotdServiceTest {
                 .isEqualTo(CommonErrorCode.UNAUTHORIZED);
     }
 
+    @Test
+    void deleteOotd_marksOwnedOotdAsDeleted() {
+        User owner = user(CURRENT_USER_ID);
+        Ootd ootd = ootd(OOTD_ID, owner);
+
+        when(ootdRepository.findVisibleActiveById(OOTD_ID, CURRENT_USER_ID, OotdPublicationStatus.ACTIVE))
+                .thenReturn(Optional.of(ootd));
+
+        ootdService.deleteOotd(CURRENT_USER_ID, OOTD_ID);
+
+        assertThat(ootd.getPublicationStatus()).isEqualTo(OotdPublicationStatus.DELETED);
+    }
+
+    @Test
+    void deleteOotd_rejectsNonOwner() {
+        User owner = user(CURRENT_USER_ID);
+        Ootd ootd = ootd(OOTD_ID, owner);
+        Long strangerId = 999L;
+
+        when(ootdRepository.findVisibleActiveById(OOTD_ID, strangerId, OotdPublicationStatus.ACTIVE))
+                .thenReturn(Optional.of(ootd));
+
+        assertThatThrownBy(() -> ootdService.deleteOotd(strangerId, OOTD_ID))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(OotdErrorCode.OOTD_OWNER_ONLY);
+        assertThat(ootd.getPublicationStatus()).isEqualTo(OotdPublicationStatus.ACTIVE);
+    }
+
+    @Test
+    void deleteOotd_rejectsWhenNotFound() {
+        when(ootdRepository.findVisibleActiveById(OOTD_ID, CURRENT_USER_ID, OotdPublicationStatus.ACTIVE))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> ootdService.deleteOotd(CURRENT_USER_ID, OOTD_ID))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(OotdErrorCode.OOTD_NOT_FOUND);
+    }
+
+    @Test
+    void deleteOotd_isIdempotentAndReturnsNotFoundWhenAlreadyDeleted() {
+        // findVisibleActiveById는 ACTIVE 상태만 조회하므로, 이미 삭제된 게시물은 항상 빈 결과를 반환한다.
+        when(ootdRepository.findVisibleActiveById(OOTD_ID, CURRENT_USER_ID, OotdPublicationStatus.ACTIVE))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> ootdService.deleteOotd(CURRENT_USER_ID, OOTD_ID))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(OotdErrorCode.OOTD_NOT_FOUND);
+    }
+
     private User user(Long id) {
         User user = instantiate(User.class);
         ReflectionTestUtils.setField(user, "id", id);
         return user;
+    }
+
+    private Ootd ootd(Long id, User owner) {
+        Ootd ootd = instantiate(Ootd.class);
+        ReflectionTestUtils.setField(ootd, "id", id);
+        ReflectionTestUtils.setField(ootd, "owner", owner);
+        return ootd;
     }
 
     private <T> T instantiate(Class<T> type) {

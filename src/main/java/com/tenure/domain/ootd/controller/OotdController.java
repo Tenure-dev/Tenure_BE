@@ -49,16 +49,7 @@ public class OotdController {
 
     @Operation(
             summary = "My OOTD posts",
-            description = "Returns my OOTD posts as a flat latest list for my page monthly gallery. Includes active and archived posts.",
-            parameters = {
-                    @Parameter(
-                            name = "X-USER-ID",
-                            in = ParameterIn.HEADER,
-                            required = true,
-                            description = "Temporary current user id for Swagger/local testing before JWT is fully connected.",
-                            example = "1"
-                    )
-            }
+            description = "Returns my OOTD posts as a flat latest list for my page monthly gallery. Includes active and archived posts."
     )
     @ApiResponse(
             responseCode = "200",
@@ -112,16 +103,7 @@ public class OotdController {
 
     @Operation(
             summary = "Related OOTDs",
-            description = "Returns simple MVP related OOTD sections: similarMood, sameItems, and recommended.",
-            parameters = {
-                    @Parameter(
-                            name = "X-USER-ID",
-                            in = ParameterIn.HEADER,
-                            required = true,
-                            description = "Temporary current user id for Swagger/local testing before JWT is fully connected.",
-                            example = "1"
-                    )
-            }
+            description = "Returns simple MVP related OOTD sections: similarMood, sameItems, and recommended."
     )
     @ApiResponse(
             responseCode = "200",
@@ -166,6 +148,21 @@ public class OotdController {
         OotdCreateResponse response = ootdService.createOotd(currentUserId, image, source);
 
         return BaseResponse.success(response, "OOTD가 게시되었습니다.");
+    }
+
+    @Operation(
+            summary = "OOTD 삭제",
+            description = "작성자 본인이 게시한 OOTD를 삭제합니다(soft delete). 삭제된 OOTD는 상세 조회, 피드, "
+                    + "마이페이지, 검색, 하트/저장 목록 등 모든 목록에서 제외되며 복원 기능은 제공하지 않습니다."
+    )
+    @ApiResponse(responseCode = "204", description = "삭제 성공")
+    @ApiResponse(responseCode = "403", description = "본인이 게시한 OOTD가 아님")
+    @ApiResponse(responseCode = "404", description = "존재하지 않거나 비공개(ARCHIVED) 처리되었거나 이미 삭제된 OOTD")
+    @DeleteMapping("/{ootdId}")
+    public ResponseEntity<Void> deleteOotd(@PathVariable Long ootdId) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        ootdService.deleteOotd(currentUserId, ootdId);
+        return ResponseEntity.noContent().build();
     }
 
     @Operation(

@@ -83,6 +83,7 @@ public class PurchaseIntentService {
                 .findByIdAndUser_Id(request.deliveryAddressId(), currentUserId)
                 .orElseThrow(() -> new CustomException(PurchaseIntentErrorCode.DELIVERY_ADDRESS_NOT_FOUND));
 
+        LocalDateTime now = LocalDateTime.now();
         FeeAmounts amounts = calculateFeeAmounts(product);
         PurchaseIntent intent = PurchaseIntent.create(
                 product,
@@ -99,11 +100,11 @@ public class PurchaseIntentService {
                 amounts.sellerSettlementAmount(),
                 createMockPaymentAuthorizationId(),
                 request.paymentMethodId(),
-                LocalDateTime.now().plusHours(RESPONSE_HOURS)
+                now.plusHours(RESPONSE_HOURS)
         );
 
         purchaseIntentRepository.save(intent);
-        return PurchaseIntentCreateResponse.from(intent);
+        return PurchaseIntentCreateResponse.from(intent, now);
     }
 
     @Transactional

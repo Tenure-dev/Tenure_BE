@@ -15,7 +15,7 @@ public class ChatRoomListCursorResponse {
 
     private List<ChatRoomSummaryResponse> content;
     private LocalDateTime nextCursorLastMessageAt;
-    private LocalDateTime nextCursorCreatedAt;
+    private LocalDateTime nextCursorCreatedAt; // null lastMessageAt 채팅방 영역 커서
     private Long nextCursorId;
     private boolean hasNext;
 
@@ -30,8 +30,12 @@ public class ChatRoomListCursorResponse {
         if(hasNext) {
             ChatRoomMember last = chatRoomMembers.get(chatRoomMembers.size() - 1); // 맨 마지막 결과물
             nextCursorLastMessageAt = last.getChatRoom().getLastMessageAt();
-            nextCursorCreatedAt = last.getChatRoom().getCreatedAt();
             nextCursorId = last.getChatRoom().getId();
+
+            // 채팅 내역이 없으면(lastMessageAt = null) createdAt 커서 세팅
+            if(nextCursorLastMessageAt == null) {
+                nextCursorCreatedAt = last.getChatRoom().getCreatedAt();
+            }
         }
 
 

@@ -11,8 +11,6 @@ import com.tenure.domain.product.service.ProductService;
 import com.tenure.global.response.BaseResponse;
 import com.tenure.global.security.CurrentUserProvider;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -39,16 +37,7 @@ public class ProductController {
 
     @Operation(
             summary = "Create product from item",
-            description = "The owner converts an owned item into an ON_SALE product.",
-            parameters = {
-                    @Parameter(
-                            name = "X-USER-ID",
-                            in = ParameterIn.HEADER,
-                            required = true,
-                            description = "Temporary current user id for Swagger/local testing before JWT is fully connected.",
-                            example = "1"
-                    )
-            }
+            description = "The owner converts an owned item into an ON_SALE product."
     )
     @ApiResponse(
             responseCode = "200",
@@ -67,16 +56,7 @@ public class ProductController {
 
     @Operation(
             summary = "Get product detail",
-            description = "Returns product detail with viewer mode and available actions.",
-            parameters = {
-                    @Parameter(
-                            name = "X-USER-ID",
-                            in = ParameterIn.HEADER,
-                            required = true,
-                            description = "Temporary current user id for Swagger/local testing before JWT is fully connected.",
-                            example = "2"
-                    )
-            }
+            description = "Returns product detail with viewer mode and available actions."
     )
     @ApiResponse(
             responseCode = "200",
@@ -92,16 +72,7 @@ public class ProductController {
 
     @Operation(
             summary = "Update product",
-            description = "The seller updates an ON_SALE product. attachedOotdIds must belong to the product item and the current seller.",
-            parameters = {
-                    @Parameter(
-                            name = "X-USER-ID",
-                            in = ParameterIn.HEADER,
-                            required = true,
-                            description = "Temporary current user id for Swagger/local testing before JWT is fully connected.",
-                            example = "1"
-                    )
-            }
+            description = "The seller updates an ON_SALE product. attachedOotdIds must belong to the product item and the current seller."
     )
     @ApiResponse(
             responseCode = "200",
@@ -120,16 +91,7 @@ public class ProductController {
 
     @Operation(
             summary = "Complete product externally",
-            description = "The seller marks an ON_SALE product as sold outside Tenure. The product and item become SOLD, pending intents/offers are canceled, and no trade or item transfer is created.",
-            parameters = {
-                    @Parameter(
-                            name = "X-USER-ID",
-                            in = ParameterIn.HEADER,
-                            required = true,
-                            description = "Temporary current user id for Swagger/local testing before JWT is fully connected.",
-                            example = "1"
-                    )
-            }
+            description = "The seller marks an ON_SALE product as sold outside Tenure. The product and item become SOLD, pending intents/offers are canceled, and no trade or item transfer is created."
     )
     @ApiResponse(
             responseCode = "200",
@@ -145,16 +107,7 @@ public class ProductController {
 
     @Operation(
             summary = "Delete product posting",
-            description = "The seller hides an ON_SALE product posting and reverts the item to OWNED. The product and item rows are not deleted.",
-            parameters = {
-                    @Parameter(
-                            name = "X-USER-ID",
-                            in = ParameterIn.HEADER,
-                            required = true,
-                            description = "Temporary current user id for Swagger/local testing before JWT is fully connected.",
-                            example = "1"
-                    )
-            }
+            description = "The seller hides an ON_SALE product posting and reverts the item to OWNED. The product and item rows are not deleted."
     )
     @ApiResponse(
             responseCode = "200",

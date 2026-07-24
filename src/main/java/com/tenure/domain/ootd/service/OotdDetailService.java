@@ -10,7 +10,6 @@ import com.tenure.domain.ootd.exception.OotdErrorCode;
 import com.tenure.domain.ootd.repository.OotdReactionRepository;
 import com.tenure.domain.ootd.repository.OotdRepository;
 import com.tenure.domain.product.entity.Product;
-import com.tenure.domain.product.enums.ProductStatus;
 import com.tenure.domain.product.repository.ProductRepository;
 import com.tenure.domain.tag.entity.OotdTag;
 import com.tenure.domain.tag.enums.TagStatus;
@@ -18,11 +17,12 @@ import com.tenure.domain.tag.repository.OotdTagRepository;
 import com.tenure.domain.user.entity.User;
 import com.tenure.domain.user.enums.AccountVisibility;
 import com.tenure.global.exception.CustomException;
+import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -43,7 +43,7 @@ public class OotdDetailService {
         Ootd ootd = ootdRepository.findVisibleActiveById(ootdId, currentUserId, OotdPublicationStatus.ACTIVE)
                 .orElseThrow(() -> new CustomException(OotdErrorCode.OOTD_NOT_FOUND));
 
-        validateOotdVisibility(ootd.getOwner(), currentUserId);
+        boolean following = validateVisibilityAndResolveFollowing(ootd.getOwner(), currentUserId);
 
         List<OotdTag> tags = ootdTagRepository.findConfirmedItemTagsByOotdId(ootdId, TagStatus.CONFIRMED);
 
@@ -54,27 +54,51 @@ public class OotdDetailService {
                 .findReactedOotdIds(currentUserId, List.of(ootdId), OotdReactionType.SAVE)
                 .contains(ootdId);
 
-        Map<Long, Product> onSaleProductsByItemId = findOnSaleProductsByItemId(tags);
+        Map<Long, Product> latestProductByItemId = findLatestProductByItemId(tags);
 
-        return OotdDetailResponse.of(ootd, hearted, saved, tags, onSaleProductsByItemId);
+        long followerCount = followRelationshipRepository.countByFollowing_IdAndStatus(
+                ootd.getOwner().getId(),
+                FollowStatus.ACCEPTED
+        );
+        long feedCount = ootdRepository.countByOwner_IdAndPublicationStatus(
+                ootd.getOwner().getId(),
+                OotdPublicationStatus.ACTIVE
+        );
+
+        return OotdDetailResponse.of(
+                ootd,
+                hearted,
+                saved,
+                tags,
+                latestProductByItemId,
+                followerCount,
+                feedCount,
+                following
+        );
     }
 
-    private void validateOotdVisibility(User owner, Long currentUserId) {
-        if (owner.getId().equals(currentUserId) || owner.getAccountVisibility() == AccountVisibility.PUBLIC) {
-            return;
+    // 팔로우 여부(following)와 비공개 계정 접근 가능 여부를 같은 exists 조회 결과로 함께 판단한다.
+    // 본인 글이면 조회 자체를 스킵(following=false 고정), 공개 계정도 following 값이 필요해
+    // 이제 항상 조회가 발생하므로 별도 쿼리를 다시 날리지 않도록 결과를 재사용한다.
+    private boolean validateVisibilityAndResolveFollowing(User owner, Long currentUserId) {
+        if (owner.getId().equals(currentUserId)) {
+            return false;
         }
 
-        boolean acceptedFollower = followRelationshipRepository.existsByFollower_IdAndFollowing_IdAndStatus(
+        boolean following = followRelationshipRepository.existsByFollower_IdAndFollowing_IdAndStatus(
                 currentUserId,
                 owner.getId(),
                 FollowStatus.ACCEPTED
         );
-        if (!acceptedFollower) {
+
+        if (owner.getAccountVisibility() != AccountVisibility.PUBLIC && !following) {
             throw new CustomException(OotdErrorCode.PRIVATE_OOTD_ACCESS_DENIED);
         }
+
+        return following;
     }
 
-    private Map<Long, Product> findOnSaleProductsByItemId(List<OotdTag> tags) {
+    private Map<Long, Product> findLatestProductByItemId(List<OotdTag> tags) {
         Set<Long> itemIds = tags.stream()
                 .map(tag -> tag.getItem().getId())
                 .collect(Collectors.toCollection(LinkedHashSet::new));
@@ -82,15 +106,14 @@ public class OotdDetailService {
             return Map.of();
         }
 
-        List<Product> onSaleProducts = productRepository.findByItemIdInAndProductStatus(
-                itemIds,
-                ProductStatus.ON_SALE
-        );
-        return onSaleProducts.stream()
-                .collect(Collectors.toMap(
+        List<Product> products = productRepository.findByItemIdIn(itemIds);
+        return products.stream()
+                .collect(Collectors.groupingBy(
                         product -> product.getItem().getId(),
-                        Function.identity(),
-                        (first, second) -> first
+                        Collectors.collectingAndThen(
+                                Collectors.maxBy(Comparator.comparing(Product::getCreatedAt)),
+                                Optional::get
+                        )
                 ));
     }
 }

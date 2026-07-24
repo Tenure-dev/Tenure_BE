@@ -2,10 +2,12 @@ package com.tenure.domain.ootd.dto;
 
 import com.tenure.domain.item.entity.Category;
 import com.tenure.domain.item.entity.Item;
+import com.tenure.domain.item.enums.ItemStatus;
 import com.tenure.domain.ootd.entity.Ootd;
 import com.tenure.domain.ootd.enums.OotdSource;
 import com.tenure.domain.ootd.enums.OotdTagStatus;
 import com.tenure.domain.product.entity.Product;
+import com.tenure.domain.product.enums.ProductStatus;
 import com.tenure.domain.tag.entity.OotdTag;
 import com.tenure.domain.user.entity.User;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
@@ -59,7 +61,10 @@ public record OotdDetailResponse(
             boolean hearted,
             boolean saved,
             List<OotdTag> tags,
-            Map<Long, Product> onSaleProductsByItemId
+            Map<Long, Product> latestProductByItemId,
+            long followerCount,
+            long feedCount,
+            boolean following
     ) {
         return new OotdDetailResponse(
                 ootd.getId(),
@@ -67,14 +72,14 @@ public record OotdDetailResponse(
                 ootd.getSource(),
                 ootd.getTagStatus(),
                 ootd.getTagConfirmedAt(),
-                Author.from(ootd.getOwner()),
+                Author.from(ootd.getOwner(), followerCount, feedCount, following),
                 ootd.getHeartCount(),
                 ootd.getSaveCount(),
                 ootd.getViewCount(),
                 hearted,
                 saved,
                 tags.stream()
-                        .map(tag -> TagInfo.of(tag, onSaleProductsByItemId.get(tag.getItem().getId())))
+                        .map(tag -> TagInfo.of(tag, latestProductByItemId.get(tag.getItem().getId())))
                         .toList()
         );
     }
@@ -88,11 +93,27 @@ public record OotdDetailResponse(
             String username,
 
             @Schema(description = "프로필 이미지 URL", example = "https://image.url/profile.jpg")
-            String profileImageUrl
+            String profileImageUrl,
+
+            @Schema(description = "팔로워 수", example = "42")
+            long followerCount,
+
+            @Schema(description = "작성자의 활성 피드(게시물) 수", example = "17")
+            long feedCount,
+
+            @Schema(description = "현재 요청자가 작성자를 팔로우 중인지 여부", example = "true")
+            boolean following
     ) {
 
-        static Author from(User owner) {
-            return new Author(owner.getId(), owner.getUsername(), owner.getProfileImageUrl());
+        static Author from(User owner, long followerCount, long feedCount, boolean following) {
+            return new Author(
+                    owner.getId(),
+                    owner.getUsername(),
+                    owner.getProfileImageUrl(),
+                    followerCount,
+                    feedCount,
+                    following
+            );
         }
     }
 
@@ -125,22 +146,35 @@ public record OotdDetailResponse(
             boolean onSale,
 
             @Schema(description = "판매 가격 (판매중일 때만 노출)", example = "50000")
-            Integer price
+            Integer price,
+
+            @Schema(description = "구매 제안 허용 여부", example = "true")
+            Boolean purchaseOfferEnabled,
+
+            @Schema(description = "아이템 상태", example = "ON_SALE")
+            ItemStatus itemStatus,
+
+            @Schema(description = "가장 최근 판매글 상태 (판매글이 없으면 null)", example = "ON_SALE")
+            ProductStatus productStatus
     ) {
 
-        static TagInfo of(OotdTag tag, Product onSaleProduct) {
-            boolean onSale = onSaleProduct != null;
+        static TagInfo of(OotdTag tag, Product latestProduct) {
+            Item item = tag.getItem();
+            boolean onSale = latestProduct != null && latestProduct.getProductStatus() == ProductStatus.ON_SALE;
             return new TagInfo(
                     tag.getId(),
-                    tag.getItem().getId(),
+                    item.getId(),
                     tag.getBboxX(),
                     tag.getBboxY(),
                     tag.getBboxWidth(),
                     tag.getBboxHeight(),
                     tag.getLabelText(),
-                    ItemInfo.from(tag.getItem()),
+                    ItemInfo.from(item),
                     onSale,
-                    onSale ? onSaleProduct.getPrice() : null
+                    onSale ? latestProduct.getPrice() : null,
+                    item.getPurchaseOfferEnabled(),
+                    item.getItemStatus(),
+                    latestProduct == null ? null : latestProduct.getProductStatus()
             );
         }
     }
