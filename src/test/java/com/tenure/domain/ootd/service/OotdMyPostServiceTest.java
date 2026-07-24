@@ -9,7 +9,9 @@ import static org.mockito.Mockito.when;
 import com.tenure.domain.ootd.dto.OotdMyPostsResponse;
 import com.tenure.domain.ootd.entity.Ootd;
 import com.tenure.domain.ootd.enums.OotdPublicationStatus;
+import com.tenure.domain.ootd.enums.OotdReactionType;
 import com.tenure.domain.ootd.enums.OotdTagStatus;
+import com.tenure.domain.ootd.repository.OotdReactionRepository;
 import com.tenure.domain.ootd.repository.OotdRepository;
 import com.tenure.domain.user.entity.User;
 import com.tenure.global.exception.CommonErrorCode;
@@ -17,6 +19,7 @@ import com.tenure.global.exception.CustomException;
 import java.lang.reflect.Constructor;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -33,11 +36,14 @@ class OotdMyPostServiceTest {
     @Mock
     private OotdRepository ootdRepository;
 
+    @Mock
+    private OotdReactionRepository ootdReactionRepository;
+
     private OotdMyPostService ootdMyPostService;
 
     @BeforeEach
     void setUp() {
-        ootdMyPostService = new OotdMyPostService(ootdRepository);
+        ootdMyPostService = new OotdMyPostService(ootdRepository, ootdReactionRepository);
     }
 
     @Test
@@ -69,6 +75,16 @@ class OotdMyPostServiceTest {
                 eq(CURRENT_USER_ID),
                 any(Pageable.class)
         )).thenReturn(List.of(active, archived, extra));
+        when(ootdReactionRepository.findReactedOotdIds(
+                eq(CURRENT_USER_ID),
+                eq(List.of(11L, 10L)),
+                eq(OotdReactionType.HEART)
+        )).thenReturn(Set.of(11L));
+        when(ootdReactionRepository.findReactedOotdIds(
+                eq(CURRENT_USER_ID),
+                eq(List.of(11L, 10L)),
+                eq(OotdReactionType.SAVE)
+        )).thenReturn(Set.of(10L));
 
         OotdMyPostsResponse response = ootdMyPostService.getMyPosts(CURRENT_USER_ID, null, null, 2);
 
@@ -76,10 +92,14 @@ class OotdMyPostServiceTest {
         assertThat(response.content().get(0).ootdId()).isEqualTo(11L);
         assertThat(response.content().get(0).publicationStatus()).isEqualTo(OotdPublicationStatus.ACTIVE);
         assertThat(response.content().get(0).archived()).isFalse();
+        assertThat(response.content().get(0).hearted()).isTrue();
+        assertThat(response.content().get(0).saved()).isFalse();
         assertThat(response.content().get(1).ootdId()).isEqualTo(10L);
         assertThat(response.content().get(1).publicationStatus()).isEqualTo(OotdPublicationStatus.ARCHIVED);
         assertThat(response.content().get(1).archived()).isTrue();
         assertThat(response.content().get(1).reviewRequired()).isTrue();
+        assertThat(response.content().get(1).hearted()).isFalse();
+        assertThat(response.content().get(1).saved()).isTrue();
         assertThat(response.hasNext()).isTrue();
         assertThat(response.nextCursorCreatedAt()).isEqualTo(archived.getCreatedAt());
         assertThat(response.nextCursorId()).isEqualTo(archived.getId());
