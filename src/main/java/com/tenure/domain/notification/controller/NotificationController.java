@@ -30,8 +30,6 @@ public class NotificationController {
             summary = "알림 목록 조회",
             description = "로그인 사용자의 알림 목록을 조회합니다. 카테고리 필터 및 읽지 않은 알림만 조회 가능합니다.",
             parameters = {
-                    @Parameter(name = "X-USER-ID", in = ParameterIn.HEADER, required = true,
-                            description = "JWT 적용 전 Swagger 테스트용 현재 사용자 ID", example = "1"),
                     @Parameter(name = "category", in = ParameterIn.QUERY,
                             description = "알림 카테고리 필터 (null이면 전체 조회)", example = "TRADE_STATUS"),
                     @Parameter(name = "unreadOnly", in = ParameterIn.QUERY,
@@ -61,8 +59,6 @@ public class NotificationController {
             summary = "알림 단건 읽음 처리",
             description = "특정 알림을 읽음 처리합니다. 본인 알림만 처리할 수 있습니다.",
             parameters = {
-                    @Parameter(name = "X-USER-ID", in = ParameterIn.HEADER, required = true,
-                            description = "JWT 적용 전 Swagger 테스트용 현재 사용자 ID", example = "1"),
                     @Parameter(name = "notificationId", in = ParameterIn.PATH, required = true,
                             description = "읽음 처리할 알림 ID", example = "1")
             }
@@ -77,11 +73,7 @@ public class NotificationController {
 
     @Operation(
             summary = "알림 전체 읽음 처리",
-            description = "읽지 않은 모든 알림을 읽음 처리합니다.",
-            parameters = {
-                    @Parameter(name = "X-USER-ID", in = ParameterIn.HEADER, required = true,
-                            description = "JWT 적용 전 Swagger 테스트용 현재 사용자 ID", example = "1")
-            }
+            description = "읽지 않은 모든 알림을 읽음 처리합니다."
     )
     @PostMapping("/read-all")
     public BaseResponse<Void> markReadAll() {
