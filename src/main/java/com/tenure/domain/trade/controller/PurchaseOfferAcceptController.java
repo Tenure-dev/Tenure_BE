@@ -5,8 +5,6 @@ import com.tenure.domain.trade.service.PurchaseOfferAcceptService;
 import com.tenure.global.response.BaseResponse;
 import com.tenure.global.security.CurrentUserProvider;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -31,10 +29,7 @@ public class PurchaseOfferAcceptController {
     @Operation(
             summary = "Accept purchase offer",
             description = "The item owner accepts a SENT purchase offer, captures the mock payment authorization, "
-                    + "and creates a trade. Other SENT offers for the same item are canceled.",
-            parameters = {
-                    @Parameter(name = "X-USER-ID", in = ParameterIn.HEADER, required = true, example = "1")
-            }
+                    + "and creates a trade. Other SENT offers for the same item are canceled."
     )
     @ApiResponse(
             responseCode = "201",
