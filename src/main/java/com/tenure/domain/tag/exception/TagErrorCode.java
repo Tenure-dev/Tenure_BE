@@ -12,7 +12,8 @@ public enum TagErrorCode implements ErrorCode {
     ITEM_NOT_FOUND("TAG_002", "아이템 정보를 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
     TAG_OWNER_ONLY("TAG_003", "본인이 게시한 OOTD에만 태그를 등록할 수 있습니다.", HttpStatus.FORBIDDEN),
     TAG_STATUS_INVALID("TAG_004", "직접 등록하는 태그는 CONFIRMED 상태만 허용됩니다.", HttpStatus.BAD_REQUEST),
-    TAG_NOT_FOUND("TAG_005", "태그 정보를 찾을 수 없습니다.", HttpStatus.NOT_FOUND);
+    TAG_NOT_FOUND("TAG_005", "태그 정보를 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
+    BATCH_ITEM_NOT_FOUND("TAG_006", "유효하지 않은 아이템이 포함되어 있습니다.", HttpStatus.BAD_REQUEST);
 
     private final String code;
     private final String message;

@@ -14,8 +14,6 @@ import com.tenure.domain.ootd.service.OotdService;
 import com.tenure.global.response.BaseResponse;
 import com.tenure.global.security.CurrentUserProvider;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -76,16 +74,7 @@ public class OotdController {
 
     @Operation(
             summary = "OOTD 상세 조회",
-            description = "OOTD 상세 정보를 조회합니다. 공개 계정이거나 승인된 팔로워만 비공개 계정의 게시물을 조회할 수 있습니다.",
-            parameters = {
-                    @Parameter(
-                            name = "X-USER-ID",
-                            in = ParameterIn.HEADER,
-                            required = true,
-                            description = "JWT 적용 전 Swagger/local testing용 임시 헤더.",
-                            example = "1"
-                    )
-            }
+            description = "OOTD 상세 정보를 조회합니다. 공개 계정이거나 승인된 팔로워만 비공개 계정의 게시물을 조회할 수 있습니다."
     )
     @ApiResponse(
             responseCode = "200",
@@ -122,16 +111,7 @@ public class OotdController {
             description = "앱 전용 카메라로 촬영한 착장 사진을 OOTD로 게시합니다. "
                     + "게시 응답은 AI 태그 분석을 기다리지 않고 즉시 반환하며, "
                     + "OOTD_CREATED 이벤트를 통해 백그라운드에서 비동기로 AI 태그 분석을 진행합니다. "
-                    + "분석 결과 중 유사도가 Threshold 이상인 태그만 AUTO_UNCONFIRMED 상태로 저장됩니다.",
-            parameters = {
-                    @Parameter(
-                            name = "X-USER-ID",
-                            in = ParameterIn.HEADER,
-                            required = true,
-                            description = "JWT 적용 전 Swagger 테스트용 현재 사용자 ID. JWT 적용 후에는 SecurityContext 값을 사용합니다.",
-                            example = "1"
-                    )
-            }
+                    + "분석 결과 중 유사도가 Threshold 이상인 태그만 AUTO_UNCONFIRMED 상태로 저장됩니다."
     )
     @ApiResponse(
             responseCode = "200",
@@ -167,16 +147,7 @@ public class OotdController {
 
     @Operation(
             summary = "OOTD 하트 등록",
-            description = "로그인 사용자가 OOTD에 하트(좋아요)를 등록합니다. 이미 등록되어 있는 경우에도 동일하게 204를 반환합니다(멱등).",
-            parameters = {
-                    @Parameter(
-                            name = "X-USER-ID",
-                            in = ParameterIn.HEADER,
-                            required = true,
-                            description = "JWT 적용 전 Swagger/local testing용 임시 헤더.",
-                            example = "1"
-                    )
-            }
+            description = "로그인 사용자가 OOTD에 하트(좋아요)를 등록합니다. 이미 등록되어 있는 경우에도 동일하게 204를 반환합니다(멱등)."
     )
     @ApiResponse(responseCode = "204", description = "하트 등록 성공 또는 이미 등록되어 있어 멱등 처리됨")
     @ApiResponse(responseCode = "404", description = "존재하지 않거나 비공개(ARCHIVED) 처리되었거나 차단 관계로 조회할 수 없는 OOTD")
@@ -189,16 +160,7 @@ public class OotdController {
 
     @Operation(
             summary = "OOTD 하트 취소",
-            description = "로그인 사용자가 등록했던 OOTD 하트(좋아요)를 취소합니다. 등록 이력이 없는 경우에도 동일하게 204를 반환합니다(멱등).",
-            parameters = {
-                    @Parameter(
-                            name = "X-USER-ID",
-                            in = ParameterIn.HEADER,
-                            required = true,
-                            description = "JWT 적용 전 Swagger/local testing용 임시 헤더.",
-                            example = "1"
-                    )
-            }
+            description = "로그인 사용자가 등록했던 OOTD 하트(좋아요)를 취소합니다. 등록 이력이 없는 경우에도 동일하게 204를 반환합니다(멱등)."
     )
     @ApiResponse(responseCode = "204", description = "하트 취소 성공 또는 등록 이력이 없어 멱등 처리됨")
     @ApiResponse(responseCode = "404", description = "존재하지 않거나 비공개(ARCHIVED) 처리되었거나 차단 관계로 조회할 수 없는 OOTD")
@@ -211,16 +173,7 @@ public class OotdController {
 
     @Operation(
             summary = "OOTD 저장 등록",
-            description = "로그인 사용자가 OOTD를 저장(save)합니다. 이미 저장되어 있는 경우에도 동일하게 204를 반환합니다(멱등).",
-            parameters = {
-                    @Parameter(
-                            name = "X-USER-ID",
-                            in = ParameterIn.HEADER,
-                            required = true,
-                            description = "JWT 적용 전 Swagger/local testing용 임시 헤더.",
-                            example = "1"
-                    )
-            }
+            description = "로그인 사용자가 OOTD를 저장(save)합니다. 이미 저장되어 있는 경우에도 동일하게 204를 반환합니다(멱등)."
     )
     @ApiResponse(responseCode = "204", description = "저장 성공 또는 이미 저장되어 있어 멱등 처리됨")
     @ApiResponse(responseCode = "404", description = "존재하지 않거나 비공개(ARCHIVED) 처리되었거나 차단 관계로 조회할 수 없는 OOTD")
@@ -233,16 +186,7 @@ public class OotdController {
 
     @Operation(
             summary = "OOTD 저장 취소",
-            description = "로그인 사용자가 저장했던 OOTD 저장(save)을 취소합니다. 저장 이력이 없는 경우에도 동일하게 204를 반환합니다(멱등).",
-            parameters = {
-                    @Parameter(
-                            name = "X-USER-ID",
-                            in = ParameterIn.HEADER,
-                            required = true,
-                            description = "JWT 적용 전 Swagger/local testing용 임시 헤더.",
-                            example = "1"
-                    )
-            }
+            description = "로그인 사용자가 저장했던 OOTD 저장(save)을 취소합니다. 저장 이력이 없는 경우에도 동일하게 204를 반환합니다(멱등)."
     )
     @ApiResponse(responseCode = "204", description = "저장 취소 성공 또는 저장 이력이 없어 멱등 처리됨")
     @ApiResponse(responseCode = "404", description = "존재하지 않거나 비공개(ARCHIVED) 처리되었거나 차단 관계로 조회할 수 없는 OOTD")
@@ -256,16 +200,7 @@ public class OotdController {
     @Operation(
             summary = "하트한 OOTD 목록",
             description = "로그인 사용자가 하트(좋아요)한 OOTD를 마이페이지 썸네일 그리드용으로 조회합니다. "
-                    + "반응 이후 삭제되었거나 차단 관계가 된 게시물은 제외됩니다.",
-            parameters = {
-                    @Parameter(
-                            name = "X-USER-ID",
-                            in = ParameterIn.HEADER,
-                            required = true,
-                            description = "JWT 적용 전 Swagger/local testing용 임시 헤더.",
-                            example = "1"
-                    )
-            }
+                    + "반응 이후 삭제되었거나 차단 관계가 된 게시물은 제외됩니다."
     )
     @ApiResponse(
             responseCode = "200",
@@ -293,16 +228,7 @@ public class OotdController {
     @Operation(
             summary = "저장한 OOTD 목록",
             description = "로그인 사용자가 저장(save)한 OOTD를 마이페이지 썸네일 그리드용으로 조회합니다. "
-                    + "반응 이후 삭제되었거나 차단 관계가 된 게시물은 제외됩니다.",
-            parameters = {
-                    @Parameter(
-                            name = "X-USER-ID",
-                            in = ParameterIn.HEADER,
-                            required = true,
-                            description = "JWT 적용 전 Swagger/local testing용 임시 헤더.",
-                            example = "1"
-                    )
-            }
+                    + "반응 이후 삭제되었거나 차단 관계가 된 게시물은 제외됩니다."
     )
     @ApiResponse(
             responseCode = "200",

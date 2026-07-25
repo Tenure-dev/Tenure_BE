@@ -16,6 +16,8 @@ public interface OotdTagRepository extends JpaRepository<OotdTag, Long> {
 
     List<OotdTag> findAllByOotdId(Long ootdId);
 
+    long deleteAllByOotdId(Long ootdId);
+
     @Query("""
             select count(distinct ootd.id)
             from OotdTag tag

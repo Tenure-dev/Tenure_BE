@@ -6,7 +6,9 @@ import com.tenure.domain.ootd.ai.AiTagResult;
 import com.tenure.domain.ootd.entity.Ootd;
 import com.tenure.domain.ootd.enums.OotdPublicationStatus;
 import com.tenure.domain.ootd.repository.OotdRepository;
+import com.tenure.domain.tag.dto.request.OotdTagBatchRequest;
 import com.tenure.domain.tag.dto.request.OotdTagCreateRequest;
+import com.tenure.domain.tag.dto.response.OotdTagBatchResponse;
 import com.tenure.domain.tag.dto.response.OotdTagResponse;
 import com.tenure.domain.tag.dto.request.OotdTagUpdateRequest;
 import com.tenure.domain.tag.dto.response.OotdTagConfirmResponse;
@@ -19,7 +21,10 @@ import com.tenure.global.exception.CustomException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -115,6 +120,45 @@ public class OotdTagService {
         );
 
         return OotdTagResponse.of(tag);
+    }
+
+    @Transactional
+    public OotdTagBatchResponse createTagsBatch(
+            Long ootdId,
+            Long currentUserId,
+            OotdTagBatchRequest request
+    ) {
+        Ootd ootd = ootdRepository.findById(ootdId)
+                .filter(found -> found.getPublicationStatus() != OotdPublicationStatus.DELETED)
+                .orElseThrow(() -> new CustomException(TagErrorCode.OOTD_NOT_FOUND));
+        validateOwner(ootd, currentUserId);
+
+        List<Long> itemIds = request.tags().stream()
+                .map(OotdTagBatchRequest.TagItem::itemId)
+                .distinct()
+                .toList();
+        Map<Long, Item> itemsById = itemRepository.findAllById(itemIds).stream()
+                .collect(Collectors.toMap(Item::getId, Function.identity()));
+        if (itemsById.size() != itemIds.size()) {
+            throw new CustomException(TagErrorCode.BATCH_ITEM_NOT_FOUND);
+        }
+
+        ootdTagRepository.deleteAllByOotdId(ootdId);
+
+        List<OotdTag> tags = request.tags().stream()
+                .map(tagItem -> OotdTag.createManualTag(
+                        ootd,
+                        itemsById.get(tagItem.itemId()),
+                        tagItem.labelText(),
+                        tagItem.bbox().x(),
+                        tagItem.bbox().y(),
+                        tagItem.bbox().width(),
+                        tagItem.bbox().height()
+                ))
+                .toList();
+        ootdTagRepository.saveAll(tags);
+
+        return OotdTagBatchResponse.of(ootd.getId(), tags);
     }
 
     @Transactional
