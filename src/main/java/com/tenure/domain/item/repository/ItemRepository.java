@@ -3,6 +3,7 @@ package com.tenure.domain.item.repository;
 import com.tenure.domain.item.entity.Item;
 import com.tenure.domain.item.enums.ItemStatus;
 import jakarta.persistence.LockModeType;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -35,4 +36,6 @@ public interface ItemRepository extends JpaRepository<Item, Long> {
     );
 
     long countByOwner_Id(Long ownerUserId);
+
+    List<Item> findByOwner_IdAndItemStatusOrderByCreatedAtDesc(Long ownerUserId, ItemStatus itemStatus);
 }

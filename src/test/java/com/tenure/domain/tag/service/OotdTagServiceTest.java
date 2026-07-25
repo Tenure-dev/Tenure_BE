@@ -8,7 +8,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.tenure.domain.item.entity.Category;
 import com.tenure.domain.item.entity.Item;
+import com.tenure.domain.item.enums.ItemStatus;
 import com.tenure.domain.item.repository.ItemRepository;
 import com.tenure.domain.ootd.ai.AiTagResult;
 import com.tenure.domain.ootd.entity.Ootd;
@@ -22,6 +24,7 @@ import com.tenure.domain.tag.dto.response.OotdTagBatchResponse;
 import com.tenure.domain.tag.dto.response.OotdTagResponse;
 import com.tenure.domain.tag.dto.request.OotdTagUpdateRequest;
 import com.tenure.domain.tag.dto.response.OotdTagConfirmResponse;
+import com.tenure.domain.tag.dto.response.SimilarItemResponse;
 import com.tenure.domain.tag.entity.OotdTag;
 import com.tenure.domain.tag.enums.TagSource;
 import com.tenure.domain.tag.enums.TagStatus;
@@ -216,6 +219,78 @@ class OotdTagServiceTest {
                 .isEqualTo(TagErrorCode.BATCH_ITEM_NOT_FOUND);
 
         verify(ootdTagRepository, never()).saveAll(anyList());
+    }
+
+    @Test
+    void getSimilarItemsForTagging_prioritizesItemsMatchingOotdContext() {
+        Item matchingItem = item(20L, 101L, "Nike");
+        Item nonMatchingItem = item(21L, 202L, "Adidas");
+
+        when(itemRepository.findByOwner_IdAndItemStatusOrderByCreatedAtDesc(OWNER_ID, ItemStatus.OWNED))
+                .thenReturn(List.of(nonMatchingItem, matchingItem));
+
+        Item contextItem = item(30L, 101L, "Nike");
+        Ootd ootd = ootd(OOTD_ID, user(OWNER_ID));
+        OotdTag contextTag = OotdTag.createManualTag(
+                ootd, contextItem, "라벨",
+                BigDecimal.valueOf(0.1), BigDecimal.valueOf(0.2), BigDecimal.valueOf(0.3), BigDecimal.valueOf(0.4)
+        );
+        when(ootdTagRepository.findConfirmedItemTagsByOotdId(OOTD_ID, TagStatus.CONFIRMED))
+                .thenReturn(List.of(contextTag));
+
+        List<SimilarItemResponse> response = ootdTagService.getSimilarItemsForTagging(OWNER_ID, OOTD_ID, null);
+
+        assertThat(response).extracting(SimilarItemResponse::itemId)
+                .containsExactly(20L, 21L);
+    }
+
+    @Test
+    void getSimilarItemsForTagging_excludesItemsAlreadyTaggedInOotd() {
+        Item taggedItem = item(20L, 101L, "Nike");
+        Item untaggedItem = item(21L, 202L, "Adidas");
+
+        when(itemRepository.findByOwner_IdAndItemStatusOrderByCreatedAtDesc(OWNER_ID, ItemStatus.OWNED))
+                .thenReturn(List.of(taggedItem, untaggedItem));
+
+        Ootd ootd = ootd(OOTD_ID, user(OWNER_ID));
+        OotdTag contextTag = OotdTag.createManualTag(
+                ootd, taggedItem, "라벨",
+                BigDecimal.valueOf(0.1), BigDecimal.valueOf(0.2), BigDecimal.valueOf(0.3), BigDecimal.valueOf(0.4)
+        );
+        when(ootdTagRepository.findConfirmedItemTagsByOotdId(OOTD_ID, TagStatus.CONFIRMED))
+                .thenReturn(List.of(contextTag));
+
+        List<SimilarItemResponse> response = ootdTagService.getSimilarItemsForTagging(OWNER_ID, OOTD_ID, null);
+
+        assertThat(response).extracting(SimilarItemResponse::itemId)
+                .containsExactly(21L);
+    }
+
+    @Test
+    void getSimilarItemsForTagging_appliesGivenLimit() {
+        List<Item> ownedItems = List.of(
+                item(20L, 101L, "Nike"),
+                item(21L, 202L, "Adidas"),
+                item(22L, 303L, "Puma")
+        );
+        when(itemRepository.findByOwner_IdAndItemStatusOrderByCreatedAtDesc(OWNER_ID, ItemStatus.OWNED))
+                .thenReturn(ownedItems);
+
+        List<SimilarItemResponse> response = ootdTagService.getSimilarItemsForTagging(OWNER_ID, null, 2);
+
+        assertThat(response).extracting(SimilarItemResponse::itemId)
+                .containsExactly(20L, 21L);
+    }
+
+    @Test
+    void getSimilarItemsForTagging_returnsEmptyListWhenNoOwnedItems() {
+        when(itemRepository.findByOwner_IdAndItemStatusOrderByCreatedAtDesc(OWNER_ID, ItemStatus.OWNED))
+                .thenReturn(List.of());
+
+        List<SimilarItemResponse> response = ootdTagService.getSimilarItemsForTagging(OWNER_ID, OOTD_ID, null);
+
+        assertThat(response).isEmpty();
+        verify(ootdTagRepository, never()).findConfirmedItemTagsByOotdId(any(), any());
     }
 
     @Test
@@ -538,6 +613,20 @@ class OotdTagServiceTest {
         Item item = instantiate(Item.class);
         ReflectionTestUtils.setField(item, "id", id);
         return item;
+    }
+
+    private Item item(Long id, Long categoryId, String brandName) {
+        Item item = item(id);
+        ReflectionTestUtils.setField(item, "category", category(categoryId));
+        ReflectionTestUtils.setField(item, "brandName", brandName);
+        return item;
+    }
+
+    private Category category(Long id) {
+        Category category = instantiate(Category.class);
+        ReflectionTestUtils.setField(category, "id", id);
+        ReflectionTestUtils.setField(category, "name", "카테고리" + id);
+        return category;
     }
 
     private <T> T instantiate(Class<T> type) {

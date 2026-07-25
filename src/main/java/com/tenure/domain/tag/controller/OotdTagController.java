@@ -6,6 +6,7 @@ import com.tenure.domain.tag.dto.response.OotdTagBatchResponse;
 import com.tenure.domain.tag.dto.response.OotdTagResponse;
 import com.tenure.domain.tag.dto.request.OotdTagUpdateRequest;
 import com.tenure.domain.tag.dto.response.OotdTagConfirmResponse;
+import com.tenure.domain.tag.dto.response.SimilarItemResponse;
 import com.tenure.domain.tag.service.OotdTagService;
 import com.tenure.global.response.BaseResponse;
 import com.tenure.global.security.CurrentUserProvider;
@@ -15,11 +16,13 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @Tag(name = "OotdTag", description = "OOTD 태그 API")
@@ -87,6 +90,23 @@ public class OotdTagController {
         Long currentUserId = currentUserProvider.getCurrentUserId();
         OotdTagBatchResponse response = ootdTagService.createTagsBatch(ootdId, currentUserId, request);
         return BaseResponse.success(response, "태그가 일괄 등록되었습니다.");
+    }
+
+    @Operation(
+            summary = "OOTD 태그 작성용 유사 아이템 추천",
+            description = "OOTD 태그 작성 화면에서 태그로 연결할 수 있도록, 로그인 사용자의 보유 아이템 중 상위 limit개를 추천합니다. "
+                    + "ootdId를 함께 전달하면 해당 OOTD에 이미 확정된 태그의 카테고리/브랜드와 겹치는 보유 아이템을 우선 추천합니다."
+    )
+    @ApiResponse(responseCode = "200", description = "유사 아이템 추천 목록 조회 성공")
+    @ApiResponse(responseCode = "401", description = "로그인이 필요함")
+    @GetMapping("/tags/similar-items")
+    public BaseResponse<List<SimilarItemResponse>> getSimilarItemsForTagging(
+            @RequestParam(required = false) Long ootdId,
+            @RequestParam(required = false) Integer limit
+    ) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        List<SimilarItemResponse> response = ootdTagService.getSimilarItemsForTagging(currentUserId, ootdId, limit);
+        return BaseResponse.success(response, "유사 아이템 추천 목록을 조회했습니다.");
     }
 
     @Operation(
