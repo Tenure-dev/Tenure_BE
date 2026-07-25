@@ -21,10 +21,12 @@ public class ChatMessageResponse {
     private String contentImageUrl;
     private LocalDateTime createdAt;
 
-    public static ChatMessageResponse from(ChatMessage chatMessage) {
+    private int unreadCount; // 상대방이 읽었으면 내 메시지에 0, 안읽었으면 1
+
+    public static ChatMessageResponse from(ChatMessage chatMessage, int unreadCount) {
         return new ChatMessageResponse(chatMessage.getId(), chatMessage.getSender().getId(), chatMessage.getSender().getUsername(),
                 chatMessage.getSender().getProfileImageUrl(), chatMessage.getMessageType(), chatMessage.getContent(),
-                chatMessage.getImageUrl(), chatMessage.getCreatedAt());
+                chatMessage.getImageUrl(), chatMessage.getCreatedAt(), unreadCount);
     }
 
 

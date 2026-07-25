@@ -1,6 +1,7 @@
 package com.tenure.domain.chat.service;
 
 import com.tenure.domain.chat.dto.response.ChatMessageCursorResponse;
+import com.tenure.domain.chat.dto.response.ChatReadEvent;
 import com.tenure.domain.chat.dto.response.ChatRoomListCursorResponse;
 import com.tenure.domain.chat.dto.response.ChatRoomResponse;
 import com.tenure.domain.chat.entity.ChatMessage;
@@ -30,13 +31,16 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Slice;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
+import java.util.Objects;
 
 import static com.tenure.domain.product.enums.ProductStatus.*;
 
@@ -55,6 +59,7 @@ public class ChatRoomService {
     private final ChatMessageRepository chatMessageRepository;
     private final TradeRepository tradeRepository;
     private final ImageStorageService localImageStoreService;
+    private final SimpMessagingTemplate simpMessagingTemplate;
 
     // 채팅 이미지 전송시 허용되는 형식
     private static final List<String> ALLOWED_IMAGE_TYPES = List.of(
@@ -128,8 +133,8 @@ public class ChatRoomService {
         Long tradeId = tradeRepository.findByItemId(itemId).map(Trade::getId).orElse(null);
         return ChatRoomResponse.from(chatRoom, item, product, buyerId, tradeId);
     }
-    // 채팅방 목록 조회
 
+    // 채팅방 목록 조회
     public ChatRoomListCursorResponse chatRoomList(Long currentUserId, ChatRoomFilterType type,
                              LocalDateTime cursor, LocalDateTime createdAtCursor, Long cursorId, int size)
     {
@@ -159,8 +164,8 @@ public class ChatRoomService {
         log.info("[채팅방 목록 조회] 조회 결과 = {}건, hasNext = {}", chatRooms.getContent().size(), chatRooms.hasNext());
         return ChatRoomListCursorResponse.from(chatRooms, currentUserId);
     }
-    //채팅방 목록에서 채팅방 접속
 
+    //채팅방 목록에서 채팅방 접속
     public ChatRoomResponse enterChatroom(Long currentUserId, Long chatRoomId) {
 
         // 채팅방 존재 확인
@@ -215,6 +220,16 @@ public class ChatRoomService {
 
         chatRoomMember.updateLastRead(chatMessage);
 
+        // 트랜잭션 커밋 이후에만 broadcast (커밋 전 전송 시 수신자가 조회해도 DB 미반영 문제 방지)
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                simpMessagingTemplate.convertAndSend(
+                        "/sub/chats/" + chatRoomId,
+                        new ChatReadEvent(currentUserId)
+                );
+            }
+        });
     }
 
     // 채팅 내역 조회
@@ -226,16 +241,26 @@ public class ChatRoomService {
 
         log.info("[채팅 내역 조회] currentUserId = {}, chatRoomId = {}", currentUserId, chatRoomId);
 
-        if (!chatRoomRepository.existsById(chatRoomId)) {
-            log.warn("[채팅 내역 조회] 채팅방을 찾을 수 없습니다. chatRoomId = {}", chatRoomId);
-            throw new CustomException(ChatErrorCode.CHAT_ROOM_NOT_FOUND);
-        }
+        ChatRoom chatRoom = chatRoomRepository.findById(chatRoomId)
+                .orElseThrow(() -> {
+                    log.warn("[채팅 내역 조회] 채팅방을 찾을 수 없습니다. chatRoomId = {}", chatRoomId);
+                    return new CustomException(ChatErrorCode.CHAT_ROOM_NOT_FOUND);
+                });
 
         if (chatRoomMemberRepository.findByUserIdAndChatRoomId(currentUserId, chatRoomId).isEmpty()) {
             log.warn("[채팅 내역 조회] 해당 채팅방에 접근 권한이 없습니다. currentUserId = {}, chatRoomId = {}", currentUserId, chatRoomId);
             throw new CustomException(ChatErrorCode.CHAT_FORBIDDEN);
         }
 
+        Long opponentId = Objects.equals(chatRoom.getSeller().getId(), currentUserId) ?
+                chatRoom.getBuyer().getId() : chatRoom.getSeller().getId();
+
+        ChatRoomMember opponentMember = chatRoomMemberRepository.findByUserIdAndChatRoomId(opponentId, chatRoomId)
+                .orElseThrow(() -> new CustomException(ChatErrorCode.CHAT_FORBIDDEN));
+
+        // 상대방이 마지막으로 읽은 메시지 Id
+        long opponentLastReadMessageId = opponentMember.getLastReadMessage() != null ?
+                opponentMember.getLastReadMessage().getId() : 0L;
 
         PageRequest request = PageRequest.of(0, size);
 
@@ -243,7 +268,7 @@ public class ChatRoomService {
                 .findByChatMessages(chatRoomId, cursor, cursorId, request);
 
         log.info("[채팅 내역 조회] 채팅 내역 조회 성공");
-        return ChatMessageCursorResponse.from(chatMessages);
+        return ChatMessageCursorResponse.from(chatMessages, currentUserId, opponentLastReadMessageId);
     }
 
     //채팅방 생성 매서드
