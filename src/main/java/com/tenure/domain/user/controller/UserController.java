@@ -22,6 +22,8 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import com.tenure.domain.user.dto.request.AccountSettingsUpdateRequest;
 import com.tenure.domain.user.dto.response.PublicUserProfileResponse;
 import org.springframework.web.bind.annotation.PathVariable;
+import com.tenure.domain.user.dto.request.WithdrawalRequest;
+import org.springframework.web.bind.annotation.DeleteMapping;
 
 
 // 사용자, 인증 관련 API
@@ -84,5 +86,13 @@ public class UserController {
         Long currentUserId = currentUserProvider.getCurrentUserId();
         PublicUserProfileResponse response = userService.getUserProfile(currentUserId, userId);
         return BaseResponse.success(response);
+    }
+
+    @Operation(summary = "회원 탈퇴", description = "회원 탈퇴를 처리합니다. 탈퇴 사유를 함께 받습니다.")
+    @DeleteMapping("/users/me")
+    public BaseResponse<Void> withdraw(@Valid @RequestBody WithdrawalRequest request) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        userService.withdraw(currentUserId, request);
+        return BaseResponse.success(null, "회원 탈퇴가 완료되었습니다.");
     }
 }

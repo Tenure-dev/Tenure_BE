@@ -8,6 +8,9 @@ import com.tenure.domain.user.dto.response.SignupResponse;
 import com.tenure.domain.user.entity.User;
 import com.tenure.domain.user.exception.UserErrorCode;
 import com.tenure.domain.user.repository.UserRepository;
+import com.tenure.domain.user.dto.request.WithdrawalRequest;
+import com.tenure.domain.user.entity.UserWithdrawal;
+import com.tenure.domain.user.repository.UserWithdrawalRepository;
 import com.tenure.global.exception.CommonErrorCode;
 import com.tenure.global.exception.CustomException;
 import lombok.RequiredArgsConstructor;
@@ -42,6 +45,7 @@ public class UserService {
     private final UserBlockRepository userBlockRepository;
     private final EmailVerificationStore verificationStore;
     private final DeliveryAddressRepository addressRepository;
+    private final UserWithdrawalRepository userWithdrawalRepository;   // ← 추가
 
     // 회원가입
     @Transactional
@@ -110,6 +114,11 @@ public class UserService {
 
         // 2) 비밀번호 검증. 평문(request) vs 저장된 해시(user) 비교
         if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+            throw new CustomException(UserErrorCode.LOGIN_FAILED);
+        }
+
+        // 탈퇴한 회원은 로그인 불가
+        if (user.isWithdrawn()) {
             throw new CustomException(UserErrorCode.LOGIN_FAILED);
         }
 
@@ -204,6 +213,11 @@ public class UserService {
         User target = userRepository.findById(targetUserId)
                 .orElseThrow(() -> new CustomException(UserErrorCode.USER_NOT_FOUND));
 
+        // 탈퇴한 회원은 프로필 조회 불가 (없는 것처럼 처리)
+        if (target.isWithdrawn()) {
+            throw new CustomException(UserErrorCode.USER_NOT_FOUND);
+        }
+
         // 차단 관계 확인
         // 내가 상대를 차단했거나, 상대가 나를 차단한 경우 -> 차단 에러
         boolean blockedByMe = userBlockRepository.isBlocked(currentUserId, targetUserId);
@@ -213,5 +227,25 @@ public class UserService {
         }
 
         return PublicUserProfileResponse.from(target);
+    }
+
+    // 회원 탈퇴
+    @Transactional
+    public void withdraw(Long currentUserId, WithdrawalRequest request) {
+        User user = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new CustomException(UserErrorCode.USER_NOT_FOUND));
+
+        // 이미 탈퇴한 회원인지 확인 (중복 탈퇴 방지)
+        if (user.isWithdrawn()) {
+            throw new CustomException(UserErrorCode.USER_NOT_FOUND);
+        }
+
+        // 1) 탈퇴 사유 기록
+        userWithdrawalRepository.save(UserWithdrawal.create(currentUserId, request.reason()));
+
+        // 2) User 익명화 (변경 감지로 자동 UPDATE)
+        user.withdraw();
+
+        log.info("회원 탈퇴 완료: userId={}, reason={}", currentUserId, request.reason());
     }
 }
