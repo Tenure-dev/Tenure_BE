@@ -235,6 +235,7 @@ class OotdTagServiceTest {
                 ootd, contextItem, "라벨",
                 BigDecimal.valueOf(0.1), BigDecimal.valueOf(0.2), BigDecimal.valueOf(0.3), BigDecimal.valueOf(0.4)
         );
+        when(ootdRepository.findById(OOTD_ID)).thenReturn(Optional.of(ootd));
         when(ootdTagRepository.findConfirmedItemTagsByOotdId(OOTD_ID, TagStatus.CONFIRMED))
                 .thenReturn(List.of(contextTag));
 
@@ -242,6 +243,73 @@ class OotdTagServiceTest {
 
         assertThat(response).extracting(SimilarItemResponse::itemId)
                 .containsExactly(20L, 21L);
+    }
+
+    @Test
+    void getSimilarItemsForTagging_prioritizesItemsMatchingOnlyCategory() {
+        Item categoryOnlyMatch = item(20L, 101L, "Uniqlo");
+        Item nonMatchingItem = item(21L, 202L, "Adidas");
+
+        when(itemRepository.findByOwner_IdAndItemStatusOrderByCreatedAtDesc(OWNER_ID, ItemStatus.OWNED))
+                .thenReturn(List.of(nonMatchingItem, categoryOnlyMatch));
+
+        Item contextItem = item(30L, 101L, "Nike");
+        Ootd ootd = ootd(OOTD_ID, user(OWNER_ID));
+        OotdTag contextTag = OotdTag.createManualTag(
+                ootd, contextItem, "라벨",
+                BigDecimal.valueOf(0.1), BigDecimal.valueOf(0.2), BigDecimal.valueOf(0.3), BigDecimal.valueOf(0.4)
+        );
+        when(ootdRepository.findById(OOTD_ID)).thenReturn(Optional.of(ootd));
+        when(ootdTagRepository.findConfirmedItemTagsByOotdId(OOTD_ID, TagStatus.CONFIRMED))
+                .thenReturn(List.of(contextTag));
+
+        List<SimilarItemResponse> response = ootdTagService.getSimilarItemsForTagging(OWNER_ID, OOTD_ID, null);
+
+        assertThat(response).extracting(SimilarItemResponse::itemId)
+                .containsExactly(20L, 21L);
+    }
+
+    @Test
+    void getSimilarItemsForTagging_prioritizesItemsMatchingOnlyBrand() {
+        Item brandOnlyMatch = item(20L, 303L, "Nike");
+        Item nonMatchingItem = item(21L, 202L, "Adidas");
+
+        when(itemRepository.findByOwner_IdAndItemStatusOrderByCreatedAtDesc(OWNER_ID, ItemStatus.OWNED))
+                .thenReturn(List.of(nonMatchingItem, brandOnlyMatch));
+
+        Item contextItem = item(30L, 101L, "Nike");
+        Ootd ootd = ootd(OOTD_ID, user(OWNER_ID));
+        OotdTag contextTag = OotdTag.createManualTag(
+                ootd, contextItem, "라벨",
+                BigDecimal.valueOf(0.1), BigDecimal.valueOf(0.2), BigDecimal.valueOf(0.3), BigDecimal.valueOf(0.4)
+        );
+        when(ootdRepository.findById(OOTD_ID)).thenReturn(Optional.of(ootd));
+        when(ootdTagRepository.findConfirmedItemTagsByOotdId(OOTD_ID, TagStatus.CONFIRMED))
+                .thenReturn(List.of(contextTag));
+
+        List<SimilarItemResponse> response = ootdTagService.getSimilarItemsForTagging(OWNER_ID, OOTD_ID, null);
+
+        assertThat(response).extracting(SimilarItemResponse::itemId)
+                .containsExactly(20L, 21L);
+    }
+
+    @Test
+    void getSimilarItemsForTagging_ignoresContextWhenOotdNotOwnedByCurrentUser() {
+        Item matchingItem = item(20L, 101L, "Nike");
+        Item nonMatchingItem = item(21L, 202L, "Adidas");
+
+        when(itemRepository.findByOwner_IdAndItemStatusOrderByCreatedAtDesc(OWNER_ID, ItemStatus.OWNED))
+                .thenReturn(List.of(nonMatchingItem, matchingItem));
+
+        Long strangerId = 999L;
+        Ootd strangersOotd = ootd(OOTD_ID, user(strangerId));
+        when(ootdRepository.findById(OOTD_ID)).thenReturn(Optional.of(strangersOotd));
+
+        List<SimilarItemResponse> response = ootdTagService.getSimilarItemsForTagging(OWNER_ID, OOTD_ID, null);
+
+        assertThat(response).extracting(SimilarItemResponse::itemId)
+                .containsExactly(21L, 20L);
+        verify(ootdTagRepository, never()).findConfirmedItemTagsByOotdId(any(), any());
     }
 
     @Test
@@ -257,6 +325,7 @@ class OotdTagServiceTest {
                 ootd, taggedItem, "라벨",
                 BigDecimal.valueOf(0.1), BigDecimal.valueOf(0.2), BigDecimal.valueOf(0.3), BigDecimal.valueOf(0.4)
         );
+        when(ootdRepository.findById(OOTD_ID)).thenReturn(Optional.of(ootd));
         when(ootdTagRepository.findConfirmedItemTagsByOotdId(OOTD_ID, TagStatus.CONFIRMED))
                 .thenReturn(List.of(contextTag));
 

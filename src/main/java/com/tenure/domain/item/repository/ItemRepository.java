@@ -37,5 +37,16 @@ public interface ItemRepository extends JpaRepository<Item, Long> {
 
     long countByOwner_Id(Long ownerUserId);
 
-    List<Item> findByOwner_IdAndItemStatusOrderByCreatedAtDesc(Long ownerUserId, ItemStatus itemStatus);
+    @Query("""
+            select item
+            from Item item
+            join fetch item.category category
+            where item.owner.id = :ownerUserId
+              and item.itemStatus = :itemStatus
+            order by item.createdAt desc
+            """)
+    List<Item> findByOwner_IdAndItemStatusOrderByCreatedAtDesc(
+            @Param("ownerUserId") Long ownerUserId,
+            @Param("itemStatus") ItemStatus itemStatus
+    );
 }

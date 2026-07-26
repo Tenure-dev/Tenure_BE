@@ -193,7 +193,7 @@ public class OotdTagService {
             return List.of();
         }
 
-        OotdTagContext context = resolveOotdTagContext(ootdId);
+        OotdTagContext context = resolveOotdTagContext(ootdId, currentUserId);
 
         return ownedItems.stream()
                 .filter(item -> !context.taggedItemIds().contains(item.getId()))
@@ -203,8 +203,13 @@ public class OotdTagService {
                 .toList();
     }
 
-    private OotdTagContext resolveOotdTagContext(Long ootdId) {
+    private OotdTagContext resolveOotdTagContext(Long ootdId, Long currentUserId) {
         if (ootdId == null) {
+            return OotdTagContext.empty();
+        }
+
+        Ootd ootd = ootdRepository.findById(ootdId).orElse(null);
+        if (ootd == null || !ootd.getOwner().getId().equals(currentUserId)) {
             return OotdTagContext.empty();
         }
 
