@@ -45,13 +45,15 @@ public class FeedService {
         validateCursor(cursorCreatedAt, cursorId);
         validateFollowingFilter(currentUserId, resolvedTab, userId);
 
-        List<Ootd> ootds = findFeedPage(
+        List<Ootd> ootds = ootdRepository.findFeed(
                 currentUserId,
-                resolvedTab,
+                resolvedTab == FeedTab.FOLLOWING,
                 userId,
+                OotdPublicationStatus.ACTIVE,
+                FollowStatus.ACCEPTED,
                 cursorCreatedAt,
                 cursorId,
-                resolvedSize
+                PageRequest.of(0, resolvedSize + 1)
         );
 
         boolean hasNext = ootds.size() > resolvedSize;
@@ -107,38 +109,6 @@ public class FeedService {
         if (!acceptedFollowing) {
             throw new CustomException(CommonErrorCode.FORBIDDEN);
         }
-    }
-
-    private List<Ootd> findFeedPage(
-            Long currentUserId,
-            FeedTab tab,
-            Long userId,
-            LocalDateTime cursorCreatedAt,
-            Long cursorId,
-            int size
-    ) {
-        boolean followingOnly = tab == FeedTab.FOLLOWING;
-        PageRequest pageRequest = PageRequest.of(0, size + 1);
-        if (cursorCreatedAt == null) {
-            return ootdRepository.findFeedFirstPage(
-                    currentUserId,
-                    followingOnly,
-                    userId,
-                    OotdPublicationStatus.ACTIVE,
-                    FollowStatus.ACCEPTED,
-                    pageRequest
-            );
-        }
-        return ootdRepository.findFeed(
-                currentUserId,
-                followingOnly,
-                userId,
-                OotdPublicationStatus.ACTIVE,
-                FollowStatus.ACCEPTED,
-                cursorCreatedAt,
-                cursorId,
-                pageRequest
-        );
     }
 
     private Set<Long> findReactedOotdIds(Long currentUserId, List<Long> ootdIds, OotdReactionType reactionType) {

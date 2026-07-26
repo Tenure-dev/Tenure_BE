@@ -62,12 +62,14 @@ class FeedServiceTest {
         Ootd second = ootd(10L, owner, LocalDateTime.of(2026, 7, 14, 9, 0));
         Ootd extra = ootd(9L, owner, LocalDateTime.of(2026, 7, 14, 8, 0));
 
-        when(ootdRepository.findFeedFirstPage(
+        when(ootdRepository.findFeed(
                 eq(CURRENT_USER_ID),
                 eq(false),
                 eq(null),
                 eq(OotdPublicationStatus.ACTIVE),
                 eq(FollowStatus.ACCEPTED),
+                eq(null),
+                eq(null),
                 any(Pageable.class)
         )).thenReturn(List.of(first, second, extra));
         when(ootdReactionRepository.findReactedOotdIds(
@@ -103,12 +105,14 @@ class FeedServiceTest {
                 followingUserId,
                 FollowStatus.ACCEPTED
         )).thenReturn(true);
-        when(ootdRepository.findFeedFirstPage(
+        when(ootdRepository.findFeed(
                 eq(CURRENT_USER_ID),
                 eq(true),
                 eq(followingUserId),
                 eq(OotdPublicationStatus.ACTIVE),
                 eq(FollowStatus.ACCEPTED),
+                eq(null),
+                eq(null),
                 any(Pageable.class)
         )).thenReturn(List.of());
 
