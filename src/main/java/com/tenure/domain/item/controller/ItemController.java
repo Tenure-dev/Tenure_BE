@@ -7,8 +7,6 @@ import com.tenure.global.response.BaseResponse;
 import com.tenure.global.response.PageResponse;
 import com.tenure.global.security.CurrentUserProvider;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -30,12 +28,6 @@ public class ItemController {
             summary = "아이템 등록",
             description = "로그인 사용자의 보유 아이템을 등록합니다."
     )
-    @Parameter(
-            name = "X-USER-ID",
-            description = "개발용 사용자 ID 헤더",
-            in = ParameterIn.HEADER,
-            example = "1"
-    )
     @PostMapping("/items")
     public BaseResponse<ItemCreateResponse> createItem(
             @Valid @RequestBody ItemCreateRequest request
@@ -49,12 +41,6 @@ public class ItemController {
     @Operation(
             summary = "내 아이템 목록 조회",
             description = "로그인 사용자의 보유 아이템 목록을 조회합니다."
-    )
-    @Parameter(
-            name = "X-USER-ID",
-            description = "개발용 사용자 ID 헤더",
-            in = ParameterIn.HEADER,
-            example = "1"
     )
     @GetMapping("/items")
     public BaseResponse<PageResponse<ItemListResponse>> getMyItems(
@@ -81,12 +67,6 @@ public class ItemController {
             summary = "아이템 상세 조회",
             description = "itemId 기준으로 아이템 상세 정보를 조회합니다."
     )
-    @Parameter(
-            name = "X-USER-ID",
-            description = "개발용 사용자 ID 헤더",
-            in = ParameterIn.HEADER,
-            example = "1"
-    )
     @GetMapping("/items/{itemId}")
     public BaseResponse<ItemDetailResponse> getItemDetail(
             @PathVariable Long itemId
@@ -101,12 +81,6 @@ public class ItemController {
     @Operation(
             summary = "구매 제안 허용 설정",
             description = "로그인 사용자의 보유 아이템에 대해 구매 제안 허용 여부를 변경합니다."
-    )
-    @Parameter(
-            name = "X-USER-ID",
-            description = "개발용 사용자 ID 헤더",
-            in = ParameterIn.HEADER,
-            example = "1"
     )
     @PatchMapping("/items/{itemId}/offer-setting")
     public BaseResponse<ItemOfferSettingResponse> updatePurchaseOfferSetting(
@@ -128,12 +102,6 @@ public class ItemController {
             summary = "아이템 수정",
             description = "로그인 사용자의 보유 아이템 정보를 수정합니다."
     )
-    @Parameter(
-            name = "X-USER-ID",
-            description = "개발용 사용자 ID 헤더",
-            in = ParameterIn.HEADER,
-            example = "1"
-    )
     @PatchMapping("/items/{itemId}")
     public BaseResponse<ItemUpdateResponse> updateItem(
             @PathVariable Long itemId,
@@ -153,12 +121,6 @@ public class ItemController {
     @Operation(
             summary = "아이템 히스토리 조회",
             description = "itemId 기준으로 아이템 히스토리 목록을 조회합니다."
-    )
-    @Parameter(
-            name = "X-USER-ID",
-            description = "개발용 사용자 ID 헤더",
-            in = ParameterIn.HEADER,
-            example = "1"
     )
     @GetMapping("/items/{itemId}/histories")
     public BaseResponse<PageResponse<ItemHistoryResponse>> getItemHistories(
