@@ -1,6 +1,7 @@
 package com.tenure.domain.tag.service;
 
 import com.tenure.domain.item.entity.Item;
+import com.tenure.domain.item.enums.ItemStatus;
 import com.tenure.domain.item.repository.ItemRepository;
 import com.tenure.domain.ootd.ai.AiTagResult;
 import com.tenure.domain.ootd.entity.Ootd;
@@ -12,6 +13,7 @@ import com.tenure.domain.tag.dto.response.OotdTagBatchResponse;
 import com.tenure.domain.tag.dto.response.OotdTagResponse;
 import com.tenure.domain.tag.dto.request.OotdTagUpdateRequest;
 import com.tenure.domain.tag.dto.response.OotdTagConfirmResponse;
+import com.tenure.domain.tag.dto.response.SimilarItemResponse;
 import com.tenure.domain.tag.entity.OotdTag;
 import com.tenure.domain.tag.enums.TagStatus;
 import com.tenure.domain.tag.exception.TagErrorCode;
@@ -20,9 +22,11 @@ import com.tenure.global.config.AiTagProperties;
 import com.tenure.global.exception.CustomException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -40,6 +44,7 @@ public class OotdTagService {
             "가디건", "청바지", "운동화", "니트 스웨터", "코트", "원피스", "스카프"
     );
     private static final Random MOCK_RANDOM = new Random();
+    private static final int DEFAULT_SIMILAR_ITEM_LIMIT = 10;
 
     private final OotdRepository ootdRepository;
     private final ItemRepository itemRepository;
@@ -176,6 +181,61 @@ public class OotdTagService {
         ootd.confirmTags();
 
         return OotdTagConfirmResponse.of(ootd);
+    }
+
+    @Transactional(readOnly = true)
+    public List<SimilarItemResponse> getSimilarItemsForTagging(Long currentUserId, Long ootdId, Integer limit) {
+        int effectiveLimit = (limit == null || limit <= 0) ? DEFAULT_SIMILAR_ITEM_LIMIT : limit;
+
+        List<Item> ownedItems = itemRepository.findByOwner_IdAndItemStatusOrderByCreatedAtDesc(
+                currentUserId, ItemStatus.OWNED);
+        if (ownedItems.isEmpty()) {
+            return List.of();
+        }
+
+        OotdTagContext context = resolveOotdTagContext(ootdId, currentUserId);
+
+        return ownedItems.stream()
+                .filter(item -> !context.taggedItemIds().contains(item.getId()))
+                .sorted(Comparator.comparingInt(item -> matchesContext(item, context) ? 0 : 1))
+                .limit(effectiveLimit)
+                .map(SimilarItemResponse::of)
+                .toList();
+    }
+
+    private OotdTagContext resolveOotdTagContext(Long ootdId, Long currentUserId) {
+        if (ootdId == null) {
+            return OotdTagContext.empty();
+        }
+
+        Ootd ootd = ootdRepository.findById(ootdId).orElse(null);
+        if (ootd == null || !ootd.getOwner().getId().equals(currentUserId)) {
+            return OotdTagContext.empty();
+        }
+
+        List<OotdTag> confirmedItemTags = ootdTagRepository.findConfirmedItemTagsByOotdId(ootdId, TagStatus.CONFIRMED);
+        Set<Long> categoryIds = confirmedItemTags.stream()
+                .map(tag -> tag.getItem().getCategory().getId())
+                .collect(Collectors.toSet());
+        Set<String> brandNames = confirmedItemTags.stream()
+                .map(tag -> tag.getItem().getBrandName())
+                .collect(Collectors.toSet());
+        Set<Long> taggedItemIds = confirmedItemTags.stream()
+                .map(tag -> tag.getItem().getId())
+                .collect(Collectors.toSet());
+
+        return new OotdTagContext(categoryIds, brandNames, taggedItemIds);
+    }
+
+    private boolean matchesContext(Item item, OotdTagContext context) {
+        return context.categoryIds().contains(item.getCategory().getId())
+                || context.brandNames().contains(item.getBrandName());
+    }
+
+    private record OotdTagContext(Set<Long> categoryIds, Set<String> brandNames, Set<Long> taggedItemIds) {
+        static OotdTagContext empty() {
+            return new OotdTagContext(Set.of(), Set.of(), Set.of());
+        }
     }
 
     @Transactional
