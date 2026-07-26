@@ -16,6 +16,7 @@ import com.tenure.domain.tag.enums.TagStatus;
 import com.tenure.domain.tag.repository.OotdTagRepository;
 import com.tenure.domain.user.entity.User;
 import com.tenure.domain.user.enums.AccountVisibility;
+import com.tenure.domain.wish.repository.WishRepository;
 import com.tenure.global.exception.CustomException;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
@@ -37,6 +38,7 @@ public class OotdDetailService {
     private final OotdReactionRepository ootdReactionRepository;
     private final ProductRepository productRepository;
     private final FollowRelationshipRepository followRelationshipRepository;
+    private final WishRepository wishRepository;
 
     @Transactional(readOnly = true)
     public OotdDetailResponse getOotdDetail(Long currentUserId, Long ootdId) {
@@ -55,6 +57,7 @@ public class OotdDetailService {
                 .contains(ootdId);
 
         Map<Long, Product> latestProductByItemId = findLatestProductByItemId(tags);
+        Set<Long> wishedItemIds = findWishedItemIds(currentUserId, tags);
 
         long followerCount = followRelationshipRepository.countByFollowing_IdAndStatus(
                 ootd.getOwner().getId(),
@@ -71,6 +74,7 @@ public class OotdDetailService {
                 saved,
                 tags,
                 latestProductByItemId,
+                wishedItemIds,
                 followerCount,
                 feedCount,
                 following
@@ -115,5 +119,16 @@ public class OotdDetailService {
                                 Optional::get
                         )
                 ));
+    }
+
+    private Set<Long> findWishedItemIds(Long currentUserId, List<OotdTag> tags) {
+        Set<Long> itemIds = tags.stream()
+                .map(tag -> tag.getItem().getId())
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        if (itemIds.isEmpty()) {
+            return Set.of();
+        }
+
+        return wishRepository.findWishedItemIds(currentUserId, itemIds);
     }
 }

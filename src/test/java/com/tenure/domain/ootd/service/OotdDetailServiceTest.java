@@ -2,6 +2,7 @@ package com.tenure.domain.ootd.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -29,6 +30,7 @@ import com.tenure.domain.tag.enums.TagStatus;
 import com.tenure.domain.tag.repository.OotdTagRepository;
 import com.tenure.domain.user.entity.User;
 import com.tenure.domain.user.enums.AccountVisibility;
+import com.tenure.domain.wish.repository.WishRepository;
 import com.tenure.global.exception.CustomException;
 import java.lang.reflect.Constructor;
 import java.math.BigDecimal;
@@ -63,6 +65,9 @@ class OotdDetailServiceTest {
     @Mock
     private FollowRelationshipRepository followRelationshipRepository;
 
+    @Mock
+    private WishRepository wishRepository;
+
     private OotdDetailService ootdDetailService;
 
     @BeforeEach
@@ -72,7 +77,8 @@ class OotdDetailServiceTest {
                 ootdTagRepository,
                 ootdReactionRepository,
                 productRepository,
-                followRelationshipRepository
+                followRelationshipRepository,
+                wishRepository
         );
     }
 
@@ -83,7 +89,7 @@ class OotdDetailServiceTest {
         Ootd ootd = ootd(OOTD_ID, owner);
         Category outer = category(1L, "아우터", null);
         Category jacket = category(2L, "블루종", outer);
-        Item onSaleItem = item(10L, jacket, "Nike", "Black Jacket");
+        Item onSaleItem = item(10L, jacket, "Nike", "Black Jacket", "https://image.url/item-10.jpg");
         Item offSaleItem = item(20L, outer, "Adidas", "Windbreaker");
         OotdTag tag1 = tag(1L, ootd, onSaleItem);
         OotdTag tag2 = tag(2L, ootd, onSaleItem);
@@ -100,6 +106,8 @@ class OotdDetailServiceTest {
                 .thenReturn(Set.of());
         when(productRepository.findByItemIdIn(anyCollection()))
                 .thenReturn(List.of(onSaleProduct));
+        when(wishRepository.findWishedItemIds(eq(currentUserId), anyCollection()))
+                .thenReturn(Set.of(10L));
         when(followRelationshipRepository.countByFollowing_IdAndStatus(2L, FollowStatus.ACCEPTED))
                 .thenReturn(42L);
         when(ootdRepository.countByOwner_IdAndPublicationStatus(2L, OotdPublicationStatus.ACTIVE))
@@ -123,11 +131,16 @@ class OotdDetailServiceTest {
         assertThat(response.tags().get(0).itemStatus()).isEqualTo(ItemStatus.OWNED);
         assertThat(response.tags().get(0).purchaseOfferEnabled()).isTrue();
         assertThat(response.tags().get(0).productStatus()).isEqualTo(ProductStatus.ON_SALE);
+        assertThat(response.tags().get(0).wished()).isTrue();
+        assertThat(response.tags().get(0).item().representativeImageUrl()).isEqualTo("https://image.url/item-10.jpg");
         assertThat(response.tags().get(1).onSale()).isTrue();
         assertThat(response.tags().get(1).itemId()).isEqualTo(10L);
+        assertThat(response.tags().get(1).wished()).isTrue();
         assertThat(response.tags().get(2).onSale()).isFalse();
         assertThat(response.tags().get(2).price()).isNull();
         assertThat(response.tags().get(2).productStatus()).isNull();
+        assertThat(response.tags().get(2).wished()).isFalse();
+        assertThat(response.tags().get(2).item().representativeImageUrl()).isNull();
         assertThat(response.tags().get(0).item().categoryLarge()).isEqualTo("아우터");
         assertThat(response.tags().get(0).item().categorySmall()).isEqualTo("블루종");
     }
@@ -304,6 +317,7 @@ class OotdDetailServiceTest {
 
         assertThat(response.tags()).isEmpty();
         verify(productRepository, never()).findByItemIdIn(anyCollection());
+        verify(wishRepository, never()).findWishedItemIds(any(), any());
     }
 
     @Test
@@ -435,11 +449,16 @@ class OotdDetailServiceTest {
     }
 
     private Item item(Long id, Category category, String brandName, String itemName) {
+        return item(id, category, brandName, itemName, null);
+    }
+
+    private Item item(Long id, Category category, String brandName, String itemName, String representativeImageUrl) {
         Item item = instantiate(Item.class);
         ReflectionTestUtils.setField(item, "id", id);
         ReflectionTestUtils.setField(item, "category", category);
         ReflectionTestUtils.setField(item, "brandName", brandName);
         ReflectionTestUtils.setField(item, "itemName", itemName);
+        ReflectionTestUtils.setField(item, "representativeImageUrl", representativeImageUrl);
         return item;
     }
 
