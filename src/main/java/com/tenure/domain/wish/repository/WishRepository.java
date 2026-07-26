@@ -2,7 +2,9 @@ package com.tenure.domain.wish.repository;
 
 import com.tenure.domain.product.enums.ProductStatus;
 import com.tenure.domain.wish.entity.Wish;
+import java.util.Collection;
 import java.util.Optional;
+import java.util.Set;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -15,6 +17,9 @@ public interface WishRepository extends JpaRepository<Wish, Long> {
     boolean existsByUserIdAndItemId(Long userId, Long itemId);
 
     Optional<Wish> findByUserIdAndItemId(Long userId, Long itemId);
+
+    @Query("select w.item.id from Wish w where w.user.id = :userId and w.item.id in :itemIds")
+    Set<Long> findWishedItemIds(@Param("userId") Long userId, @Param("itemIds") Collection<Long> itemIds);
 
     @Modifying
     @Query("""
