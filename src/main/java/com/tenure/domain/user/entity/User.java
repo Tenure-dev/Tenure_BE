@@ -90,6 +90,9 @@ public class User extends BaseTimeEntity {
     @Column(name = "onboarding_completed", nullable = false)
     private Boolean onboardingCompleted = false;
 
+    @Column(name = "deleted_at")
+    private java.time.LocalDateTime deletedAt;
+
     // 이메일 회원가입용 User 생성 정적 팩토리 메서드
     // 나중에 구글 가입이 생기면 createByGoogle 을 따로 만들어 구분
     public static User createByEmail(
@@ -152,5 +155,30 @@ public class User extends BaseTimeEntity {
         if (settlementAccountJson != null) {
             this.settlementAccount = settlementAccountJson;
         }
+    }
+
+    /**
+     * 회원 탈퇴 처리 (소프트 삭제 + 익명화).
+     *
+     * 행을 지우지 않는다.
+     * 이 유저가 쓴 글/거래 등이 id로 참조하고 있어서
+     * 삭제하면 그 기록이 깨지기 때문.
+     * 대신 개인정보(email, password)를 비우고, username을 익명값으로 바꾼다.
+     * -> 화면에는 "탈퇴한 사용자"로 표시되고, 비운 email로 재가입이 가능해진다.
+     *
+     * username은 unique 제약이 있으므로 id를 붙여 유일성을 보장한다.
+     */
+    public void withdraw() {
+        this.email = null;                          // 이메일 비움 (재가입 가능하게)
+        this.passwordHash = null;                   // 비밀번호 제거
+        this.username = "탈퇴한 사용자" + this.id;    // 익명화 + 유일성 (예: 탈퇴한 사용자3)
+        this.profileImageUrl = null;                // 프로필 사진 제거
+        this.settlementAccount = null;              // 정산 계좌(민감정보) 제거
+        this.deletedAt = java.time.LocalDateTime.now();  // 탈퇴 시각 기록
+    }
+
+    /** 탈퇴한 회원인지 여부 */
+    public boolean isWithdrawn() {
+        return this.deletedAt != null;
     }
 }
