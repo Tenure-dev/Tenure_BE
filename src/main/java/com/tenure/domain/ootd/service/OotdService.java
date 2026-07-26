@@ -7,6 +7,8 @@ import com.tenure.domain.ootd.enums.OotdSource;
 import com.tenure.domain.ootd.event.OotdCreatedEvent;
 import com.tenure.domain.ootd.exception.OotdErrorCode;
 import com.tenure.domain.ootd.repository.OotdRepository;
+import com.tenure.domain.tag.dto.request.OotdTagBatchRequest;
+import com.tenure.domain.tag.service.OotdTagService;
 import com.tenure.domain.user.entity.User;
 import com.tenure.domain.user.repository.UserRepository;
 import com.tenure.global.exception.CommonErrorCode;
@@ -28,9 +30,15 @@ public class OotdService {
     private final UserRepository userRepository;
     private final ImageStorageService imageStorageService;
     private final ApplicationEventPublisher eventPublisher;
+    private final OotdTagService ootdTagService;
 
     @Transactional
-    public OotdCreateResponse createOotd(Long currentUserId, MultipartFile image, String source) {
+    public OotdCreateResponse createOotd(
+            Long currentUserId,
+            MultipartFile image,
+            String source,
+            OotdTagBatchRequest tags
+    ) {
         validateImage(image);
         OotdSource ootdSource = validateSource(source);
 
@@ -43,6 +51,10 @@ public class OotdService {
         ootdRepository.save(ootd);
 
         eventPublisher.publishEvent(new OotdCreatedEvent(ootd.getId(), owner.getId(), imageUrl));
+
+        if (tags != null) {
+            ootdTagService.createTagsBatch(ootd.getId(), currentUserId, tags);
+        }
 
         return OotdCreateResponse.of(ootd);
     }
