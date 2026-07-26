@@ -15,8 +15,10 @@ import com.tenure.domain.ootd.entity.Ootd;
 import com.tenure.domain.ootd.enums.OotdPublicationStatus;
 import com.tenure.domain.ootd.enums.OotdTagStatus;
 import com.tenure.domain.ootd.repository.OotdRepository;
+import com.tenure.domain.tag.dto.request.OotdTagBatchRequest;
 import com.tenure.domain.tag.dto.request.OotdTagCreateRequest;
 import com.tenure.domain.tag.dto.request.OotdTagCreateRequest.BboxRequest;
+import com.tenure.domain.tag.dto.response.OotdTagBatchResponse;
 import com.tenure.domain.tag.dto.response.OotdTagResponse;
 import com.tenure.domain.tag.dto.request.OotdTagUpdateRequest;
 import com.tenure.domain.tag.dto.response.OotdTagConfirmResponse;
@@ -129,6 +131,91 @@ class OotdTagServiceTest {
                 .isInstanceOf(CustomException.class)
                 .extracting("errorCode")
                 .isEqualTo(TagErrorCode.TAG_STATUS_INVALID);
+    }
+
+    @Test
+    void createTagsBatch_savesConfirmedTagsAndOverwritesExisting() {
+        User owner = user(OWNER_ID);
+        Ootd ootd = ootd(OOTD_ID, owner);
+        Item firstItem = item(ITEM_ID);
+        Item secondItem = item(ITEM_ID + 1);
+
+        when(ootdRepository.findById(OOTD_ID)).thenReturn(Optional.of(ootd));
+        when(itemRepository.findAllById(List.of(ITEM_ID, ITEM_ID + 1)))
+                .thenReturn(List.of(firstItem, secondItem));
+
+        OotdTagBatchResponse response = ootdTagService.createTagsBatch(
+                OOTD_ID, OWNER_ID, batchRequest(List.of(ITEM_ID, ITEM_ID + 1)));
+
+        assertThat(response.ootdId()).isEqualTo(OOTD_ID);
+        assertThat(response.savedCount()).isEqualTo(2);
+        assertThat(response.tags()).allSatisfy(tag -> {
+            assertThat(tag.status()).isEqualTo(TagStatus.CONFIRMED);
+            assertThat(tag.source()).isEqualTo(TagSource.MANUAL);
+        });
+
+        verify(ootdTagRepository).deleteAllByOotdId(OOTD_ID);
+        verify(ootdTagRepository).saveAll(anyList());
+    }
+
+    @Test
+    void createTagsBatch_rejectsMissingOotd() {
+        when(ootdRepository.findById(OOTD_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> ootdTagService.createTagsBatch(
+                OOTD_ID, OWNER_ID, batchRequest(List.of(ITEM_ID))))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(TagErrorCode.OOTD_NOT_FOUND);
+    }
+
+    @Test
+    void createTagsBatch_rejectsDeletedOotd() {
+        User owner = user(OWNER_ID);
+        Ootd ootd = ootd(OOTD_ID, owner);
+        ReflectionTestUtils.setField(ootd, "publicationStatus", OotdPublicationStatus.DELETED);
+
+        when(ootdRepository.findById(OOTD_ID)).thenReturn(Optional.of(ootd));
+
+        assertThatThrownBy(() -> ootdTagService.createTagsBatch(
+                OOTD_ID, OWNER_ID, batchRequest(List.of(ITEM_ID))))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(TagErrorCode.OOTD_NOT_FOUND);
+    }
+
+    @Test
+    void createTagsBatch_rejectsNonOwner() {
+        User owner = user(OWNER_ID);
+        Ootd ootd = ootd(OOTD_ID, owner);
+
+        when(ootdRepository.findById(OOTD_ID)).thenReturn(Optional.of(ootd));
+
+        Long strangerId = 999L;
+        assertThatThrownBy(() -> ootdTagService.createTagsBatch(
+                OOTD_ID, strangerId, batchRequest(List.of(ITEM_ID))))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(TagErrorCode.TAG_OWNER_ONLY);
+    }
+
+    @Test
+    void createTagsBatch_rejectsWhenItemDoesNotExist() {
+        User owner = user(OWNER_ID);
+        Ootd ootd = ootd(OOTD_ID, owner);
+        Item existingItem = item(ITEM_ID);
+
+        when(ootdRepository.findById(OOTD_ID)).thenReturn(Optional.of(ootd));
+        when(itemRepository.findAllById(List.of(ITEM_ID, ITEM_ID + 1)))
+                .thenReturn(List.of(existingItem));
+
+        assertThatThrownBy(() -> ootdTagService.createTagsBatch(
+                OOTD_ID, OWNER_ID, batchRequest(List.of(ITEM_ID, ITEM_ID + 1))))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(TagErrorCode.BATCH_ITEM_NOT_FOUND);
+
+        verify(ootdTagRepository, never()).saveAll(anyList());
     }
 
     @Test
@@ -388,6 +475,17 @@ class OotdTagServiceTest {
                 "블루종 자켓",
                 status
         );
+    }
+
+    private OotdTagBatchRequest batchRequest(List<Long> itemIds) {
+        List<OotdTagBatchRequest.TagItem> tagItems = itemIds.stream()
+                .map(itemId -> new OotdTagBatchRequest.TagItem(
+                        itemId,
+                        new BboxRequest(BigDecimal.valueOf(0.1), BigDecimal.valueOf(0.2), BigDecimal.valueOf(0.3), BigDecimal.valueOf(0.4)),
+                        "블루종 자켓"
+                ))
+                .toList();
+        return new OotdTagBatchRequest(tagItems);
     }
 
     private OotdTagUpdateRequest updateRequest(Long itemId) {
