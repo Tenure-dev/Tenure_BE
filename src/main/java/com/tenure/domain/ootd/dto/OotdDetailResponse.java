@@ -16,6 +16,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Schema(description = "OOTD 상세 응답")
 public record OotdDetailResponse(
@@ -62,6 +63,7 @@ public record OotdDetailResponse(
             boolean saved,
             List<OotdTag> tags,
             Map<Long, Product> latestProductByItemId,
+            Set<Long> wishedItemIds,
             long followerCount,
             long feedCount,
             boolean following
@@ -79,7 +81,11 @@ public record OotdDetailResponse(
                 hearted,
                 saved,
                 tags.stream()
-                        .map(tag -> TagInfo.of(tag, latestProductByItemId.get(tag.getItem().getId())))
+                        .map(tag -> TagInfo.of(
+                                tag,
+                                latestProductByItemId.get(tag.getItem().getId()),
+                                wishedItemIds.contains(tag.getItem().getId())
+                        ))
                         .toList()
         );
     }
@@ -155,10 +161,13 @@ public record OotdDetailResponse(
             ItemStatus itemStatus,
 
             @Schema(description = "가장 최근 판매글 상태 (판매글이 없으면 null)", example = "ON_SALE")
-            ProductStatus productStatus
+            ProductStatus productStatus,
+
+            @Schema(description = "현재 사용자의 위시 등록 여부", example = "true")
+            boolean wished
     ) {
 
-        static TagInfo of(OotdTag tag, Product latestProduct) {
+        static TagInfo of(OotdTag tag, Product latestProduct, boolean wished) {
             Item item = tag.getItem();
             boolean onSale = latestProduct != null && latestProduct.getProductStatus() == ProductStatus.ON_SALE;
             return new TagInfo(
@@ -174,7 +183,8 @@ public record OotdDetailResponse(
                     onSale ? latestProduct.getPrice() : null,
                     item.getPurchaseOfferEnabled(),
                     item.getItemStatus(),
-                    latestProduct == null ? null : latestProduct.getProductStatus()
+                    latestProduct == null ? null : latestProduct.getProductStatus(),
+                    wished
             );
         }
     }
@@ -194,7 +204,10 @@ public record OotdDetailResponse(
             String categoryLarge,
 
             @Schema(description = "상세 카테고리", example = "블루종")
-            String categorySmall
+            String categorySmall,
+
+            @Schema(description = "대표 이미지 URL", example = "https://image.url/item.jpg")
+            String representativeImageUrl
     ) {
 
         static ItemInfo from(Item item) {
@@ -207,7 +220,8 @@ public record OotdDetailResponse(
                     item.getBrandName(),
                     item.getItemName(),
                     categoryLarge,
-                    categorySmall
+                    categorySmall,
+                    item.getRepresentativeImageUrl()
             );
         }
     }
