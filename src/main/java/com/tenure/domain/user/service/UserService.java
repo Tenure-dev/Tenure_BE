@@ -13,6 +13,8 @@ import com.tenure.domain.user.entity.UserWithdrawal;
 import com.tenure.domain.user.repository.UserWithdrawalRepository;
 import com.tenure.global.exception.CommonErrorCode;
 import com.tenure.global.exception.CustomException;
+import com.tenure.global.storage.ImageStorageService;
+import org.springframework.web.multipart.MultipartFile;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -45,7 +47,8 @@ public class UserService {
     private final UserBlockRepository userBlockRepository;
     private final EmailVerificationStore verificationStore;
     private final DeliveryAddressRepository addressRepository;
-    private final UserWithdrawalRepository userWithdrawalRepository;   // ← 추가
+    private final UserWithdrawalRepository userWithdrawalRepository;
+    private final ImageStorageService imageStorageService;
 
     // 회원가입
     @Transactional
@@ -247,5 +250,21 @@ public class UserService {
         user.withdraw();
 
         log.info("회원 탈퇴 완료: userId={}, reason={}", currentUserId, request.reason());
+    }
+
+    // 프로필 이미지 업로드
+    public String uploadProfileImage(MultipartFile image) {
+        // 파일 검증
+        if (image == null || image.isEmpty()) {
+            throw new CustomException(CommonErrorCode.INVALID_REQUEST);
+        }
+        // 이미지 형식만 허용
+        String contentType = image.getContentType();
+        if (contentType == null || !contentType.startsWith("image/")) {
+            throw new CustomException(CommonErrorCode.INVALID_REQUEST);
+        }
+
+        // "profile" 디렉토리에 저장하고 URL 반환
+        return imageStorageService.store(image, "profile");
     }
 }
