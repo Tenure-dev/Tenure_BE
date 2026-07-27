@@ -79,6 +79,26 @@ public class Notification {
         this.createdAt = LocalDateTime.now();
     }
 
+    // 생성 매서드
+    public static Notification of(
+            User receiver, NotificationType type,
+            String body, Long targetId,
+            String senderUsername, String brandName, String itemName, String imageUrl
+    ) {
+        Notification n = new Notification();
+        n.receiver = receiver;
+        n.type = type;
+        n.category = type.getCategory();
+        n.targetType = type.getTargetType();
+        n.body = body;
+        n.targetId = targetId;
+        n.senderUsername = senderUsername;
+        n.brandName = brandName;
+        n.itemName = itemName;
+        n.imageUrl = imageUrl;
+        return n;
+    }
+
     public void markRead() {
         if(this.readAt == null) {
             this.readAt = LocalDateTime.now();

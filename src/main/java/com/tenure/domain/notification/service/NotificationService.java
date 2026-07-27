@@ -26,6 +26,19 @@ public class NotificationService {
 
     private final NotificationRepository notificationRepository;
 
+    // 알림 단건 저장
+    @Transactional
+    public void save(Notification notification) {
+        notificationRepository.save(notification);
+    }
+
+    // 알림 여러건 저장
+    @Transactional
+    public void saveAll(List<Notification> notifications) {
+        if (notifications == null || notifications.isEmpty()) return;
+        notificationRepository.saveAll(notifications);
+    }
+
     //모든 알림 조회
     public NotificationCursorResponse findAllNotification(
             Long currentUserId, NotificationCategory category, boolean unReadOnly,
