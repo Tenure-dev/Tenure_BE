@@ -30,10 +30,10 @@ public enum NotificationType {
 
     // 관심 아이템
     WISH_CREATED(INTEREST, ITEM),                                  // 타 사용자가 내 아이템을 관심 등록함
-    PRODUCT_CREATED(ITEM_NEWS, PRODUCT),                           // 관심 아이템 판매 전환됨
-    PRODUCT_RETURNED_TO_UNSOLD(ITEM_NEWS, PRODUCT),                // 관심 아이템 미판매 전환됨
-    PRODUCT_SOLD(ITEM_NEWS, PRODUCT),                              // 관심 아이템 판매 완료됨
-    PRODUCT_PRICE_CHANGED(ITEM_NEWS, PRODUCT),                     // 관심 아이템 가격 변경됨
+    PRODUCT_CREATED(ITEM_NEWS, ITEM),                              // 관심 아이템 판매 전환됨
+    PRODUCT_RETURNED_TO_UNSOLD(ITEM_NEWS, ITEM),                   // 관심 아이템 미판매 전환됨
+    PRODUCT_SOLD(ITEM_NEWS, ITEM),                                 // 관심 아이템 판매 완료됨
+    PRODUCT_PRICE_CHANGED(ITEM_NEWS, ITEM),                        // 관심 아이템 가격 변경됨
 
     // 채팅
     CHAT_MESSAGE_CREATED(NEEDS_ACTION, CHAT),                      // 새로운 채팅 메시지 수신

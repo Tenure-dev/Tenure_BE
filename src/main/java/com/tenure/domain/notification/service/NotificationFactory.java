@@ -232,42 +232,41 @@ public class NotificationFactory {
     }
 
     // 판매 전환 (관심 유저에게)
-    public Notification productCreated(User receiver, Item item, Long productId) {
+    public Notification productCreated(User receiver, Item item) {
         return Notification.of(
                 receiver, NotificationType.PRODUCT_CREATED,
-                "관심 아이템이 판매를 시작했어요.", productId,
+                "관심 아이템이 판매를 시작했어요.", item.getId(),
                 null, item.getBrandName(), item.getItemName(),
                 item.getRepresentativeImageUrl()
         );
     }
 
     // 미판매 전환 (관심 유저에게)
-    public Notification productReturnedToUnsold(User receiver, Item item, Long productId) {
+    public Notification productReturnedToUnsold(User receiver, Item item) {
         return Notification.of(
                 receiver, NotificationType.PRODUCT_RETURNED_TO_UNSOLD,
-                "관심 아이템이 미판매 상태로 변경됐어요.", productId,
+                "관심 아이템이 미판매 상태로 변경됐어요.", item.getId(),
                 null, item.getBrandName(), item.getItemName(),
                 item.getRepresentativeImageUrl()
         );
     }
 
     // 판매 완료 (관심 유저에게)
-    public Notification productSold(User receiver, Item item, Long productId) {
+    public Notification productSold(User receiver, Item item) {
         return Notification.of(
                 receiver, NotificationType.PRODUCT_SOLD,
-                "관심 아이템이 판매 완료됐어요.", productId,
+                "관심 아이템이 판매 완료됐어요.", item.getId(),
                 null, item.getBrandName(), item.getItemName(),
                 item.getRepresentativeImageUrl()
         );
     }
 
     // 가격 변경 (관심 유저에게)
-    public Notification productPriceChanged(User receiver, Item item, Long productId,
-                                            int oldPrice, int newPrice) {
+    public Notification productPriceChanged(User receiver, Item item, int oldPrice, int newPrice) {
         String body = oldPrice + "원에서 " + newPrice + "원으로 변경됐어요.";
         return Notification.of(
                 receiver, NotificationType.PRODUCT_PRICE_CHANGED,
-                body, productId,
+                body, item.getId(),
                 null, item.getBrandName(), item.getItemName(),
                 item.getRepresentativeImageUrl()
         );
