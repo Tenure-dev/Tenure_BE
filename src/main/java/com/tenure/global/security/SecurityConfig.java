@@ -39,6 +39,7 @@ public class SecurityConfig {
             "/auth/email/verify",
             "/auth/username/check",
             "/auth/password/reset/**",
+            "/images/profile",
             "/health"
     };
 

@@ -24,6 +24,10 @@ import com.tenure.domain.user.dto.response.PublicUserProfileResponse;
 import org.springframework.web.bind.annotation.PathVariable;
 import com.tenure.domain.user.dto.request.WithdrawalRequest;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import com.tenure.domain.user.dto.response.ProfileImageUploadResponse;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.multipart.MultipartFile;
 
 
 // 사용자, 인증 관련 API
@@ -94,5 +98,16 @@ public class UserController {
         Long currentUserId = currentUserProvider.getCurrentUserId();
         userService.withdraw(currentUserId, request);
         return BaseResponse.success(null, "회원 탈퇴가 완료되었습니다.");
+    }
+
+    @Operation(summary = "프로필 이미지 업로드",
+            description = "프로필 이미지를 업로드하고 저장된 URL을 반환합니다. "
+                    + "반환된 URL을 회원가입/프로필수정의 profileImageUrl에 사용합니다.")
+    @PostMapping(value = "/images/profile", consumes = "multipart/form-data")
+    public BaseResponse<ProfileImageUploadResponse> uploadProfileImage(
+            @RequestPart("image") MultipartFile image
+    ) {
+        String imageUrl = userService.uploadProfileImage(image);
+        return BaseResponse.success(new ProfileImageUploadResponse(imageUrl));
     }
 }
