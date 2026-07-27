@@ -1,6 +1,7 @@
 package com.tenure.domain.chat.service;
 
 import com.tenure.domain.chat.dto.request.ChatMessageRequest;
+import com.tenure.domain.chat.dto.response.ChatListUnReadCountUpdateEvent;
 import com.tenure.domain.chat.dto.response.ChatMessageResponse;
 import com.tenure.domain.chat.entity.ChatMessage;
 import com.tenure.domain.chat.entity.ChatRoom;
@@ -16,10 +17,13 @@ import com.tenure.domain.user.repository.UserRepository;
 import com.tenure.global.exception.CustomException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.messaging.simp.user.SimpUser;
 import org.springframework.messaging.simp.user.SimpUserRegistry;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Slf4j
 @Service
@@ -32,8 +36,9 @@ public class ChatMessageService {
     private final ChatRoomMemberRepository chatRoomMemberRepository;
     private final ChatMessageRepository chatMessageRepository;
     private final SimpUserRegistry simpUserRegistry;
+    private final SimpMessagingTemplate messagingTemplate;
     @Transactional
-    public ChatMessageResponse sendMessage(Long chatRoomId, Long senderId, ChatMessageRequest request) {
+    public void sendMessage(Long chatRoomId, Long senderId, ChatMessageRequest request) {
 
         //검증
         ChatRoom chatRoom = chatRoomRepository.findById(chatRoomId)
@@ -68,7 +73,7 @@ public class ChatMessageService {
         ChatMessage chatMessage = ChatMessage.of(chatRoom, sender, request.getMessageType(), request.getContent(), request.getImageUrl());
         chatMessageRepository.save(chatMessage);
 
-        // 채팅방 마지막 메시지 업데이트
+        // 채팅방 마지막 메시지 업데이트 (미리보기 메시지)
         String lastMessage = request.getMessageType() == MessageType.IMAGE
                 ? MessageType.IMAGE.toLastMessagePreview() : request.getContent();
 
@@ -78,6 +83,7 @@ public class ChatMessageService {
         Long opponentId = chatRoom.getSeller().getId().equals(senderId)
                 ? chatRoom.getBuyer().getId() : chatRoom.getSeller().getId();
 
+        // 상대방 조회(메시지 수신자)
         ChatRoomMember receiverMember = chatRoomMemberRepository.findByUserIdAndChatRoomId(opponentId, chatRoomId)
                 .orElseThrow(() -> {
                     log.warn("[메시지 전송] 상대방이 채팅방에 없습니다. opponentId = {}, chatRoomId = {}", opponentId, chatRoomId);
@@ -98,7 +104,23 @@ public class ChatMessageService {
         // 접속중인경우 0, 접속중이 아닌경우(안읽은 경우) 1
         int unreadCount = isOnline ? 0 : 1;
 
-        return ChatMessageResponse.from(chatMessage, unreadCount);
+        // db 트랜젝션 이후에 브로드 캐스팅 실행
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                // 메시지 전송(채팅방 내 실시간)
+                ChatMessageResponse response = ChatMessageResponse.from(chatMessage, unreadCount);
+                messagingTemplate.convertAndSend("/sub/chats/" + chatRoomId, response);
+
+                if(!isOnline) {
+                    // 채팅방 목록에 실시간 안읽음 카운트 반영
+                    ChatListUnReadCountUpdateEvent chatUnReadCountUpdateEvent = ChatListUnReadCountUpdateEvent.from(chatRoom, receiverMember);
+                    messagingTemplate.convertAndSend("/sub/users/" + opponentId, chatUnReadCountUpdateEvent);
+                }
+
+            }
+        });
+
     }
 
     // 카톡방 접속중(구독중)인지 확인 매서드
