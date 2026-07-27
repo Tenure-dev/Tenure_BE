@@ -10,6 +10,7 @@ import com.tenure.domain.item.repository.CategoryRepository;
 import com.tenure.domain.item.repository.ItemHistoryRepository;
 import com.tenure.domain.item.repository.ItemRepository;
 import com.tenure.domain.ootd.enums.OotdPublicationStatus;
+import com.tenure.domain.product.entity.Product;
 import com.tenure.domain.product.enums.ProductStatus;
 import com.tenure.domain.product.repository.ProductRepository;
 import com.tenure.domain.tag.enums.TagStatus;
@@ -26,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -130,10 +132,15 @@ public class ItemService {
 
     @Transactional(readOnly = true)
     public ItemDetailResponse getItemDetail(Long currentUserId, Long itemId) {
-        Item item = findItem(itemId); //itemId로 아이템 찾고
-        validateItemAccess(item, currentUserId); // 현재 사용자가 소유자인지 확인
+        Item item = findItem(itemId);
+        validateItemAccess(item, currentUserId);
 
-        return ItemDetailResponse.from(item); // 상세 응답 DTO로 바꿔서 돌려준다
+        Product product = productRepository.findFirstByItemIdAndProductStatusInOrderByCreatedAtDesc(
+                itemId,
+                List.of(ProductStatus.ON_SALE, ProductStatus.TRADING, ProductStatus.SOLD)
+        ).orElse(null);
+
+        return ItemDetailResponse.from(item, product);
     }
 
     private Item findItem(Long itemId) {
