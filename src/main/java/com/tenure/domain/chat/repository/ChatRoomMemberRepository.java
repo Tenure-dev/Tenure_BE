@@ -12,7 +12,7 @@ import java.util.Optional;
 
 public interface ChatRoomMemberRepository extends JpaRepository<ChatRoomMember, Long> {
 
-    boolean existsByUserIdAndChatRoomId(Long userId, Long chatRoomId);
+    boolean existsByUserIdAndChatRoomIdAndIsExitedFalse(Long userId, Long chatRoomId);
 
     // 전체 채팅방
     @Query("select crm from ChatRoomMember crm " +

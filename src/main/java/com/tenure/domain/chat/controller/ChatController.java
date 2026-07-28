@@ -116,6 +116,10 @@ public class ChatController {
         return BaseResponse.success(imageUrl);
     }
 
+    @Operation(
+            summary = "채팅방 나가기",
+            description = "채팅방을 영구적으로 나갑니다. 나간 채팅방은 목록에서 보이지 않습니다."
+    )
     @PostMapping("/{chatRoomId}/exit")
     public BaseResponse<Void> exitChatRoom(
             @PathVariable Long chatRoomId

@@ -176,7 +176,7 @@ public class ChatRoomService {
                 });
 
         // 채팅방 권한 체크
-        if(!chatRoomMemberRepository.existsByUserIdAndChatRoomId(currentUserId, chatRoomId)) {
+        if(!chatRoomMemberRepository.existsByUserIdAndChatRoomIdAndIsExitedFalse(currentUserId, chatRoomId)) {
             log.warn("[채팅방 조회] 채팅방 접근 권한이 없습니다. currentUserId = {}, chatRoomId = {}", currentUserId, chatRoomId);
             throw  new CustomException(ChatErrorCode.CHAT_FORBIDDEN);
         }
@@ -288,7 +288,7 @@ public class ChatRoomService {
             throw new CustomException(ChatErrorCode.CHAT_ROOM_NOT_FOUND);
         }
 
-        if(!chatRoomMemberRepository.existsByUserIdAndChatRoomId(currentUserId, chatRoomId)) {
+        if(!chatRoomMemberRepository.existsByUserIdAndChatRoomIdAndIsExitedFalse(currentUserId, chatRoomId)) {
             log.warn("[채팅 이미지 업로드] 채팅방 접근 권한이 없습니다. currentUserId = {}, chatRoomId = {}", currentUserId, chatRoomId);
             throw new CustomException(ChatErrorCode.CHAT_FORBIDDEN);
         }
