@@ -30,6 +30,9 @@ public class StompHandler implements ChannelInterceptor {
     private final JwtProvider jwtProvider;
     private final AntPathMatcher antPathMatcher = new AntPathMatcher();
 
+    private static final String chatSubPattern = "/sub/chats/{chatRoomId}";
+    private static final String userSubPattern = "/sub/users/{userId}";
+
     /**
      * Message<?> message: 사용자가 치는 채팅이 아님, 프레임 데이터 자체
      * 클라이언트가 보낸 명령어가 무엇인지 (SUBSCRIBE, CONNECT, SEND 등)
@@ -40,7 +43,6 @@ public class StompHandler implements ChannelInterceptor {
     @Override
     public @Nullable Message<?> preSend(Message<?> message, MessageChannel channel) {
         StompHeaderAccessor accessor = StompHeaderAccessor.wrap(message);
-
 
         // CONNECT 요청인 경우(웹소켓 연결하기 직전 실행)
         if(StompCommand.CONNECT.equals(accessor.getCommand())) {
@@ -63,31 +65,39 @@ public class StompHandler implements ChannelInterceptor {
         //구독요청일 경우(채팅방 접속)
         if(StompCommand.SUBSCRIBE.equals(accessor.getCommand())) {
 
-            //요청 경로에서 채팅방 id 검출(/sub/chats/{chatRoomId})
+            // 요청 경로
             String destination = accessor.getDestination();
 
-            // /sub/chats/{chatRoomId} 경로가 아닌 경우(ex. /user/queue/errors) 권한 검사 생략
-            if (destination == null || !antPathMatcher.match("/sub/chats/{chatRoomId}", destination)) {
+            if(destination == null) {
                 return message;
             }
 
             Long currentUserId = Long.valueOf(accessor.getUser().getName());
-            Long chatRoomId = getChatRoomId(destination);
 
-            // 해당 채팅방에 접근 권한 검사
-            if(chatRoomMemberRepository.findByUserIdAndChatRoomId(currentUserId, chatRoomId).isEmpty()) {
-                log.warn("[웹소켓] 채팅방 접근 권한이 없습니다. chatRoomId = {}", chatRoomId);
-                throw new CustomException(ChatErrorCode.CHAT_FORBIDDEN);
+            // /sub/chats/{chatRoomId} 경로가 아닌 경우 권한 검사 생략
+            if (antPathMatcher.match(chatSubPattern, destination)) {
+                Long chatRoomId = getIdFromDestination(chatSubPattern, destination, "chatRoomId");
+
+                // 해당 채팅방에 접근 권한 검사
+                if(!chatRoomMemberRepository.existsByUserIdAndChatRoomIdAndIsExitedFalse(currentUserId, chatRoomId)) {
+                    log.warn("[웹소켓] 채팅방 접근 권한이 없습니다. chatRoomId = {}", chatRoomId);
+                    throw new CustomException(ChatErrorCode.CHAT_FORBIDDEN);
+                }
+            } // /sub/users/{userId} 경로 검사
+            else if (antPathMatcher.match(userSubPattern, destination)) {
+                Long userId = getIdFromDestination(userSubPattern, destination, "userId");
+
+                if(!currentUserId.equals(userId)) {
+                    log.warn("[웹소켓] 다른 유저의 알림 채널에 접근 할 수 없습니다. currentUserId = {}, userId = {}", currentUserId, userId);
+                    throw new CustomException(CommonErrorCode.FORBIDDEN);
+                }
             }
         }
-
         return message;
     }
 
-    // 요청 경로에서 채팅방 id 추출 메서드
-    private Long getChatRoomId(String destination) {
-        // 구독 요청(sub) 경로 패턴
-        String pattern = "/sub/chats/{chatRoomId}";
+    // 구독 경로로부터 pathVariable 추출 매서드
+    private Long getIdFromDestination(String pattern, String destination, String variableName) {
 
         if (destination == null || !antPathMatcher.match(pattern, destination)) {
             log.warn("[웹소켓] 잘못된 구독 경로입니다. destination = {}", destination);
@@ -95,12 +105,12 @@ public class StompHandler implements ChannelInterceptor {
         }
 
         Map<String, String> variables = antPathMatcher.extractUriTemplateVariables(pattern, destination);
-        String chatRoomIdStr = variables.get("chatRoomId");
+        String id = variables.get(variableName);
 
         try {
-            return Long.valueOf(chatRoomIdStr);
+            return Long.valueOf(id);
         } catch (NumberFormatException e) {
-            log.warn("[웹소켓] 채팅방 ID가 올바른 숫자 형식이 아닙니다. value = {}", chatRoomIdStr);
+            log.warn("[웹소켓] 채팅방 ID가 올바른 숫자 형식이 아닙니다. value = {}", id);
             throw new CustomException(CommonErrorCode.INVALID_REQUEST);
         }
     }
