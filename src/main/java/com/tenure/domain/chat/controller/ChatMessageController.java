@@ -19,7 +19,7 @@ import org.springframework.stereotype.Controller;
 public class ChatMessageController {
 
     private final ChatMessageService chatMessageService;
-    private final SimpMessagingTemplate messagingTemplate;
+
 
     // /pub/chats/{chatRoomId}
     @MessageMapping("/chats/{chatRoomId}")
@@ -30,8 +30,8 @@ public class ChatMessageController {
             ) {
         Long currentUserId = Long.valueOf(headerAccessor.getUser().getName());
 
-        // 트랜잭션 커밋 후 브로드캐스트 (커밋 전 전송 시 수신자 REST 조회에서 메시지 누락 방지)
-        ChatMessageResponse response = chatMessageService.sendMessage(chatRoomId, currentUserId, chatMessageRequest);
-        messagingTemplate.convertAndSend("/sub/chats/" + chatRoomId, response);
+        // 메시지 전송
+        chatMessageService.sendMessage(chatRoomId, currentUserId, chatMessageRequest);
+
     }
 }

@@ -14,7 +14,7 @@ public class NotificationFactory {
     // 채팅 메시지 수신 (오프라인 상태)
     public Notification chatMessage(User receiver, User sender, ChatRoom chatRoom,
                                     MessageType messageType, String content) {
-        String body = messageType == MessageType.IMAGE ? "사진을 보냈어요." : content;
+        String body = messageType == MessageType.IMAGE ? "사진을 보냈습니다." : content;
         Item item = chatRoom.getItem();
         return Notification.of(
                 receiver, NotificationType.CHAT_MESSAGE_CREATED,
