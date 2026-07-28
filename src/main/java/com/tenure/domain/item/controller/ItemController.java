@@ -14,6 +14,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 
 @Tag(name = "Item", description = "아이템 API")
 @RestController
@@ -150,5 +152,22 @@ public class ItemController {
         ItemTagDraftCreateResponse response = itemService.createTagDraftItem(currentUserId, request);
 
         return BaseResponse.success(response, "태그 작성용 간편 아이템 등록에 성공했습니다.");
+    }
+
+    // 자주 같이 입은 옷 조회
+    @Operation(
+            summary = "자주 같이 입은 옷 조회",
+            description = "기준 아이템과 같은 OOTD에 함께 태그된 아이템을 함께 등장한 횟수 순으로 최대 3개 조회합니다."
+    )
+    @GetMapping("/items/{itemId}/frequently-worn-together")
+    public BaseResponse<List<ItemFrequentlyWornTogetherResponse>> getFrequentlyWornTogetherItems(
+            @PathVariable Long itemId
+    ) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+
+        List<ItemFrequentlyWornTogetherResponse> response =
+                itemService.getFrequentlyWornTogetherItems(currentUserId, itemId);
+
+        return BaseResponse.success(response, "자주 같이 입은 옷 조회에 성공했습니다.");
     }
 }
