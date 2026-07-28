@@ -21,6 +21,7 @@ import com.tenure.domain.ootd.entity.Ootd;
 import com.tenure.domain.ootd.enums.OotdPublicationStatus;
 import com.tenure.domain.ootd.repository.OotdRepository;
 import com.tenure.domain.product.dto.ProductCreateRequest;
+import com.tenure.domain.product.dto.ProductConditionFlags;
 import com.tenure.domain.product.dto.ProductCreateResponse;
 import com.tenure.domain.product.dto.ProductDeleteResponse;
 import com.tenure.domain.product.dto.ProductDetailResponse;
@@ -46,13 +47,13 @@ import com.tenure.domain.tag.repository.OotdTagRepository;
 import com.tenure.domain.user.entity.User;
 import com.tenure.domain.user.enums.AccountVisibility;
 import com.tenure.domain.user.enums.UserGrade;
+import com.tenure.global.exception.CommonErrorCode;
 import com.tenure.global.exception.CustomException;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -166,6 +167,7 @@ public class ProductService {
 
         validateProductSeller(product, currentUserId);
         validateOnSaleProduct(product);
+        validateCategoryPair(request);
         if (hasItemUpdateFields(request)) {
             validateFirstOwnedAt(request.firstOwnedAt());
             updateItemInfoPartially(item, request);
@@ -336,9 +338,9 @@ public class ProductService {
 
     private void updateItemInfoPartially(Item item, ProductUpdateRequest request) {
         Category category = item.getCategory();
-        if (request.categoryLarge() != null || request.categorySmall() != null) {
-            Category largeCategory = findLargeCategory(coalesce(request.categoryLarge(), resolveCategoryLarge(item)));
-            category = findSmallCategory(coalesce(request.categorySmall(), resolveCategorySmall(item)), largeCategory);
+        if (request.categoryLarge() != null) {
+            Category largeCategory = findLargeCategory(request.categoryLarge());
+            category = findSmallCategory(request.categorySmall(), largeCategory);
         }
 
         item.updateInfo(
@@ -381,14 +383,12 @@ public class ProductService {
                 || request.representativeImageUrl() != null;
     }
 
-    private String resolveCategoryLarge(Item item) {
-        Category category = item.getCategory();
-        Category parent = category.getParent();
-        return parent == null ? category.getName() : parent.getName();
-    }
-
-    private String resolveCategorySmall(Item item) {
-        return item.getCategory().getName();
+    private void validateCategoryPair(ProductUpdateRequest request) {
+        boolean hasCategoryLarge = request.categoryLarge() != null;
+        boolean hasCategorySmall = request.categorySmall() != null;
+        if (hasCategoryLarge != hasCategorySmall) {
+            throw new CustomException(CommonErrorCode.INVALID_REQUEST);
+        }
     }
 
     private <T> T coalesce(T value, T fallback) {
@@ -511,16 +511,16 @@ public class ProductService {
         }
     }
 
-    private Map<String, Boolean> readConditionFlagsOrEmpty(String json) {
+    private ProductConditionFlags readConditionFlagsOrEmpty(String json) {
         if (json == null || json.isBlank()) {
-            return Collections.emptyMap();
+            return ProductConditionFlags.empty();
         }
         try {
             JsonNode root = objectMapper.readTree(json);
             if (root.isArray()) {
-                Map<String, Boolean> migratedFlags = new LinkedHashMap<>();
-                root.forEach(flag -> migratedFlags.put(flag.asText(), true));
-                return migratedFlags;
+                List<String> legacyFlags = objectMapper.convertValue(root, new TypeReference<>() {
+                });
+                return ProductConditionFlags.fromLegacyFlags(legacyFlags);
             }
             return objectMapper.convertValue(root, new TypeReference<>() {
             });

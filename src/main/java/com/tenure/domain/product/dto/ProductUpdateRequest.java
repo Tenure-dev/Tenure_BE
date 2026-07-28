@@ -4,6 +4,7 @@ import com.tenure.domain.common.enums.FeePolicy;
 import com.tenure.domain.item.enums.WearingTarget;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
@@ -67,11 +68,9 @@ public record ProductUpdateRequest(
         )
         Map<String, Object> measurements,
 
-        @Schema(
-                description = "상태 이상 체크. 항목별 true/false 값을 저장합니다.",
-                example = "{\"stain\":true,\"tear\":false,\"pillingOrDiscoloration\":true,\"repairHistory\":false,\"missingComponents\":false}"
-        )
-        Map<String, Boolean> conditionFlags,
+        @Valid
+        @Schema(description = "상태 이상 체크")
+        ProductConditionFlags conditionFlags,
 
         @Schema(description = "판매자 설명", example = "상태 설명 수정")
         String sellerDescription,

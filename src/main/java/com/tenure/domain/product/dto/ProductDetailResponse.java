@@ -49,11 +49,8 @@ public record ProductDetailResponse(
         @Schema(description = "카테고리별 실측", example = "{\"shoulder\":45,\"chest\":55,\"totalLength\":70}")
         Map<String, Object> measurements,
 
-        @Schema(
-                description = "상태 이상 체크",
-                example = "{\"stain\":true,\"tear\":false,\"pillingOrDiscoloration\":true,\"repairHistory\":false,\"missingComponents\":false}"
-        )
-        Map<String, Boolean> conditionFlags,
+        @Schema(description = "상태 이상 체크")
+        ProductConditionFlags conditionFlags,
 
         @Schema(description = "판매자 설명", example = "3회 착용했습니다.")
         String sellerDescription,
@@ -67,7 +64,7 @@ public record ProductDetailResponse(
             ProductViewerMode viewerMode,
             List<ProductAction> availableActions,
             Map<String, Object> measurements,
-            Map<String, Boolean> conditionFlags,
+            ProductConditionFlags conditionFlags,
             List<ProductAttachedOotd> attachedOotds
     ) {
         return new ProductDetailResponse(

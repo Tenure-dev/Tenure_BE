@@ -28,6 +28,7 @@ import com.tenure.domain.ootd.entity.Ootd;
 import com.tenure.domain.ootd.enums.OotdPublicationStatus;
 import com.tenure.domain.ootd.repository.OotdRepository;
 import com.tenure.domain.product.dto.ProductCreateRequest;
+import com.tenure.domain.product.dto.ProductConditionFlags;
 import com.tenure.domain.product.dto.ProductCreateResponse;
 import com.tenure.domain.product.dto.ProductDeleteResponse;
 import com.tenure.domain.product.dto.ProductDetailResponse;
@@ -53,6 +54,7 @@ import com.tenure.domain.tag.repository.OotdTagRepository;
 import com.tenure.domain.user.entity.User;
 import com.tenure.domain.user.enums.AccountVisibility;
 import com.tenure.domain.user.enums.UserGrade;
+import com.tenure.global.exception.CommonErrorCode;
 import com.tenure.global.exception.CustomException;
 import java.lang.reflect.Constructor;
 import java.math.BigDecimal;
@@ -326,7 +328,8 @@ class ProductServiceTest {
         assertThat(response.price()).isEqualTo(52000);
         assertThat(response.shippingFee()).isZero();
         assertThat(response.feePolicy()).isEqualTo(FeePolicy.SELLER_PAYS);
-        assertThat(response.conditionFlags()).containsEntry("stain", true);
+        assertThat(response.conditionFlags().stain()).isTrue();
+        assertThat(response.conditionFlags().tear()).isFalse();
         assertThat(response.attachedOotdIds()).containsExactly(100L, 101L);
         assertThat(product.getPrice()).isEqualTo(52000);
         assertThat(product.getSellerDescription()).isEqualTo("updated description");
@@ -343,6 +346,7 @@ class ProductServiceTest {
         User seller = user(CURRENT_USER_ID, UserGrade.BASIC);
         Item item = item(ITEM_ID, seller, ItemStatus.ON_SALE);
         Product product = product(200L, item, seller, ProductStatus.ON_SALE);
+        String originalSellerDescription = product.getSellerDescription();
         ProductUpdateRequest request = updateRequestWithItemInfo();
 
         when(productRepository.findByIdForUpdate(200L)).thenReturn(Optional.of(product));
@@ -358,6 +362,30 @@ class ProductServiceTest {
         assertThat(item.getWearingTarget()).isEqualTo(WearingTarget.UNISEX);
         assertThat(item.getSizeValue()).isEqualTo("L");
         assertThat(item.getFirstOwnedAt()).isEqualTo(LocalDate.of(2025, 10, 1));
+        assertThat(response.price()).isEqualTo(50000);
+        assertThat(response.shippingFee()).isZero();
+        assertThat(response.feePolicy()).isEqualTo(FeePolicy.SELLER_PAYS);
+        assertThat(product.getPrice()).isEqualTo(50000);
+        assertThat(product.getShippingFee()).isZero();
+        assertThat(product.getSellerDescription()).isEqualTo(originalSellerDescription);
+    }
+
+    @Test
+    void updateProduct_rejectsSingleCategoryField() {
+        User seller = user(CURRENT_USER_ID, UserGrade.BASIC);
+        Item item = item(ITEM_ID, seller, ItemStatus.ON_SALE);
+        Product product = product(200L, item, seller, ProductStatus.ON_SALE);
+
+        when(productRepository.findByIdForUpdate(200L)).thenReturn(Optional.of(product));
+
+        assertThatThrownBy(() -> productService.updateProduct(
+                200L,
+                CURRENT_USER_ID,
+                updateRequestWithOnlyCategoryLarge()
+        ))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(CommonErrorCode.INVALID_REQUEST);
     }
 
     @Test
@@ -558,7 +586,7 @@ class ProductServiceTest {
                 feePolicy,
                 "https://image.url/product.jpg",
                 Map.of("shoulder", 45, "chest", 55, "totalLength", 70),
-                Map.of("stain", false, "tear", false),
+                ProductConditionFlags.empty(),
                 "3회 착용했습니다.",
                 attachedOotdIds
         );
@@ -580,7 +608,7 @@ class ProductServiceTest {
                 feePolicy,
                 "https://image.url/product-updated.jpg",
                 Map.of("shoulder", 46, "chest", 56, "totalLength", 71),
-                Map.of("stain", true, "tear", false),
+                new ProductConditionFlags(true, false, false, false, false),
                 "updated description",
                 attachedOotdIds
         );
@@ -597,6 +625,28 @@ class ProductServiceTest {
                 "L",
                 LocalDate.of(2025, 10, 1),
                 "https://image.url/item.jpg",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
+        );
+    }
+
+    private ProductUpdateRequest updateRequestWithOnlyCategoryLarge() {
+        return new ProductUpdateRequest(
+                null,
+                null,
+                "하의",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
                 null,
                 null,
                 null,

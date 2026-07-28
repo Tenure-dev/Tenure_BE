@@ -35,11 +35,8 @@ public record ProductUpdateResponse(
         @Schema(description = "Measurements")
         Map<String, Object> measurements,
 
-        @Schema(
-                description = "Condition flags",
-                example = "{\"stain\":true,\"tear\":false,\"pillingOrDiscoloration\":true,\"repairHistory\":false,\"missingComponents\":false}"
-        )
-        Map<String, Boolean> conditionFlags,
+        @Schema(description = "Condition flags")
+        ProductConditionFlags conditionFlags,
 
         @Schema(description = "Seller description", example = "상태 설명 수정")
         String sellerDescription,
@@ -51,7 +48,7 @@ public record ProductUpdateResponse(
     public static ProductUpdateResponse of(
             Product product,
             Map<String, Object> measurements,
-            Map<String, Boolean> conditionFlags,
+            ProductConditionFlags conditionFlags,
             List<Long> attachedOotdIds
     ) {
         return new ProductUpdateResponse(
