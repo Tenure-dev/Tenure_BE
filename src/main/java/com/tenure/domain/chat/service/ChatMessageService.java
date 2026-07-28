@@ -17,6 +17,7 @@ import com.tenure.domain.notification.service.NotificationFactory;
 import com.tenure.domain.notification.service.NotificationService;
 import com.tenure.domain.user.entity.User;
 import com.tenure.domain.user.exception.UserErrorCode;
+import com.tenure.domain.user.repository.UserBlockRepository;
 import com.tenure.domain.user.repository.UserRepository;
 import com.tenure.global.exception.CustomException;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +37,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 public class ChatMessageService {
 
     private final UserRepository userRepository;
+    private final UserBlockRepository userBlockRepository;
     private final ChatRoomRepository chatRoomRepository;
     private final ChatRoomMemberRepository chatRoomMemberRepository;
     private final ChatMessageRepository chatMessageRepository;
@@ -64,6 +66,31 @@ public class ChatMessageService {
             throw new CustomException(ChatErrorCode.CHAT_FORBIDDEN);
         }
 
+
+        // 상대방 조회(메시지 수신자)
+        User receiver = chatRoom.getSeller().getId().equals(senderId)
+                ? chatRoom.getBuyer()
+                : chatRoom.getSeller();
+
+
+        ChatRoomMember receiverMember = chatRoomMemberRepository.findByUserIdAndChatRoomId(receiver.getId(), chatRoomId)
+                .orElseThrow(() -> {
+                    log.warn("[메시지 전송] 상대방이 채팅방에 없습니다. opponentId = {}, chatRoomId = {}", receiver.getId(), chatRoomId);
+                    return new CustomException(ChatErrorCode.CHAT_ROOM_NOT_FOUND);
+                });
+
+        // 상대방이 채팅방 탈퇴했는지 점검
+        if(receiverMember.isExited()) {
+            log.warn("[메시지 전송] 상대방이 채팅방을 나갔습니다.");
+            throw new CustomException(ChatErrorCode.CHAT_OPPONENT_EXITED);
+        }
+
+        // 둘 중 한명이라도 차단했으면 거부
+        if (userBlockRepository.isBlocked(senderId, receiver.getId()) ||
+                userBlockRepository.isBlocked(receiver.getId(), senderId)) {
+            throw new CustomException(ChatErrorCode.CHAT_BLOCKED);
+        }
+
         // 메시지 타입별 내용 검증
         if (request.getMessageType() == MessageType.TEXT &&
                 (request.getContent() == null || request.getContent().isBlank())) {
@@ -85,23 +112,6 @@ public class ChatMessageService {
 
         chatRoom.updateLastMessage(lastMessage, chatMessage.getCreatedAt());
 
-        // 상대방 조회(메시지 수신자)
-        User receiver = chatRoom.getSeller().getId().equals(senderId)
-                ? chatRoom.getBuyer()
-                : chatRoom.getSeller();
-
-
-        ChatRoomMember receiverMember = chatRoomMemberRepository.findByUserIdAndChatRoomId(receiver.getId(), chatRoomId)
-                .orElseThrow(() -> {
-                    log.warn("[메시지 전송] 상대방이 채팅방에 없습니다. opponentId = {}, chatRoomId = {}", receiver.getId(), chatRoomId);
-                    return new CustomException(ChatErrorCode.CHAT_ROOM_NOT_FOUND);
-                });
-
-        // 상대방이 채팅방 탈퇴했는지 점검
-        if(receiverMember.isExited()) {
-            log.warn("[메시지 전송] 상대방이 채팅방을 나갔습니다.");
-            throw new CustomException(ChatErrorCode.CHAT_OPPONENT_EXITED);
-        }
 
         // 현재 채팅방 구독중(접속중) 확인
         SimpUser user = simpUserRegistry.getUser(receiver.getId().toString());
