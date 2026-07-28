@@ -3,6 +3,8 @@ package com.tenure.domain.item.dto;
 import com.tenure.domain.item.entity.Item;
 import com.tenure.domain.item.enums.ItemStatus;
 import com.tenure.domain.item.enums.WearingTarget;
+import com.tenure.domain.product.entity.Product;
+import com.tenure.domain.product.enums.ProductStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDate;
 
@@ -55,10 +57,19 @@ public record ItemDetailResponse(
         Integer wishCount,
 
         @Schema(description = "구매 제안 허용 여부", example = "true")
-        Boolean purchaseOfferEnabled
+        Boolean purchaseOfferEnabled,
+
+        @Schema(description = "연결된 판매 상품 ID, 판매 상품이 없으면 null", example = "1")
+                Long productId,
+
+        @Schema(description = "연결된 판매 상품 가격, 판매 상품이 없으면 null", example = "32000")
+        Integer price,
+
+        @Schema(description = "연결된 판매 상품 상태, 판매 상품이 없으면 null", example = "ON_SALE")
+        ProductStatus saleStatus
 ) {
 
-    public static ItemDetailResponse from(Item item) {
+    public static ItemDetailResponse from(Item item, Product product) {
         return new ItemDetailResponse(
                 item.getId(),
                 item.getOwner().getId(),
@@ -75,7 +86,10 @@ public record ItemDetailResponse(
                 item.getLastWornAt(),
                 item.getFirstOwnedAt(),
                 item.getWishCount(),
-                item.getPurchaseOfferEnabled()
+                item.getPurchaseOfferEnabled(),
+                product == null ? null : product.getId(),
+                product == null ? null : product.getPrice(),
+                product == null ? null : product.getProductStatus()
         );
     }
 }
