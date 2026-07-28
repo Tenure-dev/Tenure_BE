@@ -115,4 +115,12 @@ public class ChatController {
         ChatImageUploadResponse imageUrl = ChatImageUploadResponse.from(url);
         return BaseResponse.success(imageUrl);
     }
+
+    @PostMapping("/{chatRoomId}/exit")
+    public BaseResponse<Void> exitChatRoom(
+            @PathVariable Long chatRoomId
+    ) {
+        chatRoomService.exitChatRoom(currentUserProvider.getCurrentUserId(), chatRoomId);
+        return BaseResponse.success(null);
+    }
 }

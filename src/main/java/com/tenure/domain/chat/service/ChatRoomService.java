@@ -301,4 +301,36 @@ public class ChatRoomService {
         // 반환 url: /files/chat/{chatRoomId}/{UUID}.확장자
         return localImageStoreService.store(image, "chat/" + chatRoomId);
     }
+
+    // 채팅방 나가기
+    @Transactional
+    public void exitChatRoom(Long currentUserId, Long chatRoomId) {
+
+        log.info("[채팅방 나가기] currentUserId = {}, chatRoomId = {}", currentUserId, chatRoomId);
+
+        if(!chatRoomRepository.existsById(chatRoomId)) {
+            log.warn("[채팅방 나가기] 해당 채팅방을 찾을 수 없습니다. chatRoomId = {}", chatRoomId);
+            throw new CustomException(ChatErrorCode.CHAT_ROOM_NOT_FOUND);
+        }
+
+        ChatRoomMember chatRoomMember = chatRoomMemberRepository.findByUserIdAndChatRoomId(currentUserId, chatRoomId)
+                .orElseThrow(() -> {
+                    log.warn("[채팅방 나가기] 해당 채팅방에 접근 할 수 없습니다. chatRoomId = {}, currentUserId = {}", chatRoomId, currentUserId);
+                    return new CustomException(ChatErrorCode.CHAT_FORBIDDEN);
+                });
+
+        // 이미 채팅방을 나간 상태라면
+        if (chatRoomMember.isExited()) {
+            return;
+        }
+
+        // 마지막 읽은 메시지 업데이트
+        chatMessageRepository.findByRecentMessage(chatRoomId)
+                .ifPresent(chatRoomMember :: updateLastRead);
+
+        // 채팅방 나감 처리
+        chatRoomMember.exit();
+
+        log.info("[채팅방 나가기 완료] currentUserId = {}, chatRoomId = {}", currentUserId, chatRoomId);
+    }
 }
