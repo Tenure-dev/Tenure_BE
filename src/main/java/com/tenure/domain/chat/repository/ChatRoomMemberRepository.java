@@ -12,7 +12,7 @@ import java.util.Optional;
 
 public interface ChatRoomMemberRepository extends JpaRepository<ChatRoomMember, Long> {
 
-    boolean existsByUserIdAndChatRoomId(Long userId, Long chatRoomId);
+    boolean existsByUserIdAndChatRoomIdAndIsExitedFalse(Long userId, Long chatRoomId);
 
     // 전체 채팅방
     @Query("select crm from ChatRoomMember crm " +
@@ -21,6 +21,7 @@ public interface ChatRoomMemberRepository extends JpaRepository<ChatRoomMember, 
             "join fetch c.seller " +
             "join fetch c.item " +
             "where crm.user.id = :userId " +
+            "and crm.isExited = false " +
             "and ((c.lastMessageAt is null and (c.createdAt < :createdAtCursor or (c.createdAt = :createdAtCursor and c.id < :cursorId))) or c.lastMessageAt < :cursor or (c.lastMessageAt = :cursor and c.id < :cursorId))" +
             "order by c.lastMessageAt desc nulls last, c.createdAt desc, c.id desc") // lastMessageAt 기준 정렬, 채팅방에 대화내역이 없어서 lastMessageAt = null 인경우 맨 아래 배치
     Slice<ChatRoomMember> findAllChatRooms(@Param("userId") Long userId,
@@ -36,6 +37,7 @@ public interface ChatRoomMemberRepository extends JpaRepository<ChatRoomMember, 
             "join fetch c.seller " +
             "join fetch c.item " +
             "where crm.user.id = :userId " +
+            "and crm.isExited = false " +
             "and c.buyer.id = :userId " +
             "and ((c.lastMessageAt is null and (c.createdAt < :createdAtCursor or (c.createdAt = :createdAtCursor and c.id < :cursorId))) or c.lastMessageAt < :cursor or (c.lastMessageAt = :cursor and c.id < :cursorId))" +
             "order by c.lastMessageAt desc nulls last, c.createdAt desc, c.id desc")
@@ -52,6 +54,7 @@ public interface ChatRoomMemberRepository extends JpaRepository<ChatRoomMember, 
             "join fetch c.seller " +
             "join fetch c.item " +
             "where crm.user.id = :userId " +
+            "and crm.isExited = false " +
             "and c.seller.id = :userId " +
             "and ((c.lastMessageAt is null and (c.createdAt < :createdAtCursor or (c.createdAt = :createdAtCursor and c.id < :cursorId))) or c.lastMessageAt < :cursor or (c.lastMessageAt = :cursor and c.id < :cursorId))" +
             "order by c.lastMessageAt desc nulls last, c.createdAt desc, c.id desc")
@@ -68,6 +71,7 @@ public interface ChatRoomMemberRepository extends JpaRepository<ChatRoomMember, 
             "join fetch c.seller " +
             "join fetch c.item " +
             "where crm.user.id = :userId " +
+            "and crm.isExited = false " +
             "and crm.unreadCount > 0 " +
             "and ((c.lastMessageAt is null and (c.createdAt < :createdAtCursor or (c.createdAt = :createdAtCursor and c.id < :cursorId))) or c.lastMessageAt < :cursor or (c.lastMessageAt = :cursor and c.id < :cursorId))" +
             "order by c.lastMessageAt desc nulls last, c.createdAt desc, c.id desc")

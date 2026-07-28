@@ -53,7 +53,7 @@ public class ChatMessageService {
                     return new CustomException(UserErrorCode.USER_NOT_FOUND);
                 });
 
-        if (!chatRoomMemberRepository.existsByUserIdAndChatRoomId(senderId, chatRoomId)) {
+        if (!chatRoomMemberRepository.existsByUserIdAndChatRoomIdAndIsExitedFalse(senderId, chatRoomId)) {
             log.warn("[메시지 전송] 채팅방 접근 권한이 없습니다. senderId = {}, chatRoomId = {}", senderId, chatRoomId);
             throw new CustomException(ChatErrorCode.CHAT_FORBIDDEN);
         }

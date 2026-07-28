@@ -1,0 +1,3 @@
+ALTER TABLE chat_room_members
+    ADD COLUMN is_exited BOOLEAN NOT NULL DEFAULT FALSE,
+    ADD COLUMN exited_at TIMESTAMP(6);
