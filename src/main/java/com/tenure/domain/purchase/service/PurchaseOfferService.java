@@ -5,6 +5,8 @@ import com.tenure.domain.address.repository.DeliveryAddressRepository;
 import com.tenure.domain.item.entity.Item;
 import com.tenure.domain.item.enums.ItemStatus;
 import com.tenure.domain.item.repository.ItemRepository;
+import com.tenure.domain.notification.service.NotificationFactory;
+import com.tenure.domain.notification.service.NotificationService;
 import com.tenure.domain.purchase.dto.PurchaseOfferCancelResponse;
 import com.tenure.domain.purchase.dto.PurchaseOfferCreateRequest;
 import com.tenure.domain.purchase.dto.PurchaseOfferCreateResponse;
@@ -53,6 +55,8 @@ public class PurchaseOfferService {
     private final DeliveryAddressRepository deliveryAddressRepository;
     private final UserRepository userRepository;
     private final TradeRepository tradeRepository;
+    private final NotificationFactory notificationFactory;
+    private final NotificationService notificationService;
 
     @Transactional
     public PurchaseOfferCreateResponse createPurchaseOffer(
@@ -98,6 +102,13 @@ public class PurchaseOfferService {
                 now.plusHours(RESPONSE_HOURS)
         );
         purchaseOfferRepository.save(offer);
+        notificationService.save(notificationFactory.purchaseOfferSent(
+                item.getOwner(),
+                proposer,
+                item,
+                offer.getId(),
+                request.offerPrice()
+        ));
         return PurchaseOfferCreateResponse.from(offer, now);
     }
 
@@ -166,6 +177,11 @@ public class PurchaseOfferService {
         validateOwner(offer, currentUserId);
         validateSentOrExpire(offer, LocalDateTime.now());
         offer.rejectAndReleaseAuthorization();
+        notificationService.save(notificationFactory.requestRejectedForOffer(
+                offer.getProposer(),
+                offer.getItem(),
+                offer.getId()
+        ));
         return PurchaseOfferRejectResponse.from(offer, LocalDateTime.now());
     }
 
@@ -175,6 +191,13 @@ public class PurchaseOfferService {
         validateProposer(offer, currentUserId);
         validateSentOrExpire(offer, LocalDateTime.now());
         offer.cancelAndReleaseAuthorization();
+        notificationService.save(notificationFactory.requestCanceledByRequester(
+                offer.getOwner(),
+                offer.getProposer(),
+                offer.getItem(),
+                offer.getId(),
+                false
+        ));
         return PurchaseOfferCancelResponse.from(offer, LocalDateTime.now());
     }
 

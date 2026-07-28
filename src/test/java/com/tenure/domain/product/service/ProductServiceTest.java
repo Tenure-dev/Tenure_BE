@@ -22,6 +22,8 @@ import com.tenure.domain.item.enums.EndReason;
 import com.tenure.domain.item.enums.ItemStatus;
 import com.tenure.domain.item.repository.ItemHistoryRepository;
 import com.tenure.domain.item.repository.ItemRepository;
+import com.tenure.domain.notification.service.NotificationFactory;
+import com.tenure.domain.notification.service.NotificationService;
 import com.tenure.domain.ootd.entity.Ootd;
 import com.tenure.domain.ootd.enums.OotdPublicationStatus;
 import com.tenure.domain.ootd.repository.OotdRepository;
@@ -51,6 +53,7 @@ import com.tenure.domain.tag.repository.OotdTagRepository;
 import com.tenure.domain.user.entity.User;
 import com.tenure.domain.user.enums.AccountVisibility;
 import com.tenure.domain.user.enums.UserGrade;
+import com.tenure.domain.wish.repository.WishRepository;
 import com.tenure.global.exception.CustomException;
 import java.lang.reflect.Constructor;
 import java.math.BigDecimal;
@@ -100,6 +103,12 @@ class ProductServiceTest {
     @Mock
     private PurchaseOfferRepository purchaseOfferRepository;
 
+    @Mock
+    private WishRepository wishRepository;
+
+    @Mock
+    private NotificationService notificationService;
+
     private ProductService productService;
 
     @BeforeEach
@@ -114,6 +123,9 @@ class ProductServiceTest {
                 followRelationshipRepository,
                 purchaseIntentRepository,
                 purchaseOfferRepository,
+                wishRepository,
+                new NotificationFactory(),
+                notificationService,
                 new ObjectMapper()
         );
     }
