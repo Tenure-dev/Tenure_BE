@@ -20,6 +20,8 @@ import com.tenure.domain.item.entity.Item;
 import com.tenure.domain.item.entity.ItemHistory;
 import com.tenure.domain.item.enums.EndReason;
 import com.tenure.domain.item.enums.ItemStatus;
+import com.tenure.domain.item.enums.WearingTarget;
+import com.tenure.domain.item.repository.CategoryRepository;
 import com.tenure.domain.item.repository.ItemHistoryRepository;
 import com.tenure.domain.item.repository.ItemRepository;
 import com.tenure.domain.ootd.entity.Ootd;
@@ -54,6 +56,7 @@ import com.tenure.domain.user.enums.UserGrade;
 import com.tenure.global.exception.CustomException;
 import java.lang.reflect.Constructor;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -78,6 +81,9 @@ class ProductServiceTest {
 
     @Mock
     private ItemHistoryRepository itemHistoryRepository;
+
+    @Mock
+    private CategoryRepository categoryRepository;
 
     @Mock
     private ProductRepository productRepository;
@@ -107,6 +113,7 @@ class ProductServiceTest {
         productService = new ProductService(
                 itemRepository,
                 itemHistoryRepository,
+                categoryRepository,
                 productRepository,
                 productAttachedOotdRepository,
                 ootdRepository,
@@ -125,6 +132,7 @@ class ProductServiceTest {
         ProductCreateRequest request = request(FeePolicy.SELLER_PAYS, 0, List.of(100L, 101L));
 
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+        stubCategoryLookup();
         when(ootdTagRepository.countValidProductAttachedOotds(
                 eq(ITEM_ID),
                 eq(CURRENT_USER_ID),
@@ -145,6 +153,10 @@ class ProductServiceTest {
         assertThat(response.productId()).isEqualTo(200L);
         assertThat(response.itemStatus()).isEqualTo(ItemStatus.ON_SALE);
         assertThat(item.getItemStatus()).isEqualTo(ItemStatus.ON_SALE);
+        assertThat(item.getBrandName()).isEqualTo("Levis");
+        assertThat(item.getItemName()).isEqualTo("LVC 1955 501");
+        assertThat(item.getWearingTarget()).isEqualTo(WearingTarget.UNISEX);
+        assertThat(item.getFirstOwnedAt()).isEqualTo(LocalDate.of(2025, 10, 1));
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<ProductAttachedOotd>> captor = ArgumentCaptor.forClass(List.class);
@@ -201,6 +213,7 @@ class ProductServiceTest {
         ProductCreateRequest request = request(FeePolicy.BUYER_PAYS, 3000, List.of(100L, 101L));
 
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+        stubCategoryLookup();
         when(ootdTagRepository.countValidProductAttachedOotds(
                 eq(ITEM_ID),
                 eq(CURRENT_USER_ID),
@@ -313,7 +326,7 @@ class ProductServiceTest {
         assertThat(response.price()).isEqualTo(52000);
         assertThat(response.shippingFee()).isZero();
         assertThat(response.feePolicy()).isEqualTo(FeePolicy.SELLER_PAYS);
-        assertThat(response.conditionFlags()).containsExactly("STAIN");
+        assertThat(response.conditionFlags()).containsEntry("stain", true);
         assertThat(response.attachedOotdIds()).containsExactly(100L, 101L);
         assertThat(product.getPrice()).isEqualTo(52000);
         assertThat(product.getSellerDescription()).isEqualTo("updated description");
@@ -323,6 +336,28 @@ class ProductServiceTest {
         ArgumentCaptor<List<ProductAttachedOotd>> captor = ArgumentCaptor.forClass(List.class);
         verify(productAttachedOotdRepository).saveAll(captor.capture());
         assertThat(captor.getValue()).hasSize(2);
+    }
+
+    @Test
+    void updateProduct_updatesItemInfoWhenItemFieldsAreProvided() {
+        User seller = user(CURRENT_USER_ID, UserGrade.BASIC);
+        Item item = item(ITEM_ID, seller, ItemStatus.ON_SALE);
+        Product product = product(200L, item, seller, ProductStatus.ON_SALE);
+        ProductUpdateRequest request = updateRequestWithItemInfo();
+
+        when(productRepository.findByIdForUpdate(200L)).thenReturn(Optional.of(product));
+        stubCategoryLookup();
+        when(productAttachedOotdRepository.findByProductIdOrderByOotdCreatedAtDesc(200L))
+                .thenReturn(List.of());
+
+        ProductUpdateResponse response = productService.updateProduct(200L, CURRENT_USER_ID, request);
+
+        assertThat(response.productId()).isEqualTo(200L);
+        assertThat(item.getBrandName()).isEqualTo("Levis");
+        assertThat(item.getItemName()).isEqualTo("LVC 1955 501");
+        assertThat(item.getWearingTarget()).isEqualTo(WearingTarget.UNISEX);
+        assertThat(item.getSizeValue()).isEqualTo("L");
+        assertThat(item.getFirstOwnedAt()).isEqualTo(LocalDate.of(2025, 10, 1));
     }
 
     @Test
@@ -509,12 +544,21 @@ class ProductServiceTest {
 
     private ProductCreateRequest request(FeePolicy feePolicy, int shippingFee, List<Long> attachedOotdIds) {
         return new ProductCreateRequest(
+                "Levis",
+                "LVC 1955 501",
+                "하의",
+                "데님",
+                WearingTarget.UNISEX,
+                "KR",
+                "L",
+                LocalDate.of(2025, 10, 1),
+                "https://image.url/item.jpg",
                 50000,
                 shippingFee,
                 feePolicy,
                 "https://image.url/product.jpg",
                 Map.of("shoulder", 45, "chest", 55, "totalLength", 70),
-                List.of("NO_DEFECT"),
+                Map.of("stain", false, "tear", false),
                 "3회 착용했습니다.",
                 attachedOotdIds
         );
@@ -522,14 +566,45 @@ class ProductServiceTest {
 
     private ProductUpdateRequest updateRequest(FeePolicy feePolicy, int shippingFee, List<Long> attachedOotdIds) {
         return new ProductUpdateRequest(
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
                 52000,
                 shippingFee,
                 feePolicy,
                 "https://image.url/product-updated.jpg",
                 Map.of("shoulder", 46, "chest", 56, "totalLength", 71),
-                List.of("STAIN"),
+                Map.of("stain", true, "tear", false),
                 "updated description",
                 attachedOotdIds
+        );
+    }
+
+    private ProductUpdateRequest updateRequestWithItemInfo() {
+        return new ProductUpdateRequest(
+                "Levis",
+                "LVC 1955 501",
+                "하의",
+                "데님",
+                WearingTarget.UNISEX,
+                "KR",
+                "L",
+                LocalDate.of(2025, 10, 1),
+                "https://image.url/item.jpg",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
         );
     }
 
@@ -547,8 +622,12 @@ class ProductServiceTest {
         ReflectionTestUtils.setField(item, "id", id);
         ReflectionTestUtils.setField(item, "owner", owner);
         ReflectionTestUtils.setField(item, "itemStatus", itemStatus);
+        ReflectionTestUtils.setField(item, "category", category(1L, "Jackets", category(2L, "Outer", null)));
         ReflectionTestUtils.setField(item, "brandName", "Nike");
         ReflectionTestUtils.setField(item, "itemName", "Black Jacket");
+        ReflectionTestUtils.setField(item, "wearingTarget", WearingTarget.UNISEX);
+        ReflectionTestUtils.setField(item, "sizeSystem", "KR");
+        ReflectionTestUtils.setField(item, "sizeValue", "100");
         ReflectionTestUtils.setField(item, "ootdVerifiedWearCount", 3);
         ReflectionTestUtils.setField(item, "wishCount", 12);
         return item;
@@ -570,6 +649,15 @@ class ProductServiceTest {
         return category;
     }
 
+    private void stubCategoryLookup() {
+        Category largeCategory = category(10L, "하의", null);
+        Category smallCategory = category(11L, "데님", largeCategory);
+        when(categoryRepository.findByNameAndDepthAndIsActiveTrue("하의", 1))
+                .thenReturn(Optional.of(largeCategory));
+        when(categoryRepository.findByNameAndParentAndDepthAndIsActiveTrue("데님", largeCategory, 2))
+                .thenReturn(Optional.of(smallCategory));
+    }
+
     private Product product(Long id, Item item, User seller, ProductStatus status) {
         Product product = Product.create(
                 item,
@@ -580,7 +668,7 @@ class ProductServiceTest {
                 new BigDecimal("0.0600"),
                 "https://image.url/product.jpg",
                 "{\"shoulder\":45,\"chest\":55,\"totalLength\":70}",
-                "[\"NO_DEFECT\"]",
+                "{\"stain\":false,\"tear\":false}",
                 "3회 착용했습니다."
         );
         ReflectionTestUtils.setField(product, "id", id);
