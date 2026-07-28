@@ -4,13 +4,15 @@ import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
+import java.util.List;
+
 @Getter
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
 public class ChatImageUploadResponse {
 
-    private String imageUrl;
+    private List<String> imageUrls;
 
-    public static ChatImageUploadResponse from(String imageUrl) {
-        return new ChatImageUploadResponse(imageUrl);
+    public static ChatImageUploadResponse from(List<String> imageUrls) {
+        return new ChatImageUploadResponse(imageUrls);
     }
 }
