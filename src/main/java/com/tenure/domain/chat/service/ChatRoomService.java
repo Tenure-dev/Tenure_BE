@@ -67,7 +67,6 @@ public class ChatRoomService {
     );
 
     // 채팅방 조회 / 생성
-
     @Transactional
     public ChatRoomResponse findOrCreateChatRoom(Long buyerId, Long itemId) {
 
