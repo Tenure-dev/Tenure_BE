@@ -119,4 +119,12 @@ public class UserController {
         userService.userBlock(currentUserId, userId);
         return BaseResponse.success(BlockResponse.of(userId, true), "사용자 차단이 완료되었습니다.");
     }
+
+    @Operation(summary = "사용자 차단 해제", description = "사용자 차단을 해제하는 API")
+    @DeleteMapping("/users/{userId}/block")
+    public BaseResponse<BlockResponse> userUnblock(@PathVariable Long userId) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        userService.userUnblock(currentUserId, userId);
+        return BaseResponse.success(BlockResponse.of(userId, false), "사용자 차단이 해제되었습니다.");
+    }
 }
