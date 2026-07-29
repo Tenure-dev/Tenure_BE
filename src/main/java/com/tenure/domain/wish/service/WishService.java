@@ -2,6 +2,8 @@ package com.tenure.domain.wish.service;
 
 import com.tenure.domain.item.entity.Item;
 import com.tenure.domain.item.repository.ItemRepository;
+import com.tenure.domain.notification.service.NotificationFactory;
+import com.tenure.domain.notification.service.NotificationService;
 import com.tenure.domain.product.entity.Product;
 import com.tenure.domain.product.enums.ProductStatus;
 import com.tenure.domain.product.repository.ProductRepository;
@@ -30,6 +32,8 @@ public class WishService {
     private final ItemRepository itemRepository;
     private final UserRepository userRepository;
     private final ProductRepository productRepository;
+    private final NotificationFactory notificationFactory;
+    private final NotificationService notificationService;
 
     @Transactional
     public WishCreateResponse createWish(Long currentUserId, Long itemId) {
@@ -42,6 +46,8 @@ public class WishService {
         Wish savedWish = wishRepository.save(wish);
 
         item.increaseWishCount();
+
+        createWishNotificationIfNeeded(user, item);
 
         return WishCreateResponse.from(savedWish);
     }
@@ -114,8 +120,20 @@ public class WishService {
 
     private String normalizeQuery(String query) {
         if (query == null || query.isBlank()) {
-            return null;
+            return "";
         }
         return query.trim();
+    }
+
+    private void createWishNotificationIfNeeded(User wisher, Item item) {
+        User owner = item.getOwner();
+
+        if (owner.getId().equals(wisher.getId())) {
+            return;
+        }
+
+        notificationService.save(
+                notificationFactory.wishCreated(owner, wisher, item)
+        );
     }
 }

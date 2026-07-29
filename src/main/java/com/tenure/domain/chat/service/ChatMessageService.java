@@ -11,8 +11,13 @@ import com.tenure.domain.chat.exception.ChatErrorCode;
 import com.tenure.domain.chat.repository.ChatMessageRepository;
 import com.tenure.domain.chat.repository.ChatRoomMemberRepository;
 import com.tenure.domain.chat.repository.ChatRoomRepository;
+import com.tenure.domain.item.entity.Item;
+import com.tenure.domain.notification.entity.Notification;
+import com.tenure.domain.notification.service.NotificationFactory;
+import com.tenure.domain.notification.service.NotificationService;
 import com.tenure.domain.user.entity.User;
 import com.tenure.domain.user.exception.UserErrorCode;
+import com.tenure.domain.user.repository.UserBlockRepository;
 import com.tenure.domain.user.repository.UserRepository;
 import com.tenure.global.exception.CustomException;
 import lombok.RequiredArgsConstructor;
@@ -32,16 +37,19 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 public class ChatMessageService {
 
     private final UserRepository userRepository;
+    private final UserBlockRepository userBlockRepository;
     private final ChatRoomRepository chatRoomRepository;
     private final ChatRoomMemberRepository chatRoomMemberRepository;
     private final ChatMessageRepository chatMessageRepository;
     private final SimpUserRegistry simpUserRegistry;
     private final SimpMessagingTemplate messagingTemplate;
+    private final NotificationFactory notificationFactory;
+    private final NotificationService notificationService;
     @Transactional
     public void sendMessage(Long chatRoomId, Long senderId, ChatMessageRequest request) {
 
         //검증
-        ChatRoom chatRoom = chatRoomRepository.findById(chatRoomId)
+        ChatRoom chatRoom = chatRoomRepository.findByIdWithItem(chatRoomId)
                 .orElseThrow(() -> {
                     log.warn("[메시지 전송] 해당 채팅방을 찾을 수 없습니다. chatRoomId = {}", chatRoomId);
                     return new CustomException(ChatErrorCode.CHAT_ROOM_NOT_FOUND);
@@ -58,6 +66,31 @@ public class ChatMessageService {
             throw new CustomException(ChatErrorCode.CHAT_FORBIDDEN);
         }
 
+
+        // 상대방 조회(메시지 수신자)
+        User receiver = chatRoom.getSeller().getId().equals(senderId)
+                ? chatRoom.getBuyer()
+                : chatRoom.getSeller();
+
+
+        ChatRoomMember receiverMember = chatRoomMemberRepository.findByUserIdAndChatRoomId(receiver.getId(), chatRoomId)
+                .orElseThrow(() -> {
+                    log.warn("[메시지 전송] 상대방이 채팅방에 없습니다. opponentId = {}, chatRoomId = {}", receiver.getId(), chatRoomId);
+                    return new CustomException(ChatErrorCode.CHAT_ROOM_NOT_FOUND);
+                });
+
+        // 상대방이 채팅방 탈퇴했는지 점검
+        if(receiverMember.isExited()) {
+            log.warn("[메시지 전송] 상대방이 채팅방을 나갔습니다.");
+            throw new CustomException(ChatErrorCode.CHAT_OPPONENT_EXITED);
+        }
+
+        // 둘 중 한명이라도 차단했으면 거부
+        if (userBlockRepository.isBlocked(senderId, receiver.getId()) ||
+                userBlockRepository.isBlocked(receiver.getId(), senderId)) {
+            throw new CustomException(ChatErrorCode.CHAT_BLOCKED);
+        }
+
         // 메시지 타입별 내용 검증
         if (request.getMessageType() == MessageType.TEXT &&
                 (request.getContent() == null || request.getContent().isBlank())) {
@@ -65,12 +98,12 @@ public class ChatMessageService {
         }
         // 이미지면 이미지 경로가 있어야 함.
         if (request.getMessageType() == MessageType.IMAGE &&
-                (request.getImageUrl() == null || request.getImageUrl().isBlank())) {
+                (request.getImageUrls() == null || request.getImageUrls().isEmpty())) {
             throw new CustomException(ChatErrorCode.INVALID_MESSAGE_CONTENT);
         }
 
         //메시지 저장
-        ChatMessage chatMessage = ChatMessage.of(chatRoom, sender, request.getMessageType(), request.getContent(), request.getImageUrl());
+        ChatMessage chatMessage = ChatMessage.of(chatRoom, sender, request.getMessageType(), request.getContent(), request.getImageUrls());
         chatMessageRepository.save(chatMessage);
 
         // 채팅방 마지막 메시지 업데이트 (미리보기 메시지)
@@ -80,18 +113,8 @@ public class ChatMessageService {
         chatRoom.updateLastMessage(lastMessage, chatMessage.getCreatedAt());
 
 
-        Long opponentId = chatRoom.getSeller().getId().equals(senderId)
-                ? chatRoom.getBuyer().getId() : chatRoom.getSeller().getId();
-
-        // 상대방 조회(메시지 수신자)
-        ChatRoomMember receiverMember = chatRoomMemberRepository.findByUserIdAndChatRoomId(opponentId, chatRoomId)
-                .orElseThrow(() -> {
-                    log.warn("[메시지 전송] 상대방이 채팅방에 없습니다. opponentId = {}, chatRoomId = {}", opponentId, chatRoomId);
-                    return new CustomException(ChatErrorCode.CHAT_ROOM_NOT_FOUND);
-                });
-
         // 현재 채팅방 구독중(접속중) 확인
-        SimpUser user = simpUserRegistry.getUser(opponentId.toString());
+        SimpUser user = simpUserRegistry.getUser(receiver.getId().toString());
         boolean isOnline = isOnline(chatRoomId, user);
 
         // 채팅방 접속중이 아닐경우 안읽음 카운트 + 1;
@@ -104,6 +127,8 @@ public class ChatMessageService {
         // 접속중인경우 0, 접속중이 아닌경우(안읽은 경우) 1
         int unreadCount = isOnline ? 0 : 1;
 
+        Item item = chatRoom.getItem();
+
         // db 트랜젝션 이후에 브로드 캐스팅 실행
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
@@ -115,12 +140,15 @@ public class ChatMessageService {
                 if(!isOnline) {
                     // 채팅방 목록에 실시간 안읽음 카운트 반영
                     ChatListUnReadCountUpdateEvent chatUnReadCountUpdateEvent = ChatListUnReadCountUpdateEvent.from(chatRoom, receiverMember);
-                    messagingTemplate.convertAndSend("/sub/users/" + opponentId, chatUnReadCountUpdateEvent);
-                }
+                    messagingTemplate.convertAndSend("/sub/users/" + receiver.getId(), chatUnReadCountUpdateEvent);
 
+                    Notification chatNotification = notificationFactory
+                            .chatMessage(receiver, sender, chatRoom, item, lastMessage);
+
+                    notificationService.save(chatNotification);
+                }
             }
         });
-
     }
 
     // 카톡방 접속중(구독중)인지 확인 매서드

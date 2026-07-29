@@ -7,6 +7,7 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Getter
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
@@ -18,7 +19,7 @@ public class ChatMessageResponse {
     private String senderProfileImgUrl;
     private MessageType messageType;
     private String content;
-    private String contentImageUrl;
+    private List<String> contentImageUrls;
     private LocalDateTime createdAt;
 
     private int unreadCount; // 상대방이 읽었으면 내 메시지에 0, 안읽었으면 1
@@ -26,7 +27,7 @@ public class ChatMessageResponse {
     public static ChatMessageResponse from(ChatMessage chatMessage, int unreadCount) {
         return new ChatMessageResponse(chatMessage.getId(), chatMessage.getSender().getId(), chatMessage.getSender().getUsername(),
                 chatMessage.getSender().getProfileImageUrl(), chatMessage.getMessageType(), chatMessage.getContent(),
-                chatMessage.getImageUrl(), chatMessage.getCreatedAt(), unreadCount);
+                chatMessage.getImageUrls(), chatMessage.getCreatedAt(), unreadCount);
     }
 
 

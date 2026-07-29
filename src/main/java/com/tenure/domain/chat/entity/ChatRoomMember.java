@@ -16,6 +16,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.Objects;
 
 @Getter
 @Entity
@@ -63,6 +64,10 @@ public class ChatRoomMember extends BaseTimeEntity {
 
     //채팅방 접속 시 최근에 읽은 메시지 업데이트.
     public void updateLastRead(ChatMessage lastReadMessage) {
+        // 이미 다 읽은 상태인 경우 불필요한 update 방지
+        if (this.unreadCount == 0 && Objects.equals(this.lastReadMessage, lastReadMessage)) {
+            return;
+        }
         this.lastReadMessage = lastReadMessage;
         this.unreadCount = 0;
     }

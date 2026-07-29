@@ -6,7 +6,6 @@ import com.tenure.domain.product.enums.ProductStatus;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
-import java.util.Map;
 
 @Schema(description = "Product update response")
 public record ProductUpdateResponse(
@@ -33,10 +32,10 @@ public record ProductUpdateResponse(
         String mainImageUrl,
 
         @Schema(description = "Measurements")
-        Map<String, Object> measurements,
+        ProductMeasurements measurements,
 
-        @ArraySchema(schema = @Schema(description = "Condition flag", example = "STAIN"))
-        List<String> conditionFlags,
+        @Schema(description = "Condition flags")
+        ProductConditionFlags conditionFlags,
 
         @Schema(description = "Seller description", example = "상태 설명 수정")
         String sellerDescription,
@@ -47,8 +46,8 @@ public record ProductUpdateResponse(
 
     public static ProductUpdateResponse of(
             Product product,
-            Map<String, Object> measurements,
-            List<String> conditionFlags,
+            ProductMeasurements measurements,
+            ProductConditionFlags conditionFlags,
             List<Long> attachedOotdIds
     ) {
         return new ProductUpdateResponse(

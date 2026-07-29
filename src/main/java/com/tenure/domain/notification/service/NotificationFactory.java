@@ -12,13 +12,12 @@ import org.springframework.stereotype.Component;
 public class NotificationFactory {
 
     // 채팅 메시지 수신 (오프라인 상태)
-    public Notification chatMessage(User receiver, User sender, ChatRoom chatRoom,
-                                    MessageType messageType, String content) {
-        String body = messageType == MessageType.IMAGE ? "사진을 보냈습니다." : content;
-        Item item = chatRoom.getItem();
+    public Notification chatMessage(User receiver, User sender, ChatRoom chatRoom, Item item,
+                                    String lastMessage) {
+
         return Notification.of(
                 receiver, NotificationType.CHAT_MESSAGE_CREATED,
-                body, chatRoom.getId(),
+                lastMessage, chatRoom.getId(),
                 sender.getUsername(), item.getBrandName(), item.getItemName(),
                 sender.getProfileImageUrl()
         );
@@ -59,7 +58,7 @@ public class NotificationFactory {
 
     // 구매 제안 수신 (아이템 소유자에게)
     public Notification purchaseOfferSent(User receiver, User sender, Item item, Long offerId, int price) {
-        String body = sender.getUsername() + "님이 " + price + "원에 구매 제안을 보냈어요.";
+        String body = sender.getUsername() + "님이 " + String.format("%,d", price) + "원에 구매 제안을 보냈어요.";
         return Notification.of(
                 receiver, NotificationType.PURCHASE_OFFER_SENT,
                 body, offerId,
@@ -263,7 +262,7 @@ public class NotificationFactory {
 
     // 가격 변경 (관심 유저에게)
     public Notification productPriceChanged(User receiver, Item item, int oldPrice, int newPrice) {
-        String body = oldPrice + "원에서 " + newPrice + "원으로 변경됐어요.";
+        String body = String.format("%,d", oldPrice) + "원에서 " + String.format("%,d", newPrice) + "원으로 변경됐어요.";
         return Notification.of(
                 receiver, NotificationType.PRODUCT_PRICE_CHANGED,
                 body, item.getId(),

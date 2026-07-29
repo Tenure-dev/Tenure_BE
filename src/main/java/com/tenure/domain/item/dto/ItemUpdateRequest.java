@@ -21,11 +21,11 @@ public record ItemUpdateRequest(
         String itemName,
 
         @NotBlank(message = "상위 카테고리는 필수입니다.")
-        @Schema(description = "상위 카테고리", example = "상의")
+        @Schema(description = "상위 카테고리", example = "하의")
         String categoryLarge,
 
-        @NotBlank(message = "상세 카테고리는 필수입니다.")
-        @Schema(description = "상세 카테고리", example = "후디")
+        @NotBlank(message = "세부 카테고리는 필수입니다.")
+        @Schema(description = "세부 카테고리", example = "데님")
         String categorySmall,
 
         @NotNull(message = "착용 대상은 필수입니다.")
@@ -44,7 +44,7 @@ public record ItemUpdateRequest(
         LocalDate firstOwnedAt,
 
         @Size(max = 500, message = "대표 이미지 URL은 500자 이하여야 합니다.")
-        @Schema(description = "대표 이미지 URL", example = "https://image.url/item.jpg")
+        @Schema(description = "아이템 대표 이미지 URL", example = "https://image.url/item.jpg")
         String representativeImageUrl
 ) {
 }
