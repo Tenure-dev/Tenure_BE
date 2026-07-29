@@ -19,10 +19,12 @@ public interface UserBlockRepository extends JpaRepository<UserBlock, Long> {
     // 차단 관계 조회 (차단 해제 시 사용)
     Optional<UserBlock> findByBlocker_IdAndBlocked_Id(Long blockerId, Long blockedId);
 
-    // 내가 차단한 사용자 목록 조회 (최근 차단순)
+    // 내가 차단한 사용자 목록 조회 (최근 차단순, 탈퇴한 사용자 제외)
     @Query(
-            value = "SELECT ub FROM UserBlock ub JOIN FETCH ub.blocked WHERE ub.blocker.id = :blockerId ORDER BY ub.createdAt DESC",
-            countQuery = "SELECT COUNT(ub) FROM UserBlock ub WHERE ub.blocker.id = :blockerId"
+            value = "SELECT ub FROM UserBlock ub JOIN FETCH ub.blocked b "
+                    + "WHERE ub.blocker.id = :blockerId AND b.deletedAt IS NULL ORDER BY ub.createdAt DESC",
+            countQuery = "SELECT COUNT(ub) FROM UserBlock ub JOIN ub.blocked b "
+                    + "WHERE ub.blocker.id = :blockerId AND b.deletedAt IS NULL"
     )
     Page<UserBlock> findByBlockerId(@Param("blockerId") Long blockerId, Pageable pageable);
 }
