@@ -14,7 +14,6 @@ import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Map;
 
 @Schema(description = "판매 상품 상세 응답")
 public record ProductDetailResponse(
@@ -46,8 +45,8 @@ public record ProductDetailResponse(
         @Schema(description = "판매 상품 대표 이미지 URL", example = "https://image.url/product.jpg")
         String mainImageUrl,
 
-        @Schema(description = "카테고리별 실측", example = "{\"shoulder\":45,\"chest\":55,\"totalLength\":70}")
-        Map<String, Object> measurements,
+        @Schema(description = "카테고리별 실측", example = "{\"waistWidth\":38,\"thighWidth\":30,\"totalLength\":100,\"rise\":28,\"inseam\":73,\"hemWidth\":20}")
+        ProductMeasurements measurements,
 
         @Schema(description = "상태 이상 체크")
         ProductConditionFlags conditionFlags,
@@ -63,7 +62,7 @@ public record ProductDetailResponse(
             Product product,
             ProductViewerMode viewerMode,
             List<ProductAction> availableActions,
-            Map<String, Object> measurements,
+            ProductMeasurements measurements,
             ProductConditionFlags conditionFlags,
             List<ProductAttachedOotd> attachedOotds
     ) {

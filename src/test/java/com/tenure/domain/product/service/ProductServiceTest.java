@@ -33,6 +33,7 @@ import com.tenure.domain.product.dto.ProductCreateResponse;
 import com.tenure.domain.product.dto.ProductDeleteResponse;
 import com.tenure.domain.product.dto.ProductDetailResponse;
 import com.tenure.domain.product.dto.ProductExternalCompleteResponse;
+import com.tenure.domain.product.dto.ProductMeasurements;
 import com.tenure.domain.product.dto.ProductUpdateRequest;
 import com.tenure.domain.product.dto.ProductUpdateResponse;
 import com.tenure.domain.product.entity.Product;
@@ -61,7 +62,6 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -228,6 +228,26 @@ class ProductServiceTest {
                 .isInstanceOf(CustomException.class)
                 .extracting("errorCode")
                 .isEqualTo(ProductErrorCode.ATTACHED_OOTD_INVALID);
+    }
+
+    @Test
+    void createProduct_rejectsMeasurementsForOtherCategory() {
+        User seller = user(CURRENT_USER_ID, UserGrade.BASIC);
+        Item item = item(ITEM_ID, seller, ItemStatus.OWNED);
+        ProductCreateRequest request = requestWithMeasurements(
+                FeePolicy.SELLER_PAYS,
+                0,
+                List.of(100L),
+                topMeasurements()
+        );
+
+        when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+        stubCategoryLookup();
+
+        assertThatThrownBy(() -> productService.createProduct(ITEM_ID, CURRENT_USER_ID, request))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(ProductErrorCode.PRODUCT_MEASUREMENTS_INVALID);
     }
 
     @Test
@@ -571,6 +591,15 @@ class ProductServiceTest {
     }
 
     private ProductCreateRequest request(FeePolicy feePolicy, int shippingFee, List<Long> attachedOotdIds) {
+        return requestWithMeasurements(feePolicy, shippingFee, attachedOotdIds, bottomMeasurements());
+    }
+
+    private ProductCreateRequest requestWithMeasurements(
+            FeePolicy feePolicy,
+            int shippingFee,
+            List<Long> attachedOotdIds,
+            ProductMeasurements measurements
+    ) {
         return new ProductCreateRequest(
                 "Levis",
                 "LVC 1955 501",
@@ -585,7 +614,7 @@ class ProductServiceTest {
                 shippingFee,
                 feePolicy,
                 "https://image.url/product.jpg",
-                Map.of("shoulder", 45, "chest", 55, "totalLength", 70),
+                measurements,
                 ProductConditionFlags.empty(),
                 "3회 착용했습니다.",
                 attachedOotdIds
@@ -607,7 +636,7 @@ class ProductServiceTest {
                 shippingFee,
                 feePolicy,
                 "https://image.url/product-updated.jpg",
-                Map.of("shoulder", 46, "chest", 56, "totalLength", 71),
+                bottomMeasurements(),
                 new ProductConditionFlags(true, false, false, false, false),
                 "updated description",
                 attachedOotdIds
@@ -649,6 +678,36 @@ class ProductServiceTest {
                 null,
                 null,
                 null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
+        );
+    }
+
+    private ProductMeasurements bottomMeasurements() {
+        return new ProductMeasurements(
+                null,
+                null,
+                null,
+                new BigDecimal("100"),
+                new BigDecimal("38"),
+                new BigDecimal("30"),
+                new BigDecimal("28"),
+                new BigDecimal("73"),
+                new BigDecimal("20"),
+                null
+        );
+    }
+
+    private ProductMeasurements topMeasurements() {
+        return new ProductMeasurements(
+                new BigDecimal("45"),
+                new BigDecimal("55"),
+                new BigDecimal("60"),
+                new BigDecimal("70"),
                 null,
                 null,
                 null,

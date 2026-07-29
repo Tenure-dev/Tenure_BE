@@ -20,6 +20,7 @@ public enum ProductErrorCode implements ErrorCode {
     PRODUCT_JSON_INVALID("PRODUCT_006", "판매 상품 입력값을 저장할 수 없습니다.", HttpStatus.BAD_REQUEST),
     PRODUCT_NOT_TRADING("PRODUCT_007", "거래 중인 상품이 아닙니다.", HttpStatus.CONFLICT),
     PRODUCT_NOT_ON_SALE("PRODUCT_008", "판매중인 상품이 아닙니다.", HttpStatus.CONFLICT),
+    PRODUCT_MEASUREMENTS_INVALID("PRODUCT_009", "카테고리에 맞지 않는 실측 입력값입니다.", HttpStatus.BAD_REQUEST),
     PRODUCT_DETAIL_DATA_INVALID("PRODUCT_500", "판매 상품 정보를 불러올 수 없습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
 
     private final String code;

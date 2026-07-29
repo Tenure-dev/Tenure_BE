@@ -10,7 +10,6 @@ import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Map;
 
 @Schema(description = "판매 게시 수정 요청")
 public record ProductUpdateRequest(
@@ -63,10 +62,10 @@ public record ProductUpdateRequest(
         String mainImageUrl,
 
         @Schema(
-                description = "카테고리별 실측. 입력 항목은 추후 확정 예정이며 현재는 key/value 그대로 저장합니다.",
-                example = "{\"shoulder\":45,\"chest\":55,\"totalLength\":70}"
+                description = "카테고리별 실측. 아우터/상의/원피스: shoulderWidth,chestWidth,sleeveLength,totalLength, 하의: waistWidth,thighWidth,totalLength,rise,inseam,hemWidth, 치마: waistWidth,hipWidth,hemWidth,totalLength, 신발/가방/모자/액세서리/주얼리: 없음",
+                example = "{\"waistWidth\":38,\"thighWidth\":30,\"totalLength\":100,\"rise\":28,\"inseam\":73,\"hemWidth\":20}"
         )
-        Map<String, Object> measurements,
+        ProductMeasurements measurements,
 
         @Valid
         @Schema(description = "상태 이상 체크")

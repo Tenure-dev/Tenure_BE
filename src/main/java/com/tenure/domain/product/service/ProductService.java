@@ -26,6 +26,7 @@ import com.tenure.domain.product.dto.ProductCreateResponse;
 import com.tenure.domain.product.dto.ProductDeleteResponse;
 import com.tenure.domain.product.dto.ProductDetailResponse;
 import com.tenure.domain.product.dto.ProductExternalCompleteResponse;
+import com.tenure.domain.product.dto.ProductMeasurements;
 import com.tenure.domain.product.dto.ProductUpdateRequest;
 import com.tenure.domain.product.dto.ProductUpdateResponse;
 import com.tenure.domain.product.entity.Product;
@@ -53,7 +54,6 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -103,6 +103,7 @@ public class ProductService {
                 request.firstOwnedAt(),
                 request.representativeImageUrl()
         );
+        validateMeasurements(request.categoryLarge(), request.measurements(), true);
         validateAttachedOotdIds(item, currentUserId, request.attachedOotdIds());
 
         Product product = Product.create(
@@ -153,7 +154,7 @@ public class ProductService {
                 product,
                 viewerMode,
                 resolveAvailableActions(viewerMode, product.getProductStatus()),
-                readMapOrEmpty(product.getMeasurements()),
+                readMeasurementsOrEmpty(product.getMeasurements()),
                 readConditionFlagsOrEmpty(product.getConditionFlags()),
                 representativeOotds
         );
@@ -168,6 +169,7 @@ public class ProductService {
         validateProductSeller(product, currentUserId);
         validateOnSaleProduct(product);
         validateCategoryPair(request);
+        ProductMeasurements measurements = resolveMeasurementsForUpdate(item, request);
         if (hasItemUpdateFields(request)) {
             validateFirstOwnedAt(request.firstOwnedAt());
             updateItemInfoPartially(item, request);
@@ -186,7 +188,7 @@ public class ProductService {
                 request.shippingFee(),
                 request.feePolicy(),
                 request.mainImageUrl(),
-                writeJsonOrNull(request.measurements()),
+                writeJsonOrNull(measurements),
                 writeJsonOrNull(request.conditionFlags()),
                 request.sellerDescription()
         );
@@ -197,7 +199,7 @@ public class ProductService {
 
         return ProductUpdateResponse.of(
                 product,
-                readMapOrEmpty(product.getMeasurements()),
+                readMeasurementsOrEmpty(product.getMeasurements()),
                 readConditionFlagsOrEmpty(product.getConditionFlags()),
                 attachedOotdIds
         );
@@ -391,6 +393,126 @@ public class ProductService {
         }
     }
 
+    private ProductMeasurements resolveMeasurementsForUpdate(Item item, ProductUpdateRequest request) {
+        if (request.measurements() == null) {
+            return null;
+        }
+
+        String categoryLarge = request.categoryLarge() == null
+                ? resolveCategoryLarge(item)
+                : request.categoryLarge();
+        validateMeasurements(categoryLarge, request.measurements(), false);
+        return request.measurements();
+    }
+
+    private void validateMeasurements(
+            String categoryLarge,
+            ProductMeasurements measurements,
+            boolean required
+    ) {
+        if (hasNoMeasurementFields(categoryLarge)) {
+            if (measurements != null && !measurements.isEmpty()) {
+                throw new CustomException(ProductErrorCode.PRODUCT_MEASUREMENTS_INVALID);
+            }
+            return;
+        }
+
+        if (!requiresMeasurements(categoryLarge)) {
+            return;
+        }
+
+        if (measurements == null || measurements.isEmpty()) {
+            if (required) {
+                throw new CustomException(ProductErrorCode.PRODUCT_MEASUREMENTS_INVALID);
+            }
+            return;
+        }
+
+        if (isTopLikeCategory(categoryLarge)) {
+            validateTopLikeMeasurements(measurements);
+            return;
+        }
+        if ("하의".equals(categoryLarge)) {
+            validateBottomMeasurements(measurements);
+            return;
+        }
+        if ("치마".equals(categoryLarge)) {
+            validateSkirtMeasurements(measurements);
+        }
+    }
+
+    private boolean requiresMeasurements(String categoryLarge) {
+        return isTopLikeCategory(categoryLarge)
+                || "하의".equals(categoryLarge)
+                || "치마".equals(categoryLarge);
+    }
+
+    private boolean hasNoMeasurementFields(String categoryLarge) {
+        return "신발".equals(categoryLarge)
+                || "가방".equals(categoryLarge)
+                || "모자".equals(categoryLarge)
+                || "액세서리".equals(categoryLarge)
+                || "악세사리".equals(categoryLarge)
+                || "주얼리".equals(categoryLarge);
+    }
+
+    private boolean isTopLikeCategory(String categoryLarge) {
+        return "아우터".equals(categoryLarge)
+                || "상의".equals(categoryLarge)
+                || "원피스".equals(categoryLarge);
+    }
+
+    private void validateTopLikeMeasurements(ProductMeasurements measurements) {
+        if (measurements.shoulderWidth() == null
+                || measurements.chestWidth() == null
+                || measurements.sleeveLength() == null
+                || measurements.totalLength() == null
+                || measurements.waistWidth() != null
+                || measurements.thighWidth() != null
+                || measurements.rise() != null
+                || measurements.inseam() != null
+                || measurements.hemWidth() != null
+                || measurements.hipWidth() != null) {
+            throw new CustomException(ProductErrorCode.PRODUCT_MEASUREMENTS_INVALID);
+        }
+    }
+
+    private void validateBottomMeasurements(ProductMeasurements measurements) {
+        if (measurements.waistWidth() == null
+                || measurements.thighWidth() == null
+                || measurements.totalLength() == null
+                || measurements.rise() == null
+                || measurements.inseam() == null
+                || measurements.hemWidth() == null
+                || measurements.shoulderWidth() != null
+                || measurements.chestWidth() != null
+                || measurements.sleeveLength() != null
+                || measurements.hipWidth() != null) {
+            throw new CustomException(ProductErrorCode.PRODUCT_MEASUREMENTS_INVALID);
+        }
+    }
+
+    private void validateSkirtMeasurements(ProductMeasurements measurements) {
+        if (measurements.waistWidth() == null
+                || measurements.hipWidth() == null
+                || measurements.hemWidth() == null
+                || measurements.totalLength() == null
+                || measurements.shoulderWidth() != null
+                || measurements.chestWidth() != null
+                || measurements.sleeveLength() != null
+                || measurements.thighWidth() != null
+                || measurements.rise() != null
+                || measurements.inseam() != null) {
+            throw new CustomException(ProductErrorCode.PRODUCT_MEASUREMENTS_INVALID);
+        }
+    }
+
+    private String resolveCategoryLarge(Item item) {
+        Category category = item.getCategory();
+        Category parent = category.getParent();
+        return parent == null ? category.getName() : parent.getName();
+    }
+
     private <T> T coalesce(T value, T fallback) {
         return value != null ? value : fallback;
     }
@@ -499,14 +621,15 @@ public class ProductService {
         return List.of(ProductAction.SHARE, ProductAction.REPORT);
     }
 
-    private Map<String, Object> readMapOrEmpty(String json) {
+    private ProductMeasurements readMeasurementsOrEmpty(String json) {
         if (json == null || json.isBlank()) {
-            return Collections.emptyMap();
+            return ProductMeasurements.empty();
         }
         try {
-            return objectMapper.readValue(json, new TypeReference<>() {
+            Map<String, Object> measurementMap = objectMapper.readValue(json, new TypeReference<>() {
             });
-        } catch (IOException e) {
+            return ProductMeasurements.fromLegacyMap(measurementMap);
+        } catch (IOException | NumberFormatException e) {
             throw new CustomException(ProductErrorCode.PRODUCT_DETAIL_DATA_INVALID);
         }
     }
