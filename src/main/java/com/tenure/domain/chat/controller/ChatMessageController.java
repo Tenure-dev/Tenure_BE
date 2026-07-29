@@ -9,7 +9,6 @@ import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
 
 
@@ -28,8 +27,8 @@ public class ChatMessageController {
             @Valid @Payload ChatMessageRequest chatMessageRequest,
             SimpMessageHeaderAccessor headerAccessor
             ) {
-        Long currentUserId = Long.valueOf(headerAccessor.getUser().getName());
 
+        Long currentUserId = (Long) headerAccessor.getSessionAttributes().get("userId");
         // 메시지 전송
         chatMessageService.sendMessage(chatRoomId, currentUserId, chatMessageRequest);
 

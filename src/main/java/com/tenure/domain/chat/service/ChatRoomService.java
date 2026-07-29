@@ -265,7 +265,7 @@ public class ChatRoomService {
                 });
 
         // 현재 사용자가 해당 채팅방을 나가지 않았는가
-        if (chatRoomMemberRepository.existsByUserIdAndChatRoomIdAndIsExitedFalse(currentUserId, chatRoomId)) {
+        if (!chatRoomMemberRepository.existsByUserIdAndChatRoomIdAndIsExitedFalse(currentUserId, chatRoomId)) {
             log.warn("[채팅 내역 조회] 해당 채팅방에 접근 권한이 없습니다. currentUserId = {}, chatRoomId = {}", currentUserId, chatRoomId);
             throw new CustomException(ChatErrorCode.CHAT_FORBIDDEN);
         }
@@ -344,7 +344,7 @@ public class ChatRoomService {
                 });
 
         // 이미 채팅방을 나간 상태라면
-        if (chatRoomMember.isExited() && chatRoom.isClosed()) {
+        if (chatRoomMember.isExited()) {
             return;
         }
 

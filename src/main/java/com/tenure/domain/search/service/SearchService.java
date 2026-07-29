@@ -493,8 +493,13 @@ public class SearchService {
         Slice<SearchUserQueryDto> slice = userRepository
                 .findPopularUsers(cursorFollowerCount, cursorId, currentUserId, pageRequest);
 
+        List<Long> targetIds = slice.map(SearchUserQueryDto::getId).toList();
+
+        HashSet<Long> followingIds = targetIds.isEmpty() ?
+                new HashSet<>() : new HashSet<>(followRelationshipRepository.findFollowingIds(currentUserId, targetIds));
+
         log.debug("[인기 사용자] 조회 {}건, hasNext = {}", slice.getNumberOfElements(), slice.hasNext());
-        return SearchHomePopularUserCursorResponse.from(slice);
+        return SearchHomePopularUserCursorResponse.from(slice,followingIds);
     }
 
     private Set<Long> buildExcludeIds(List<Ootd> result, Long sourceOotdId) {
