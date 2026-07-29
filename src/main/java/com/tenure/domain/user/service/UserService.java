@@ -319,4 +319,19 @@ public class UserService {
         log.info("사용자 차단: {} -> {}", currentUserId, targetUserId);
     }
 
+    @Transactional
+    public void userUnblock(Long currentUserId, Long targetUserId) {
+        // 대상 사용자 존재 확인
+        if (!userRepository.existsById(targetUserId)) {
+            throw new CustomException(UserErrorCode.USER_NOT_FOUND);
+        }
+
+        // 차단 관계 조회. 없으면 404
+        UserBlock userBlock = userBlockRepository.findByBlocker_IdAndBlocked_Id(currentUserId, targetUserId)
+            .orElseThrow(() -> new CustomException(UserErrorCode.BLOCK_NOT_FOUND));
+
+        userBlockRepository.delete(userBlock);
+        log.info("사용자 차단 해제: {} -> {}", currentUserId, targetUserId);
+    }
+
 }
