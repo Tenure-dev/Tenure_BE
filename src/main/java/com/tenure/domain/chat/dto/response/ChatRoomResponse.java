@@ -25,12 +25,14 @@ public class ChatRoomResponse {
     private Integer price;
     private LocalDate lastWornAt;
 
-    private boolean isBuyer;   // 현재 유저가 구매자인지
-    private Long tradeId;      // 거래 있으면 tradeId, 없으면 null
-    private Long productId;    // 상품 상세/관리 링크용
+    private boolean isBuyer;          // 현재 유저가 구매자인지
+    private Long tradeId;             // 거래 있으면 tradeId, 없으면 null
+    private Long productId;           // 상품 상세/관리 링크용
+    private boolean isBlocked;        // 어느 한쪽이라도 차단했으면 true
+    private boolean isOpponentExited; // 상대방이 채팅방을 나갔으면 true
 
 
-    public static ChatRoomResponse from(ChatRoom chatRoom, Item item, Product product, Long currentUserId, Long tradeId) {
+    public static ChatRoomResponse from(ChatRoom chatRoom, Item item, Product product, Long currentUserId, Long tradeId, boolean isBlocked, boolean isOpponentExited) {
         boolean isBuyer = currentUserId.equals(chatRoom.getBuyer().getId());
 
         String opponentUsername = isBuyer
@@ -43,7 +45,7 @@ public class ChatRoomResponse {
 
         return new ChatRoomResponse(chatRoom.getId(), opponentUsername, opponentProfileImage, item.getRepresentativeImageUrl(),
                 item.getBrandName(), item.getItemName(), product.getProductStatus(), product.getPrice(),
-                item.getLastWornAt(), isBuyer, tradeId, product.getId()
+                item.getLastWornAt(), isBuyer, tradeId, product.getId(), isBlocked, isOpponentExited
         );
     }
 

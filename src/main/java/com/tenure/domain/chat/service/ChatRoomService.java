@@ -98,7 +98,8 @@ public class ChatRoomService {
             throw new CustomException(ChatErrorCode.CHAT_CREATION_NOT_ALLOWED);
         }
 
-        if(userBlockRepository.isBlocked(buyerId, owner.getId()) || userBlockRepository.isBlocked(owner.getId(), buyerId)) {
+        // 내가 상대방을 차단 한 경우
+        if(userBlockRepository.isBlocked(buyerId, owner.getId())) {
             log.warn("[채팅방 생성 / 조회] 차단된 사용자와는 채팅 할 수 없습니다.");
             throw new CustomException(ChatErrorCode.CHAT_BLOCKED);
         }
@@ -130,7 +131,12 @@ public class ChatRoomService {
 
 
         Long tradeId = tradeRepository.findByItemId(itemId).map(Trade::getId).orElse(null);
-        return ChatRoomResponse.from(chatRoom, item, product, buyerId, tradeId);
+
+        // 상대방이 나를 차단 했는지 검사
+        boolean isBlocked = userBlockRepository.isBlocked(owner.getId(), buyerId);
+
+        // 아이템 상세에서 바로 들어온 경우 처음엔 isOpponentExited false 고정
+        return ChatRoomResponse.from(chatRoom, item, product, buyerId, tradeId, isBlocked, false);
     }
 
     // 채팅방 목록 조회
@@ -168,7 +174,7 @@ public class ChatRoomService {
     public ChatRoomResponse enterChatroom(Long currentUserId, Long chatRoomId) {
 
         // 채팅방 존재 확인
-        ChatRoom chatRoom = chatRoomRepository.findById(chatRoomId)
+        ChatRoom chatRoom = chatRoomRepository.findByIdWithItem(chatRoomId)
                 .orElseThrow(() -> {
                     log.warn("[채팅방 조회] 채팅방을 찾을 수 없습니다. chatRoomId = {}", chatRoomId);
                     return new CustomException(ChatErrorCode.CHAT_ROOM_NOT_FOUND);
@@ -193,7 +199,19 @@ public class ChatRoomService {
         Long tradeId = tradeRepository
                 .findByItemId(item.getId()).map(Trade::getId).orElse(null);
 
-        return ChatRoomResponse.from(chatRoom, item, product, currentUserId, tradeId);
+        Long opponentId = currentUserId.equals(chatRoom.getBuyer().getId())
+                ? chatRoom.getSeller().getId()
+                : chatRoom.getBuyer().getId();
+
+        // 상대방이 나를 차단했는지 여부
+        boolean isBlocked = userBlockRepository.isBlocked(opponentId, currentUserId);
+
+        // 상대방이 채팅방을 나갔는지 여부
+        boolean isOpponentExited = chatRoomMemberRepository.findByUserIdAndChatRoomId(opponentId, chatRoomId)
+                .map(ChatRoomMember::isExited)
+                .orElse(false);
+
+        return ChatRoomResponse.from(chatRoom, item, product, currentUserId, tradeId, isBlocked, isOpponentExited);
     }
 
     //채팅방 접속 시 unreadCount 업데이트
