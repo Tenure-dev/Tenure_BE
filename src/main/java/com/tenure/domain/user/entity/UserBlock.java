@@ -49,4 +49,13 @@ public class UserBlock {
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
     }
+
+    public static UserBlock create(User blocker, User blocked) {
+        UserBlock userBlock = new UserBlock();
+        userBlock.blocker = blocker;
+        userBlock.blocked = blocked;
+        return userBlock;
+    }
 }
+
+
