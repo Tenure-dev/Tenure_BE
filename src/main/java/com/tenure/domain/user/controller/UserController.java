@@ -1,6 +1,7 @@
 package com.tenure.domain.user.controller;
 
 import com.tenure.domain.user.dto.request.SignupRequest;
+import com.tenure.domain.user.dto.response.BlockResponse;
 import com.tenure.domain.user.dto.response.SignupResponse;
 import com.tenure.domain.user.service.UserService;
 import com.tenure.global.response.BaseResponse;
@@ -109,5 +110,13 @@ public class UserController {
     ) {
         String imageUrl = userService.uploadProfileImage(image);
         return BaseResponse.success(new ProfileImageUploadResponse(imageUrl));
+    }
+
+    @Operation(summary = "사용자 차단", description = "사용자를 차단하는 API")
+    @PostMapping("/users/{userId}/block")
+    public BaseResponse<BlockResponse> userBlock(@PathVariable Long userId) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        userService.userBlock(currentUserId, userId);
+        return BaseResponse.success(BlockResponse.of(userId, true), "사용자 차단이 완료되었습니다.");
     }
 }

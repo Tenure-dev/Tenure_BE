@@ -1,7 +1,9 @@
 package com.tenure.domain.purchase.repository;
 
 import com.tenure.domain.purchase.entity.PurchaseIntent;
+import com.tenure.domain.purchase.entity.PurchaseOffer;
 import com.tenure.domain.purchase.enums.PurchaseIntentStatus;
+import com.tenure.domain.purchase.enums.PurchaseOfferStatus;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -189,4 +191,19 @@ public interface PurchaseIntentRepository extends JpaRepository<PurchaseIntent, 
             @Param("statuses") Collection<PurchaseIntentStatus> statuses,
             Pageable pageable
     );
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""                                                                                                               
+          select intent                                                                                                    
+          from PurchaseIntent intent                                                                                       
+          where intent.status = :status                                                                                    
+            and ((intent.buyer.id = :userId1 and intent.seller.id = :userId2)                                              
+              or (intent.buyer.id = :userId2 and intent.seller.id = :userId1))                                             
+          """)
+    List<PurchaseIntent> findSentBetweenUsersForUpdate(
+        @Param("userId1") Long userId1,
+        @Param("userId2") Long userId2,
+        @Param("status") PurchaseIntentStatus status
+    );
+
 }

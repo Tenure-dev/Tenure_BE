@@ -187,4 +187,19 @@ public interface PurchaseOfferRepository extends JpaRepository<PurchaseOffer, Lo
             @Param("statuses") Collection<PurchaseOfferStatus> statuses,
             Pageable pageable
     );
+
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""                                                                                                               
+          select offer                                                                                                     
+          from PurchaseOffer offer                                                                                         
+          where offer.status = :status                                                                                     
+            and ((offer.proposer.id = :userId1 and offer.owner.id = :userId2)                                              
+              or (offer.proposer.id = :userId2 and offer.owner.id = :userId1))                                             
+          """)
+    List<PurchaseOffer> findSentBetweenUsersForUpdate(
+        @Param("userId1") Long userId1,
+        @Param("userId2") Long userId2,
+        @Param("status") PurchaseOfferStatus status
+    );
 }

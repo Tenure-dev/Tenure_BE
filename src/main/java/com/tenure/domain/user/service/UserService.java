@@ -2,10 +2,18 @@ package com.tenure.domain.user.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.tenure.domain.follow.repository.FollowRelationshipRepository;
+import com.tenure.domain.purchase.entity.PurchaseIntent;
+import com.tenure.domain.purchase.entity.PurchaseOffer;
+import com.tenure.domain.purchase.enums.PurchaseIntentStatus;
+import com.tenure.domain.purchase.enums.PurchaseOfferStatus;
+import com.tenure.domain.purchase.repository.PurchaseIntentRepository;
+import com.tenure.domain.purchase.repository.PurchaseOfferRepository;
 import com.tenure.domain.user.dto.request.AccountSettingsUpdateRequest;
 import com.tenure.domain.user.dto.request.SignupRequest;
 import com.tenure.domain.user.dto.response.SignupResponse;
 import com.tenure.domain.user.entity.User;
+import com.tenure.domain.user.entity.UserBlock;
 import com.tenure.domain.user.exception.UserErrorCode;
 import com.tenure.domain.user.repository.UserRepository;
 import com.tenure.domain.user.dto.request.WithdrawalRequest;
@@ -49,6 +57,9 @@ public class UserService {
     private final DeliveryAddressRepository addressRepository;
     private final UserWithdrawalRepository userWithdrawalRepository;
     private final ImageStorageService imageStorageService;
+    private final FollowRelationshipRepository followRepository;
+    private final PurchaseIntentRepository purchaseIntentRepository;
+    private final PurchaseOfferRepository purchaseOfferRepository;
 
     // 회원가입
     @Transactional
@@ -267,4 +278,45 @@ public class UserService {
         // "profile" 디렉토리에 저장하고 URL 반환
         return imageStorageService.store(image, "profile");
     }
+
+    @Transactional
+    public void userBlock(Long currentUserId, Long targetUserId) {
+        // 1) 자기 자신 차단 불가
+        if (currentUserId.equals(targetUserId)) {
+            throw new CustomException(UserErrorCode.CANNOT_BLOCK_SELF);
+        }
+
+        // 2) 대상 사용자 존재 확인
+        User target = userRepository.findById(targetUserId)
+            .orElseThrow(() -> new CustomException(UserErrorCode.USER_NOT_FOUND));
+
+        // 3) 이미 차단한 경우 거부 (unique 제약 위반 방지)
+        if (userBlockRepository.isBlocked(currentUserId, targetUserId)) {
+            throw new CustomException(UserErrorCode.ALREADY_BLOCKED);
+        }
+
+        // 4) 차단 관계 생성
+        User blocker = userRepository.findById(currentUserId)
+            .orElseThrow(() -> new CustomException(UserErrorCode.USER_NOT_FOUND));
+        userBlockRepository.save(UserBlock.create(blocker, target));
+
+        // 5) 양방향 팔로우 즉시 해제
+        followRepository.findByFollower_IdAndFollowing_Id(currentUserId, targetUserId)
+            .ifPresent(followRepository::delete);
+        followRepository.findByFollower_IdAndFollowing_Id(targetUserId, currentUserId)
+            .ifPresent(followRepository::delete);
+
+        // 6) 두 사용자 사이의 대기 중(SENT) 구매의사 취소 + 승인 해제
+        purchaseIntentRepository.findSentBetweenUsersForUpdate(
+            currentUserId, targetUserId, PurchaseIntentStatus.SENT
+        ).forEach(PurchaseIntent::cancelAndReleaseAuthorization);
+
+        // 7) 두 사용자 사이의 대기 중(SENT) 구매제안 취소 + 승인 해제
+        purchaseOfferRepository.findSentBetweenUsersForUpdate(
+            currentUserId, targetUserId, PurchaseOfferStatus.SENT
+        ).forEach(PurchaseOffer::cancelAndReleaseAuthorization);
+
+        log.info("사용자 차단: {} -> {}", currentUserId, targetUserId);
+    }
+
 }
