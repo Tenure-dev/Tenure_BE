@@ -16,11 +16,11 @@ import com.tenure.domain.product.repository.ProductRepository;
 import com.tenure.domain.tag.enums.TagStatus;
 import com.tenure.domain.tag.repository.OotdTagRepository;
 import com.tenure.domain.user.entity.User;
-import com.tenure.domain.user.exception.UserErrorCode;
 import com.tenure.domain.user.repository.UserRepository;
 import com.tenure.global.exception.CustomException;
 import com.tenure.global.response.PageResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -273,5 +273,30 @@ public class ItemService {
     private Category findAiPendingCategory() {
         return categoryRepository.findByNameAndDepthAndIsActiveTrue(AI_PENDING_CATEGORY_NAME, DETAIL_CATEGORY_DEPTH)
                 .orElseThrow(() -> new CustomException(ItemErrorCode.CATEGORY_NOT_FOUND));
+    }
+
+    @Transactional(readOnly = true)
+    public List<ItemFrequentlyWornTogetherResponse> getFrequentlyWornTogetherItems(
+            Long currentUserId,
+            Long itemId
+    ) {
+        Item item = findItem(itemId); //기준 아이템이 존재하는지 확인
+        validateItemAccess(item, currentUserId); //상세 조회와 같은 권한 기준 적용
+
+        return ootdTagRepository.findFrequentlyWornTogetherItems( //같은 OOTD에 함께 태그된 아이템을 count 순으로 조회
+                        itemId,
+                        OotdPublicationStatus.ACTIVE,
+                        TagStatus.CONFIRMED,
+                        PageRequest.of(0, 3) //최대 3개만
+                )
+                .stream()
+                .map(result -> new ItemFrequentlyWornTogetherResponse(
+                        result.getItemId(),
+                        result.getBrandName(),
+                        result.getItemName(),
+                        result.getRepresentativeImageUrl(),
+                        result.getTogetherCount()
+                ))
+                .toList();
     }
 }

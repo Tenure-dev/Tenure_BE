@@ -11,12 +11,22 @@ import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.data.domain.Pageable;
+import java.util.List;
 
 public interface OotdTagRepository extends JpaRepository<OotdTag, Long> {
 
     List<OotdTag> findAllByOotdId(Long ootdId);
 
     long deleteAllByOotdId(Long ootdId);
+
+    interface FrequentlyWornTogetherItemProjection {
+        Long getItemId();
+        String getBrandName();
+        String getItemName();
+        String getRepresentativeImageUrl();
+        Long getTogetherCount();
+    }
 
     @Query("""
             select count(distinct ootd.id)
@@ -207,6 +217,32 @@ public interface OotdTagRepository extends JpaRepository<OotdTag, Long> {
             @Param("excludedOotdIds") Collection<Long> excludedOotdIds,
             @Param("cursorId") Long cursorId,
             @Param("currentUserId") Long currentUserId,
+            @Param("publicationStatus") OotdPublicationStatus publicationStatus,
+            @Param("tagStatus") TagStatus tagStatus,
+            Pageable pageable
+    );
+
+    // 기준 아이템과 같은 OOTD에 함께 태그된 아이템을 함께 등장한 횟수 순으로 조회 (자주 같이 입은 옷 조회)
+    @Query("""
+            select item.id as itemId,
+                   item.brandName as brandName,
+                   item.itemName as itemName,
+                   item.representativeImageUrl as representativeImageUrl,
+                   count(distinct ootd.id) as togetherCount
+            from OotdTag baseTag, OotdTag togetherTag
+            join baseTag.ootd ootd
+            join togetherTag.item item
+            where baseTag.item.id = :itemId
+              and togetherTag.ootd.id = ootd.id
+              and togetherTag.item.id <> :itemId
+              and ootd.publicationStatus = :publicationStatus
+              and baseTag.status = :tagStatus
+              and togetherTag.status = :tagStatus
+            group by item.id, item.brandName, item.itemName, item.representativeImageUrl
+            order by count(distinct ootd.id) desc, item.id asc
+            """)
+    List<FrequentlyWornTogetherItemProjection> findFrequentlyWornTogetherItems(
+            @Param("itemId") Long itemId,
             @Param("publicationStatus") OotdPublicationStatus publicationStatus,
             @Param("tagStatus") TagStatus tagStatus,
             Pageable pageable
