@@ -117,11 +117,11 @@ public class ChatRoomService {
 
         // 사용자가 동시에 채팅방 생성을 할 경우 방지
         try {
-            //체팅방을 조회 / 없으면 새로 만든 후 저장
-            chatRoom = chatRoomRepository.findByItemIdAndSellerIdAndBuyerId(itemId, owner.getId(), buyerId)
+            //체팅방을 조회(닫히지 않은 채팅방) / 없으면 새로 만든 후 저장
+            chatRoom = chatRoomRepository.findByItemIdAndSellerIdAndBuyerIdAndIsClosedFalse(itemId, owner.getId(), buyerId)
                     .orElseGet(() -> createChatRoom(item, buyer, owner));
         } catch (DataIntegrityViolationException e) {
-            chatRoom = chatRoomRepository.findByItemIdAndSellerIdAndBuyerId(itemId, owner.getId(), buyerId)
+            chatRoom = chatRoomRepository.findByItemIdAndSellerIdAndBuyerIdAndIsClosedFalse(itemId, owner.getId(), buyerId)
                     .orElseThrow(() -> {
                         log.warn("[채팅방 생성/조회] 채팅방을 찾을 수 없습니다. itemId = {}, ownerId = {}, buyerId = {}", itemId, owner.getId(), buyerId );
                         return new CustomException(ChatErrorCode.CHAT_ROOM_NOT_FOUND);
@@ -330,10 +330,12 @@ public class ChatRoomService {
 
         log.info("[채팅방 나가기] currentUserId = {}, chatRoomId = {}", currentUserId, chatRoomId);
 
-        if(!chatRoomRepository.existsById(chatRoomId)) {
-            log.warn("[채팅방 나가기] 해당 채팅방을 찾을 수 없습니다. chatRoomId = {}", chatRoomId);
-            throw new CustomException(ChatErrorCode.CHAT_ROOM_NOT_FOUND);
-        }
+        ChatRoom chatRoom = chatRoomRepository.findById(chatRoomId)
+                .orElseThrow(() -> {
+                    log.warn("[채팅방 나가기] 해당 채팅방을 찾을 수 없습니다. chatRoomId = {}", chatRoomId);
+                    return new CustomException(ChatErrorCode.CHAT_ROOM_NOT_FOUND);
+                });
+
 
         ChatRoomMember chatRoomMember = chatRoomMemberRepository.findByUserIdAndChatRoomId(currentUserId, chatRoomId)
                 .orElseThrow(() -> {
@@ -342,7 +344,7 @@ public class ChatRoomService {
                 });
 
         // 이미 채팅방을 나간 상태라면
-        if (chatRoomMember.isExited()) {
+        if (chatRoomMember.isExited() && chatRoom.isClosed()) {
             return;
         }
 
@@ -352,6 +354,7 @@ public class ChatRoomService {
 
         // 채팅방 나감 처리
         chatRoomMember.exit();
+        chatRoom.close();
 
         log.info("[채팅방 나가기 완료] currentUserId = {}, chatRoomId = {}", currentUserId, chatRoomId);
     }
