@@ -1,15 +1,14 @@
 package com.tenure.domain.wish.controller;
 
 import com.tenure.domain.product.enums.ProductStatus;
-import com.tenure.domain.wish.dto.WishCreateResponse;
-import com.tenure.domain.wish.dto.WishDeleteResponse;
-import com.tenure.domain.wish.dto.WishListResponse;
+import com.tenure.domain.wish.dto.*;
 import com.tenure.domain.wish.service.WishService;
 import com.tenure.global.response.BaseResponse;
 import com.tenure.global.response.PageResponse;
 import com.tenure.global.security.CurrentUserProvider;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -73,5 +72,22 @@ public class WishController {
         );
 
         return BaseResponse.success(response, "위시리스트 조회에 성공했습니다.");
+    }
+
+    @Operation(
+            summary = "위시 알림 설정 변경",
+            description = "로그인 사용자가 위시 등록한 아이템의 알림 수신 여부를 변경합니다."
+    )
+    @PatchMapping("/items/{itemId}/wish/notification")
+    public BaseResponse<WishNotificationUpdateResponse> updateWishNotification(
+            @PathVariable Long itemId,
+            @Valid @RequestBody WishNotificationUpdateRequest request
+    ) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+
+        WishNotificationUpdateResponse response =
+                wishService.updateWishNotification(currentUserId, itemId, request);
+
+        return BaseResponse.success(response, "위시 알림 설정 변경에 성공했습니다.");
     }
 }
