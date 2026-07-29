@@ -19,6 +19,9 @@ public interface ItemRepository extends JpaRepository<Item, Long> {
     @Query("select item from Item item where item.id = :itemId")
     Optional<Item> findByIdForUpdate(@Param("itemId") Long itemId);
 
+    @Query("select item from Item item join fetch item.owner where item.id = :itemId")
+    Optional<Item> findByIdWithOwner(@Param("itemId") Long itemId);
+
     @Query("""
             select item
             from Item item
