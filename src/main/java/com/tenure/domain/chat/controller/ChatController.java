@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Tag(name = "Chat", description = "채팅 API")
 @RestController
@@ -109,11 +110,13 @@ public class ChatController {
     @PostMapping(value = "/{chatRoomId}/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public BaseResponse<ChatImageUploadResponse> uploadChatImage(
             @PathVariable Long chatRoomId,
-            @RequestParam("image") MultipartFile image
+            @RequestParam("images") List<MultipartFile> images
     ) {
-        String url = chatRoomService.uploadImage(currentUserProvider.getCurrentUserId(), chatRoomId, image);
-        ChatImageUploadResponse imageUrl = ChatImageUploadResponse.from(url);
-        return BaseResponse.success(imageUrl);
+        List<String> imageUrls = chatRoomService
+                .uploadImage(currentUserProvider.getCurrentUserId(), chatRoomId, images);
+
+        ChatImageUploadResponse chatImageUploadResponse = ChatImageUploadResponse.from(imageUrls);
+        return BaseResponse.success(chatImageUploadResponse);
     }
 
     @Operation(

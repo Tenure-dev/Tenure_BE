@@ -3,19 +3,11 @@ package com.tenure.domain.chat.entity;
 import com.tenure.domain.chat.enums.MessageType;
 
 import com.tenure.domain.user.entity.User;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.PrePersist;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
+
 import java.time.LocalDateTime;
+import java.util.List;
+
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -45,8 +37,9 @@ public class ChatMessage {
     @Column(columnDefinition = "text")
     private String content;
 
-    @Column(name = "image_url", length = 500)
-    private String imageUrl;
+    @Convert(converter = com.tenure.global.converter.StringListConverter.class)
+    @Column(name = "image_urls", columnDefinition = "text")
+    private List<String> imageUrls;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -58,14 +51,14 @@ public class ChatMessage {
 
     // 채팅 매시지 생성 매서드
     public static ChatMessage of(ChatRoom chatRoom, User sender,
-                                 MessageType messageType, String content,  String imageUrl) {
+                                 MessageType messageType, String content, List<String> imageUrls) {
 
         ChatMessage chatMessage = new ChatMessage();
         chatMessage.chatRoom = chatRoom;
         chatMessage.sender = sender;
         chatMessage.messageType = messageType;
         chatMessage.content = content;
-        chatMessage.imageUrl = imageUrl;
+        chatMessage.imageUrls = imageUrls;
         return chatMessage;
 
     }

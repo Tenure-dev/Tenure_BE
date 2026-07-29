@@ -98,12 +98,12 @@ public class ChatMessageService {
         }
         // 이미지면 이미지 경로가 있어야 함.
         if (request.getMessageType() == MessageType.IMAGE &&
-                (request.getImageUrl() == null || request.getImageUrl().isBlank())) {
+                (request.getImageUrls() == null || request.getImageUrls().isEmpty())) {
             throw new CustomException(ChatErrorCode.INVALID_MESSAGE_CONTENT);
         }
 
         //메시지 저장
-        ChatMessage chatMessage = ChatMessage.of(chatRoom, sender, request.getMessageType(), request.getContent(), request.getImageUrl());
+        ChatMessage chatMessage = ChatMessage.of(chatRoom, sender, request.getMessageType(), request.getContent(), request.getImageUrls());
         chatMessageRepository.save(chatMessage);
 
         // 채팅방 마지막 메시지 업데이트 (미리보기 메시지)

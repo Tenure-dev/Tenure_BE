@@ -264,7 +264,8 @@ public class ChatRoomService {
                     return new CustomException(ChatErrorCode.CHAT_ROOM_NOT_FOUND);
                 });
 
-        if (chatRoomMemberRepository.findByUserIdAndChatRoomId(currentUserId, chatRoomId).isEmpty()) {
+        // 현재 사용자가 해당 채팅방을 나가지 않았는가
+        if (chatRoomMemberRepository.existsByUserIdAndChatRoomIdAndIsExitedFalse(currentUserId, chatRoomId)) {
             log.warn("[채팅 내역 조회] 해당 채팅방에 접근 권한이 없습니다. currentUserId = {}, chatRoomId = {}", currentUserId, chatRoomId);
             throw new CustomException(ChatErrorCode.CHAT_FORBIDDEN);
         }
@@ -298,7 +299,7 @@ public class ChatRoomService {
 
 
     //채팅 이미지 업로드
-    public String uploadImage(Long currentUserId, Long chatRoomId, MultipartFile image) {
+    public List<String> uploadImage(Long currentUserId, Long chatRoomId, List<MultipartFile> images) {
 
         if(!chatRoomRepository.existsById(chatRoomId)) {
             log.warn("[채팅 이미지 업로드] 채팅방을 찾을 수 없습니다. chatRoomId = {}", chatRoomId);
@@ -310,13 +311,17 @@ public class ChatRoomService {
             throw new CustomException(ChatErrorCode.CHAT_FORBIDDEN);
         }
 
-        if(!ALLOWED_IMAGE_TYPES.contains(image.getContentType())) {
-            log.warn("[채팅 이미지 업로드] 지원하지 않는 이미지 형식입니다. contentType = {}", image.getContentType());
-            throw new CustomException(ChatErrorCode.INVALID_IMAGE_TYPE);
-        }
+        images.forEach(image -> {
+            if(!ALLOWED_IMAGE_TYPES.contains(image.getContentType())) {
+                log.warn("[채팅 이미지 업로드] 지원하지 않는 이미지 형식입니다. contentType = {}", image.getContentType());
+                throw new CustomException(ChatErrorCode.INVALID_IMAGE_TYPE);
+            }
+        });
 
         // 반환 url: /files/chat/{chatRoomId}/{UUID}.확장자
-        return localImageStoreService.store(image, "chat/" + chatRoomId);
+        return images.stream().map(image ->
+                localImageStoreService.store(image, "chat/" + chatRoomId)).toList();
+
     }
 
     // 채팅방 나가기
