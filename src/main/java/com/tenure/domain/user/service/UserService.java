@@ -11,9 +11,13 @@ import com.tenure.domain.purchase.repository.PurchaseIntentRepository;
 import com.tenure.domain.purchase.repository.PurchaseOfferRepository;
 import com.tenure.domain.user.dto.request.AccountSettingsUpdateRequest;
 import com.tenure.domain.user.dto.request.SignupRequest;
+import com.tenure.domain.user.dto.response.BlockedUserResponse;
 import com.tenure.domain.user.dto.response.SignupResponse;
 import com.tenure.domain.user.entity.User;
 import com.tenure.domain.user.entity.UserBlock;
+import com.tenure.global.response.PageResponse;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import com.tenure.domain.user.exception.UserErrorCode;
 import com.tenure.domain.user.repository.UserRepository;
 import com.tenure.domain.user.dto.request.WithdrawalRequest;
@@ -332,6 +336,13 @@ public class UserService {
 
         userBlockRepository.delete(userBlock);
         log.info("사용자 차단 해제: {} -> {}", currentUserId, targetUserId);
+    }
+
+    // 내가 차단한 사용자 목록 조회
+    @Transactional(readOnly = true)
+    public PageResponse<BlockedUserResponse> getBlockedUsers(Long currentUserId, Pageable pageable) {
+        Page<UserBlock> blocks = userBlockRepository.findByBlockerId(currentUserId, pageable);
+        return PageResponse.from(blocks, ub -> BlockedUserResponse.of(ub.getBlocked(), ub.getCreatedAt()));
     }
 
 }
