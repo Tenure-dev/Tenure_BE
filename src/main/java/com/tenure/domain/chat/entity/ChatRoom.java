@@ -20,15 +20,7 @@ import lombok.NoArgsConstructor;
 
 @Getter
 @Entity
-@Table(
-        name = "chat_rooms",
-        uniqueConstraints = {
-                @UniqueConstraint(
-                        name = "uk_chat_rooms_item_buyer_seller",
-                        columnNames = {"item_id", "buyer_user_id", "seller_user_id"}
-                )
-        }
-)
+@Table(name = "chat_rooms")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ChatRoom extends BaseTimeEntity {
 
@@ -54,6 +46,9 @@ public class ChatRoom extends BaseTimeEntity {
     @Column(name = "last_message_at")
     private LocalDateTime lastMessageAt;
 
+    @Column(name = "is_closed")
+    private boolean isClosed = false;
+
 
     //채팅방 생성 매서드
     public static ChatRoom of(Item item, User buyer, User seller) {
@@ -69,5 +64,10 @@ public class ChatRoom extends BaseTimeEntity {
     public void updateLastMessage(String lastMessage, LocalDateTime lastMessageAt) {
         this.lastMessage = lastMessage;
         this.lastMessageAt = lastMessageAt;
+    }
+
+    // 채팅방 닫기(한쪽이 나간 경우)
+    public void close() {
+        this.isClosed = true;
     }
 }

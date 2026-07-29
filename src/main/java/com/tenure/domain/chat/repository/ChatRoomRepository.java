@@ -9,7 +9,7 @@ import java.util.Optional;
 public interface ChatRoomRepository extends JpaRepository<ChatRoom, Long> {
 
     //아이템, 판매자, 구매자로 채팅방 조회
-    Optional<ChatRoom> findByItemIdAndSellerIdAndBuyerId(Long itemId, Long sellerId, Long buyerId);
+    Optional<ChatRoom> findByItemIdAndSellerIdAndBuyerIdAndIsClosedFalse(Long itemId, Long sellerId, Long buyerId);
 
     @Query("select c from ChatRoom c " +
             "join fetch c.item join fetch c.buyer join fetch c.seller " +
