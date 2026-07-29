@@ -6,6 +6,7 @@ import com.tenure.domain.product.entity.Product;
 import com.tenure.domain.product.enums.ProductStatus;
 import com.tenure.domain.wish.entity.Wish;
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.time.LocalDateTime;
 
 @Schema(description = "위시리스트 조회 응답")
 public record WishListResponse(
@@ -34,6 +35,12 @@ public record WishListResponse(
         @Schema(description = "판매 가격. 판매 상품이 없으면 null", example = "50000")
         Integer price,
 
+        @Schema(description = "판매자 닉네임. 판매 상품이 없으면 null", example = "yoonfit")
+        String sellerUsername,
+
+        @Schema(description = "위시 등록 시각", example = "2026-07-28T10:30:00")
+        LocalDateTime createdAt,
+
         @Schema(description = "구매 제안 허용 여부", example = "true")
         Boolean purchaseOfferEnabled,
 
@@ -56,6 +63,8 @@ public record WishListResponse(
                 item.getItemStatus(),
                 product == null ? null : product.getProductStatus(),
                 product == null ? null : product.getPrice(),
+                product == null ? null : product.getSeller().getUsername(),
+                wish.getCreatedAt(),
                 item.getPurchaseOfferEnabled(),
                 wish.getNotificationEnabled(),
                 item.getWishCount()

@@ -2,24 +2,31 @@ package com.tenure.domain.product.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tenure.domain.common.enums.FeePolicy;
 import com.tenure.domain.follow.enums.FollowStatus;
 import com.tenure.domain.follow.repository.FollowRelationshipRepository;
+import com.tenure.domain.item.entity.Category;
 import com.tenure.domain.item.entity.Item;
 import com.tenure.domain.item.entity.ItemHistory;
 import com.tenure.domain.item.enums.EndReason;
 import com.tenure.domain.item.enums.ItemStatus;
+import com.tenure.domain.item.enums.WearingTarget;
+import com.tenure.domain.item.exception.ItemErrorCode;
+import com.tenure.domain.item.repository.CategoryRepository;
 import com.tenure.domain.item.repository.ItemHistoryRepository;
 import com.tenure.domain.item.repository.ItemRepository;
 import com.tenure.domain.ootd.entity.Ootd;
 import com.tenure.domain.ootd.enums.OotdPublicationStatus;
 import com.tenure.domain.ootd.repository.OotdRepository;
 import com.tenure.domain.product.dto.ProductCreateRequest;
+import com.tenure.domain.product.dto.ProductConditionFlags;
 import com.tenure.domain.product.dto.ProductCreateResponse;
 import com.tenure.domain.product.dto.ProductDeleteResponse;
 import com.tenure.domain.product.dto.ProductDetailResponse;
 import com.tenure.domain.product.dto.ProductExternalCompleteResponse;
+import com.tenure.domain.product.dto.ProductMeasurements;
 import com.tenure.domain.product.dto.ProductUpdateRequest;
 import com.tenure.domain.product.dto.ProductUpdateResponse;
 import com.tenure.domain.product.entity.Product;
@@ -41,11 +48,12 @@ import com.tenure.domain.tag.repository.OotdTagRepository;
 import com.tenure.domain.user.entity.User;
 import com.tenure.domain.user.enums.AccountVisibility;
 import com.tenure.domain.user.enums.UserGrade;
+import com.tenure.global.exception.CommonErrorCode;
 import com.tenure.global.exception.CustomException;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -59,8 +67,12 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ProductService {
 
+    private static final int LARGE_CATEGORY_DEPTH = 1;
+    private static final int SMALL_CATEGORY_DEPTH = 2;
+
     private final ItemRepository itemRepository;
     private final ItemHistoryRepository itemHistoryRepository;
+    private final CategoryRepository categoryRepository;
     private final ProductRepository productRepository;
     private final ProductAttachedOotdRepository productAttachedOotdRepository;
     private final OotdRepository ootdRepository;
@@ -77,7 +89,21 @@ public class ProductService {
 
         validateOwner(item, currentUserId);
         validateItemStatus(item);
+        validateFirstOwnedAt(request.firstOwnedAt());
         validateBasicUserPolicy(item.getOwner(), request);
+        updateItemInfo(
+                item,
+                request.brandName(),
+                request.itemName(),
+                request.categoryLarge(),
+                request.categorySmall(),
+                request.wearingTarget(),
+                request.sizeSystem(),
+                request.sizeValue(),
+                request.firstOwnedAt(),
+                request.representativeImageUrl()
+        );
+        validateMeasurements(request.categoryLarge(), request.measurements(), true);
         validateAttachedOotdIds(item, currentUserId, request.attachedOotdIds());
 
         Product product = Product.create(
@@ -128,8 +154,8 @@ public class ProductService {
                 product,
                 viewerMode,
                 resolveAvailableActions(viewerMode, product.getProductStatus()),
-                readMapOrEmpty(product.getMeasurements()),
-                readListOrEmpty(product.getConditionFlags()),
+                readMeasurementsOrEmpty(product.getMeasurements()),
+                readConditionFlagsOrEmpty(product.getConditionFlags()),
                 representativeOotds
         );
     }
@@ -142,6 +168,12 @@ public class ProductService {
 
         validateProductSeller(product, currentUserId);
         validateOnSaleProduct(product);
+        validateCategoryPair(request);
+        ProductMeasurements measurements = resolveMeasurementsForUpdate(item, request);
+        if (hasItemUpdateFields(request)) {
+            validateFirstOwnedAt(request.firstOwnedAt());
+            updateItemInfoPartially(item, request);
+        }
         validateBasicUserPolicy(product.getSeller(), request);
 
         List<Long> attachedOotdIds = null;
@@ -156,7 +188,7 @@ public class ProductService {
                 request.shippingFee(),
                 request.feePolicy(),
                 request.mainImageUrl(),
-                writeJsonOrNull(request.measurements()),
+                writeJsonOrNull(measurements),
                 writeJsonOrNull(request.conditionFlags()),
                 request.sellerDescription()
         );
@@ -167,8 +199,8 @@ public class ProductService {
 
         return ProductUpdateResponse.of(
                 product,
-                readMapOrEmpty(product.getMeasurements()),
-                readListOrEmpty(product.getConditionFlags()),
+                readMeasurementsOrEmpty(product.getMeasurements()),
+                readConditionFlagsOrEmpty(product.getConditionFlags()),
                 attachedOotdIds
         );
     }
@@ -272,6 +304,217 @@ public class ProductService {
             return new BigDecimal("0.0300");
         }
         return new BigDecimal("0.0600");
+    }
+
+    private void validateFirstOwnedAt(LocalDate firstOwnedAt) {
+        if (firstOwnedAt != null && firstOwnedAt.isAfter(LocalDate.now())) {
+            throw new CustomException(ItemErrorCode.FIRST_OWNED_AT_IN_FUTURE);
+        }
+    }
+
+    private void updateItemInfo(
+            Item item,
+            String brandName,
+            String itemName,
+            String categoryLarge,
+            String categorySmall,
+            WearingTarget wearingTarget,
+            String sizeSystem,
+            String sizeValue,
+            LocalDate firstOwnedAt,
+            String representativeImageUrl
+    ) {
+        Category largeCategory = findLargeCategory(categoryLarge);
+        Category smallCategory = findSmallCategory(categorySmall, largeCategory);
+        item.updateInfo(
+                smallCategory,
+                brandName,
+                itemName,
+                wearingTarget,
+                sizeSystem,
+                sizeValue,
+                firstOwnedAt,
+                representativeImageUrl
+        );
+    }
+
+    private void updateItemInfoPartially(Item item, ProductUpdateRequest request) {
+        Category category = item.getCategory();
+        if (request.categoryLarge() != null) {
+            Category largeCategory = findLargeCategory(request.categoryLarge());
+            category = findSmallCategory(request.categorySmall(), largeCategory);
+        }
+
+        item.updateInfo(
+                category,
+                coalesce(request.brandName(), item.getBrandName()),
+                coalesce(request.itemName(), item.getItemName()),
+                coalesce(request.wearingTarget(), item.getWearingTarget()),
+                coalesce(request.sizeSystem(), item.getSizeSystem()),
+                coalesce(request.sizeValue(), item.getSizeValue()),
+                coalesce(request.firstOwnedAt(), item.getFirstOwnedAt()),
+                coalesce(request.representativeImageUrl(), item.getRepresentativeImageUrl())
+        );
+    }
+
+    private Category findLargeCategory(String categoryLarge) {
+        return categoryRepository
+                .findByNameAndDepthAndIsActiveTrue(categoryLarge, LARGE_CATEGORY_DEPTH)
+                .orElseThrow(() -> new CustomException(ItemErrorCode.CATEGORY_NOT_FOUND));
+    }
+
+    private Category findSmallCategory(String categorySmall, Category parentCategory) {
+        return categoryRepository
+                .findByNameAndParentAndDepthAndIsActiveTrue(
+                        categorySmall,
+                        parentCategory,
+                        SMALL_CATEGORY_DEPTH
+                )
+                .orElseThrow(() -> new CustomException(ItemErrorCode.CATEGORY_NOT_FOUND));
+    }
+
+    private boolean hasItemUpdateFields(ProductUpdateRequest request) {
+        return request.brandName() != null
+                || request.itemName() != null
+                || request.categoryLarge() != null
+                || request.categorySmall() != null
+                || request.wearingTarget() != null
+                || request.sizeSystem() != null
+                || request.sizeValue() != null
+                || request.firstOwnedAt() != null
+                || request.representativeImageUrl() != null;
+    }
+
+    private void validateCategoryPair(ProductUpdateRequest request) {
+        boolean hasCategoryLarge = request.categoryLarge() != null;
+        boolean hasCategorySmall = request.categorySmall() != null;
+        if (hasCategoryLarge != hasCategorySmall) {
+            throw new CustomException(CommonErrorCode.INVALID_REQUEST);
+        }
+    }
+
+    private ProductMeasurements resolveMeasurementsForUpdate(Item item, ProductUpdateRequest request) {
+        if (request.measurements() == null) {
+            return null;
+        }
+
+        String categoryLarge = request.categoryLarge() == null
+                ? resolveCategoryLarge(item)
+                : request.categoryLarge();
+        validateMeasurements(categoryLarge, request.measurements(), false);
+        return request.measurements();
+    }
+
+    private void validateMeasurements(
+            String categoryLarge,
+            ProductMeasurements measurements,
+            boolean required
+    ) {
+        if (hasNoMeasurementFields(categoryLarge)) {
+            if (measurements != null && !measurements.isEmpty()) {
+                throw new CustomException(ProductErrorCode.PRODUCT_MEASUREMENTS_INVALID);
+            }
+            return;
+        }
+
+        if (!requiresMeasurements(categoryLarge)) {
+            return;
+        }
+
+        if (measurements == null || measurements.isEmpty()) {
+            if (required) {
+                throw new CustomException(ProductErrorCode.PRODUCT_MEASUREMENTS_INVALID);
+            }
+            return;
+        }
+
+        if (isTopLikeCategory(categoryLarge)) {
+            validateTopLikeMeasurements(measurements);
+            return;
+        }
+        if ("하의".equals(categoryLarge)) {
+            validateBottomMeasurements(measurements);
+            return;
+        }
+        if ("치마".equals(categoryLarge)) {
+            validateSkirtMeasurements(measurements);
+        }
+    }
+
+    private boolean requiresMeasurements(String categoryLarge) {
+        return isTopLikeCategory(categoryLarge)
+                || "하의".equals(categoryLarge)
+                || "치마".equals(categoryLarge);
+    }
+
+    private boolean hasNoMeasurementFields(String categoryLarge) {
+        return "신발".equals(categoryLarge)
+                || "가방".equals(categoryLarge)
+                || "모자".equals(categoryLarge)
+                || "액세서리".equals(categoryLarge)
+                || "악세사리".equals(categoryLarge)
+                || "주얼리".equals(categoryLarge);
+    }
+
+    private boolean isTopLikeCategory(String categoryLarge) {
+        return "아우터".equals(categoryLarge)
+                || "상의".equals(categoryLarge)
+                || "원피스".equals(categoryLarge);
+    }
+
+    private void validateTopLikeMeasurements(ProductMeasurements measurements) {
+        if (measurements.shoulderWidth() == null
+                || measurements.chestWidth() == null
+                || measurements.sleeveLength() == null
+                || measurements.totalLength() == null
+                || measurements.waistWidth() != null
+                || measurements.thighWidth() != null
+                || measurements.rise() != null
+                || measurements.inseam() != null
+                || measurements.hemWidth() != null
+                || measurements.hipWidth() != null) {
+            throw new CustomException(ProductErrorCode.PRODUCT_MEASUREMENTS_INVALID);
+        }
+    }
+
+    private void validateBottomMeasurements(ProductMeasurements measurements) {
+        if (measurements.waistWidth() == null
+                || measurements.thighWidth() == null
+                || measurements.totalLength() == null
+                || measurements.rise() == null
+                || measurements.inseam() == null
+                || measurements.hemWidth() == null
+                || measurements.shoulderWidth() != null
+                || measurements.chestWidth() != null
+                || measurements.sleeveLength() != null
+                || measurements.hipWidth() != null) {
+            throw new CustomException(ProductErrorCode.PRODUCT_MEASUREMENTS_INVALID);
+        }
+    }
+
+    private void validateSkirtMeasurements(ProductMeasurements measurements) {
+        if (measurements.waistWidth() == null
+                || measurements.hipWidth() == null
+                || measurements.hemWidth() == null
+                || measurements.totalLength() == null
+                || measurements.shoulderWidth() != null
+                || measurements.chestWidth() != null
+                || measurements.sleeveLength() != null
+                || measurements.thighWidth() != null
+                || measurements.rise() != null
+                || measurements.inseam() != null) {
+            throw new CustomException(ProductErrorCode.PRODUCT_MEASUREMENTS_INVALID);
+        }
+    }
+
+    private String resolveCategoryLarge(Item item) {
+        Category category = item.getCategory();
+        Category parent = category.getParent();
+        return parent == null ? category.getName() : parent.getName();
+    }
+
+    private <T> T coalesce(T value, T fallback) {
+        return value != null ? value : fallback;
     }
 
     private void validateAttachedOotdIds(Item item, Long currentUserId, List<Long> attachedOotdIds) {
@@ -378,26 +621,33 @@ public class ProductService {
         return List.of(ProductAction.SHARE, ProductAction.REPORT);
     }
 
-    private Map<String, Object> readMapOrEmpty(String json) {
+    private ProductMeasurements readMeasurementsOrEmpty(String json) {
         if (json == null || json.isBlank()) {
-            return Collections.emptyMap();
+            return ProductMeasurements.empty();
         }
         try {
-            return objectMapper.readValue(json, new TypeReference<>() {
+            Map<String, Object> measurementMap = objectMapper.readValue(json, new TypeReference<>() {
             });
-        } catch (IOException e) {
+            return ProductMeasurements.fromLegacyMap(measurementMap);
+        } catch (IOException | NumberFormatException e) {
             throw new CustomException(ProductErrorCode.PRODUCT_DETAIL_DATA_INVALID);
         }
     }
 
-    private List<String> readListOrEmpty(String json) {
+    private ProductConditionFlags readConditionFlagsOrEmpty(String json) {
         if (json == null || json.isBlank()) {
-            return List.of();
+            return ProductConditionFlags.empty();
         }
         try {
-            return objectMapper.readValue(json, new TypeReference<>() {
+            JsonNode root = objectMapper.readTree(json);
+            if (root.isArray()) {
+                List<String> legacyFlags = objectMapper.convertValue(root, new TypeReference<>() {
+                });
+                return ProductConditionFlags.fromLegacyFlags(legacyFlags);
+            }
+            return objectMapper.convertValue(root, new TypeReference<>() {
             });
-        } catch (IOException e) {
+        } catch (IOException | IllegalArgumentException e) {
             throw new CustomException(ProductErrorCode.PRODUCT_DETAIL_DATA_INVALID);
         }
     }

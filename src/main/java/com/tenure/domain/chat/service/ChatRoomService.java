@@ -67,7 +67,6 @@ public class ChatRoomService {
     );
 
     // 채팅방 조회 / 생성
-
     @Transactional
     public ChatRoomResponse findOrCreateChatRoom(Long buyerId, Long itemId) {
 
@@ -99,7 +98,8 @@ public class ChatRoomService {
             throw new CustomException(ChatErrorCode.CHAT_CREATION_NOT_ALLOWED);
         }
 
-        if(userBlockRepository.isBlocked(buyerId, owner.getId()) || userBlockRepository.isBlocked(owner.getId(), buyerId)) {
+        // 내가 상대방을 차단 한 경우
+        if(userBlockRepository.isBlocked(buyerId, owner.getId())) {
             log.warn("[채팅방 생성 / 조회] 차단된 사용자와는 채팅 할 수 없습니다.");
             throw new CustomException(ChatErrorCode.CHAT_BLOCKED);
         }
@@ -117,11 +117,11 @@ public class ChatRoomService {
 
         // 사용자가 동시에 채팅방 생성을 할 경우 방지
         try {
-            //체팅방을 조회 / 없으면 새로 만든 후 저장
-            chatRoom = chatRoomRepository.findByItemIdAndSellerIdAndBuyerId(itemId, owner.getId(), buyerId)
+            //체팅방을 조회(닫히지 않은 채팅방) / 없으면 새로 만든 후 저장
+            chatRoom = chatRoomRepository.findByItemIdAndSellerIdAndBuyerIdAndIsClosedFalse(itemId, owner.getId(), buyerId)
                     .orElseGet(() -> createChatRoom(item, buyer, owner));
         } catch (DataIntegrityViolationException e) {
-            chatRoom = chatRoomRepository.findByItemIdAndSellerIdAndBuyerId(itemId, owner.getId(), buyerId)
+            chatRoom = chatRoomRepository.findByItemIdAndSellerIdAndBuyerIdAndIsClosedFalse(itemId, owner.getId(), buyerId)
                     .orElseThrow(() -> {
                         log.warn("[채팅방 생성/조회] 채팅방을 찾을 수 없습니다. itemId = {}, ownerId = {}, buyerId = {}", itemId, owner.getId(), buyerId );
                         return new CustomException(ChatErrorCode.CHAT_ROOM_NOT_FOUND);
@@ -131,7 +131,12 @@ public class ChatRoomService {
 
 
         Long tradeId = tradeRepository.findByItemId(itemId).map(Trade::getId).orElse(null);
-        return ChatRoomResponse.from(chatRoom, item, product, buyerId, tradeId);
+
+        // 상대방이 나를 차단 했는지 검사
+        boolean isBlocked = userBlockRepository.isBlocked(owner.getId(), buyerId);
+
+        // 아이템 상세에서 바로 들어온 경우 처음엔 isOpponentExited false 고정
+        return ChatRoomResponse.from(chatRoom, item, product, buyerId, tradeId, isBlocked, false);
     }
 
     // 채팅방 목록 조회
@@ -169,14 +174,14 @@ public class ChatRoomService {
     public ChatRoomResponse enterChatroom(Long currentUserId, Long chatRoomId) {
 
         // 채팅방 존재 확인
-        ChatRoom chatRoom = chatRoomRepository.findById(chatRoomId)
+        ChatRoom chatRoom = chatRoomRepository.findByIdWithItem(chatRoomId)
                 .orElseThrow(() -> {
                     log.warn("[채팅방 조회] 채팅방을 찾을 수 없습니다. chatRoomId = {}", chatRoomId);
                     return new CustomException(ChatErrorCode.CHAT_ROOM_NOT_FOUND);
                 });
 
         // 채팅방 권한 체크
-        if(!chatRoomMemberRepository.existsByUserIdAndChatRoomId(currentUserId, chatRoomId)) {
+        if(!chatRoomMemberRepository.existsByUserIdAndChatRoomIdAndIsExitedFalse(currentUserId, chatRoomId)) {
             log.warn("[채팅방 조회] 채팅방 접근 권한이 없습니다. currentUserId = {}, chatRoomId = {}", currentUserId, chatRoomId);
             throw  new CustomException(ChatErrorCode.CHAT_FORBIDDEN);
         }
@@ -194,7 +199,19 @@ public class ChatRoomService {
         Long tradeId = tradeRepository
                 .findByItemId(item.getId()).map(Trade::getId).orElse(null);
 
-        return ChatRoomResponse.from(chatRoom, item, product, currentUserId, tradeId);
+        Long opponentId = currentUserId.equals(chatRoom.getBuyer().getId())
+                ? chatRoom.getSeller().getId()
+                : chatRoom.getBuyer().getId();
+
+        // 상대방이 나를 차단했는지 여부
+        boolean isBlocked = userBlockRepository.isBlocked(opponentId, currentUserId);
+
+        // 상대방이 채팅방을 나갔는지 여부
+        boolean isOpponentExited = chatRoomMemberRepository.findByUserIdAndChatRoomId(opponentId, chatRoomId)
+                .map(ChatRoomMember::isExited)
+                .orElse(false);
+
+        return ChatRoomResponse.from(chatRoom, item, product, currentUserId, tradeId, isBlocked, isOpponentExited);
     }
 
     //채팅방 접속 시 unreadCount 업데이트
@@ -247,7 +264,8 @@ public class ChatRoomService {
                     return new CustomException(ChatErrorCode.CHAT_ROOM_NOT_FOUND);
                 });
 
-        if (chatRoomMemberRepository.findByUserIdAndChatRoomId(currentUserId, chatRoomId).isEmpty()) {
+        // 현재 사용자가 해당 채팅방을 나가지 않았는가
+        if (chatRoomMemberRepository.existsByUserIdAndChatRoomIdAndIsExitedFalse(currentUserId, chatRoomId)) {
             log.warn("[채팅 내역 조회] 해당 채팅방에 접근 권한이 없습니다. currentUserId = {}, chatRoomId = {}", currentUserId, chatRoomId);
             throw new CustomException(ChatErrorCode.CHAT_FORBIDDEN);
         }
@@ -281,24 +299,63 @@ public class ChatRoomService {
 
 
     //채팅 이미지 업로드
-    public String uploadImage(Long currentUserId, Long chatRoomId, MultipartFile image) {
+    public List<String> uploadImage(Long currentUserId, Long chatRoomId, List<MultipartFile> images) {
 
         if(!chatRoomRepository.existsById(chatRoomId)) {
             log.warn("[채팅 이미지 업로드] 채팅방을 찾을 수 없습니다. chatRoomId = {}", chatRoomId);
             throw new CustomException(ChatErrorCode.CHAT_ROOM_NOT_FOUND);
         }
 
-        if(!chatRoomMemberRepository.existsByUserIdAndChatRoomId(currentUserId, chatRoomId)) {
+        if(!chatRoomMemberRepository.existsByUserIdAndChatRoomIdAndIsExitedFalse(currentUserId, chatRoomId)) {
             log.warn("[채팅 이미지 업로드] 채팅방 접근 권한이 없습니다. currentUserId = {}, chatRoomId = {}", currentUserId, chatRoomId);
             throw new CustomException(ChatErrorCode.CHAT_FORBIDDEN);
         }
 
-        if(!ALLOWED_IMAGE_TYPES.contains(image.getContentType())) {
-            log.warn("[채팅 이미지 업로드] 지원하지 않는 이미지 형식입니다. contentType = {}", image.getContentType());
-            throw new CustomException(ChatErrorCode.INVALID_IMAGE_TYPE);
-        }
+        images.forEach(image -> {
+            if(!ALLOWED_IMAGE_TYPES.contains(image.getContentType())) {
+                log.warn("[채팅 이미지 업로드] 지원하지 않는 이미지 형식입니다. contentType = {}", image.getContentType());
+                throw new CustomException(ChatErrorCode.INVALID_IMAGE_TYPE);
+            }
+        });
 
         // 반환 url: /files/chat/{chatRoomId}/{UUID}.확장자
-        return localImageStoreService.store(image, "chat/" + chatRoomId);
+        return images.stream().map(image ->
+                localImageStoreService.store(image, "chat/" + chatRoomId)).toList();
+
+    }
+
+    // 채팅방 나가기
+    @Transactional
+    public void exitChatRoom(Long currentUserId, Long chatRoomId) {
+
+        log.info("[채팅방 나가기] currentUserId = {}, chatRoomId = {}", currentUserId, chatRoomId);
+
+        ChatRoom chatRoom = chatRoomRepository.findById(chatRoomId)
+                .orElseThrow(() -> {
+                    log.warn("[채팅방 나가기] 해당 채팅방을 찾을 수 없습니다. chatRoomId = {}", chatRoomId);
+                    return new CustomException(ChatErrorCode.CHAT_ROOM_NOT_FOUND);
+                });
+
+
+        ChatRoomMember chatRoomMember = chatRoomMemberRepository.findByUserIdAndChatRoomId(currentUserId, chatRoomId)
+                .orElseThrow(() -> {
+                    log.warn("[채팅방 나가기] 해당 채팅방에 접근 할 수 없습니다. chatRoomId = {}, currentUserId = {}", chatRoomId, currentUserId);
+                    return new CustomException(ChatErrorCode.CHAT_FORBIDDEN);
+                });
+
+        // 이미 채팅방을 나간 상태라면
+        if (chatRoomMember.isExited() && chatRoom.isClosed()) {
+            return;
+        }
+
+        // 마지막 읽은 메시지 업데이트
+        chatMessageRepository.findByRecentMessage(chatRoomId)
+                .ifPresent(chatRoomMember :: updateLastRead);
+
+        // 채팅방 나감 처리
+        chatRoomMember.exit();
+        chatRoom.close();
+
+        log.info("[채팅방 나가기 완료] currentUserId = {}, chatRoomId = {}", currentUserId, chatRoomId);
     }
 }

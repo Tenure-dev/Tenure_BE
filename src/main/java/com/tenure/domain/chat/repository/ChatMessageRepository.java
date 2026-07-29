@@ -6,12 +6,12 @@ import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-
 import java.time.LocalDateTime;
 import java.util.Optional;
 
 public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> {
 
+    //가장 최근 메시지 조회
     @Query("select cm from ChatMessage cm " +
             "where cm.chatRoom.id = :chatRoomId " +
             "order by cm.createdAt desc limit 1")
@@ -27,6 +27,5 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
                                           @Param("cursorId") Long cursorId,
                                           Pageable pageable
     );
-
 
 }

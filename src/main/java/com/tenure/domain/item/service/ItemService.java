@@ -10,22 +10,24 @@ import com.tenure.domain.item.repository.CategoryRepository;
 import com.tenure.domain.item.repository.ItemHistoryRepository;
 import com.tenure.domain.item.repository.ItemRepository;
 import com.tenure.domain.ootd.enums.OotdPublicationStatus;
+import com.tenure.domain.product.entity.Product;
 import com.tenure.domain.product.enums.ProductStatus;
 import com.tenure.domain.product.repository.ProductRepository;
 import com.tenure.domain.tag.enums.TagStatus;
 import com.tenure.domain.tag.repository.OotdTagRepository;
 import com.tenure.domain.user.entity.User;
-import com.tenure.domain.user.exception.UserErrorCode;
 import com.tenure.domain.user.repository.UserRepository;
 import com.tenure.global.exception.CustomException;
 import com.tenure.global.response.PageResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -130,10 +132,15 @@ public class ItemService {
 
     @Transactional(readOnly = true)
     public ItemDetailResponse getItemDetail(Long currentUserId, Long itemId) {
-        Item item = findItem(itemId); //itemId로 아이템 찾고
-        validateItemAccess(item, currentUserId); // 현재 사용자가 소유자인지 확인
+        Item item = findItem(itemId);
+        validateItemAccess(item, currentUserId);
 
-        return ItemDetailResponse.from(item); // 상세 응답 DTO로 바꿔서 돌려준다
+        Product product = productRepository.findFirstByItemIdAndProductStatusInOrderByCreatedAtDesc(
+                itemId,
+                List.of(ProductStatus.ON_SALE, ProductStatus.TRADING, ProductStatus.SOLD)
+        ).orElse(null);
+
+        return ItemDetailResponse.from(item, product);
     }
 
     private Item findItem(Long itemId) {
@@ -266,5 +273,30 @@ public class ItemService {
     private Category findAiPendingCategory() {
         return categoryRepository.findByNameAndDepthAndIsActiveTrue(AI_PENDING_CATEGORY_NAME, DETAIL_CATEGORY_DEPTH)
                 .orElseThrow(() -> new CustomException(ItemErrorCode.CATEGORY_NOT_FOUND));
+    }
+
+    @Transactional(readOnly = true)
+    public List<ItemFrequentlyWornTogetherResponse> getFrequentlyWornTogetherItems(
+            Long currentUserId,
+            Long itemId
+    ) {
+        Item item = findItem(itemId); //기준 아이템이 존재하는지 확인
+        validateItemAccess(item, currentUserId); //상세 조회와 같은 권한 기준 적용
+
+        return ootdTagRepository.findFrequentlyWornTogetherItems( //같은 OOTD에 함께 태그된 아이템을 count 순으로 조회
+                        itemId,
+                        OotdPublicationStatus.ACTIVE,
+                        TagStatus.CONFIRMED,
+                        PageRequest.of(0, 3) //최대 3개만
+                )
+                .stream()
+                .map(result -> new ItemFrequentlyWornTogetherResponse(
+                        result.getItemId(),
+                        result.getBrandName(),
+                        result.getItemName(),
+                        result.getRepresentativeImageUrl(),
+                        result.getTogetherCount()
+                ))
+                .toList();
     }
 }

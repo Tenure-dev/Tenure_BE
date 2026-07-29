@@ -15,6 +15,9 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
+import java.util.Objects;
+
 @Getter
 @Entity
 @Table(name = "chat_room_members")
@@ -40,6 +43,12 @@ public class ChatRoomMember extends BaseTimeEntity {
     @Column(name = "unread_count", nullable = false)
     private Integer unreadCount = 0;
 
+    @Column(name = "is_exited")
+    private boolean isExited = false;
+
+    @Column(name = "exited_at")
+    private LocalDateTime exitedAt;
+
     public static ChatRoomMember of(ChatRoom chatRoom, User user) {
         ChatRoomMember chatRoomMember = new ChatRoomMember();
         chatRoomMember.chatRoom = chatRoom;
@@ -47,8 +56,18 @@ public class ChatRoomMember extends BaseTimeEntity {
         return chatRoomMember;
     }
 
+    // 채팅방 나가기
+    public void exit() {
+        this.isExited = true;
+        this.exitedAt = LocalDateTime.now();
+    }
+
     //채팅방 접속 시 최근에 읽은 메시지 업데이트.
     public void updateLastRead(ChatMessage lastReadMessage) {
+        // 이미 다 읽은 상태인 경우 불필요한 update 방지
+        if (this.unreadCount == 0 && Objects.equals(this.lastReadMessage, lastReadMessage)) {
+            return;
+        }
         this.lastReadMessage = lastReadMessage;
         this.unreadCount = 0;
     }
