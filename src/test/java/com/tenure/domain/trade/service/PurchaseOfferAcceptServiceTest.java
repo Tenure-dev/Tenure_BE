@@ -9,6 +9,8 @@ import static org.mockito.Mockito.when;
 
 import com.tenure.domain.address.entity.DeliveryAddress;
 import com.tenure.domain.common.enums.PaymentAuthorizationStatus;
+import com.tenure.domain.follow.enums.FollowStatus;
+import com.tenure.domain.follow.repository.FollowRelationshipRepository;
 import com.tenure.domain.item.entity.Item;
 import com.tenure.domain.item.repository.ItemRepository;
 import com.tenure.domain.purchase.entity.PurchaseOffer;
@@ -59,6 +61,9 @@ class PurchaseOfferAcceptServiceTest {
     @Mock
     private TradeRepository tradeRepository;
 
+    @Mock
+    private FollowRelationshipRepository followRelationshipRepository;
+
     private PurchaseOfferAcceptService purchaseOfferAcceptService;
 
     private void setUpService() {
@@ -66,7 +71,8 @@ class PurchaseOfferAcceptServiceTest {
                 itemRepository,
                 purchaseOfferRepository,
                 tradeRepository,
-                new PurchaseOfferExpirationService()
+                new PurchaseOfferExpirationService(),
+                followRelationshipRepository
         );
     }
 
@@ -240,6 +246,35 @@ class PurchaseOfferAcceptServiceTest {
         ArgumentCaptor<Collection<TradeStatus>> statusesCaptor = ArgumentCaptor.forClass(Collection.class);
         verify(tradeRepository).existsByItemIdAndStatusNotIn(eq(ITEM_ID), statusesCaptor.capture());
         assertThat(statusesCaptor.getValue()).containsExactly(TradeStatus.TRANSFERRED);
+    }
+
+    @Test
+    void acceptPurchaseOffer_returnsProposerAsCounterpart() {
+        setUpService();
+        User owner = user(OWNER_ID);
+        User proposer = user(PROPOSER_ID);
+        Item item = item(ITEM_ID, owner);
+        PurchaseOffer offer = existingOffer(OFFER_ID, item, proposer, owner, LocalDateTime.now().plusHours(2));
+
+        givenOfferDetail(item, offer);
+        when(tradeRepository.existsByItemIdAndStatusNotIn(eq(ITEM_ID), any())).thenReturn(false);
+        when(purchaseOfferRepository.findSentByItemIdForUpdate(ITEM_ID, PurchaseOfferStatus.SENT))
+                .thenReturn(List.of(offer));
+        when(tradeRepository.save(any(Trade.class))).thenAnswer(invocation -> {
+            Trade trade = invocation.getArgument(0);
+            ReflectionTestUtils.setField(trade, "id", 900L);
+            return trade;
+        });
+        when(followRelationshipRepository.countByFollowing_IdAndStatus(PROPOSER_ID, FollowStatus.ACCEPTED))
+                .thenReturn(42L);
+
+        TradeDetailResponse response = purchaseOfferAcceptService.acceptPurchaseOffer(OFFER_ID, OWNER_ID);
+
+        // 이 accept 흐름은 항상 SELLER(owner) 시점 응답이므로 counterpart는 proposer(buyer)여야 한다.
+        assertThat(response.counterpart().userId()).isEqualTo(PROPOSER_ID);
+        assertThat(response.counterpart().username()).isEqualTo("user" + PROPOSER_ID);
+        assertThat(response.counterpart().followerCount()).isEqualTo(42L);
+        verify(followRelationshipRepository).countByFollowing_IdAndStatus(PROPOSER_ID, FollowStatus.ACCEPTED);
     }
 
     @Test
