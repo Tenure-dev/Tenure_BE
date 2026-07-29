@@ -186,6 +186,8 @@ public class ChatRoomService {
     //채팅방 목록에서 채팅방 접속
     public ChatRoomResponse enterChatroom(Long currentUserId, Long chatRoomId) {
 
+        log.info("[채팅방 진입] currentUserId = {}, chatRoomId = {}", currentUserId, chatRoomId);
+
         // 채팅방 존재 확인
         ChatRoom chatRoom = chatRoomRepository.findByIdWithItem(chatRoomId)
                 .orElseThrow(() -> {
@@ -239,6 +241,8 @@ public class ChatRoomService {
     //채팅방 접속 시 unreadCount 업데이트
     @Transactional
     public void updateRead(Long currentUserId, Long chatRoomId) {
+
+        log.info("[읽음 처리] currentUserId = {}, chatRoomId = {}", currentUserId, chatRoomId);
 
         //채팅방이 없으면
         if (!chatRoomRepository.existsById(chatRoomId)) {
@@ -322,6 +326,8 @@ public class ChatRoomService {
 
     //채팅 이미지 업로드
     public List<String> uploadImage(Long currentUserId, Long chatRoomId, List<MultipartFile> images) {
+
+        log.info("[채팅 이미지 업로드] currentUserId = {}, chatRoomId = {}, 이미지 수 = {}", currentUserId, chatRoomId, images.size());
 
         if(!chatRoomRepository.existsById(chatRoomId)) {
             log.warn("[채팅 이미지 업로드] 채팅방을 찾을 수 없습니다. chatRoomId = {}", chatRoomId);
