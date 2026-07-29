@@ -1,5 +1,6 @@
 package com.tenure.domain.search.dto.response;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -14,7 +15,9 @@ public class SearchUserResponse {
     private String profileImageUrl;
     private Long followerCount;
     private Long ootdCount;
-    private boolean isFollowing;
+
+    @Schema(description = "팔로잉 여부")
+    private boolean following;
 
     public static SearchUserResponse from(SearchUserQueryDto searchUserQueryDto, Set<Long> followingIds) {
 
