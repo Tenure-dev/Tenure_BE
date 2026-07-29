@@ -6,17 +6,18 @@ import lombok.Getter;
 import org.springframework.data.domain.Slice;
 
 import java.util.List;
+import java.util.Set;
 
 @Getter
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
 public class SearchHomePopularUserCursorResponse {
 
-    private List<SearchUserQueryDto> content;
+    private List<SearchUserResponse> content;
     private boolean hasNext;
     private Long nextCursorFollowerCount;
     private Long nextCursorId;
 
-    public static SearchHomePopularUserCursorResponse from(Slice<SearchUserQueryDto> slice) {
+    public static SearchHomePopularUserCursorResponse from(Slice<SearchUserQueryDto> slice, Set<Long> followingIds) {
         List<SearchUserQueryDto> users = slice.getContent();
         boolean hasNext = slice.hasNext();
 
@@ -28,6 +29,10 @@ public class SearchHomePopularUserCursorResponse {
             nextCursorId = last.getId();
         }
 
-        return new SearchHomePopularUserCursorResponse(users, hasNext, nextCursorFollowerCount, nextCursorId);
+        List<SearchUserResponse> content = users.stream()
+                .map(u -> SearchUserResponse.from(u, followingIds))
+                .toList();
+
+        return new SearchHomePopularUserCursorResponse(content, hasNext, nextCursorFollowerCount, nextCursorId);
     }
 }

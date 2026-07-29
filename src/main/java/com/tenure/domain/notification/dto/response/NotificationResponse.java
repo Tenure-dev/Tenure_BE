@@ -1,6 +1,5 @@
 package com.tenure.domain.notification.dto.response;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.tenure.domain.notification.entity.Notification;
 import com.tenure.domain.notification.enums.NotificationCategory;
 import com.tenure.domain.notification.enums.NotificationType;
@@ -22,8 +21,7 @@ public class NotificationResponse {
     private TargetType targetType;            // 클릭 시 이동할 화면
     private Long targetId;                    // 이동할 리소스 ID
 
-    @JsonProperty("isRead")
-    private boolean isRead;                   // readAt != null
+    private boolean read;                      // readAt != null
     private LocalDateTime createdAt;          // 날짜 그룹핑용
 
     private String imageUrl;                  // 이미지 url (itemImg or UserImg)
