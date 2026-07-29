@@ -21,6 +21,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.tenure.domain.wish.dto.WishNotificationUpdateRequest;
+import com.tenure.domain.wish.dto.WishNotificationUpdateResponse;
 
 import java.util.List;
 
@@ -95,6 +97,21 @@ public class WishService {
                     return WishListResponse.of(wish, product);
                 }
         );
+    }
+
+    @Transactional
+    public WishNotificationUpdateResponse updateWishNotification(
+            Long currentUserId,
+            Long itemId,
+            WishNotificationUpdateRequest request
+    ) {
+        User user = findUser(currentUserId);
+        Item item = findItem(itemId);
+        Wish wish = findWish(user.getId(), item.getId());
+
+        wish.updateNotificationEnabled(request.notificationEnabled());
+
+        return WishNotificationUpdateResponse.from(wish);
     }
 
     private Wish findWish(Long userId, Long itemId) {
