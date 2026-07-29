@@ -60,10 +60,20 @@ public class StompHandler implements ChannelInterceptor {
             Long currentUserId = jwtProvider.getUserId(jwtToken);
             accessor.setUser(new UsernamePasswordAuthenticationToken(currentUserId.toString(),
                     null, Collections.emptyList()));
+            accessor.getSessionAttributes().put("userId", currentUserId);
         }
         
         //구독요청일 경우(채팅방 접속)
         if(StompCommand.SUBSCRIBE.equals(accessor.getCommand())) {
+
+            log.info("[웹소켓 구독 시도] Destination: {}", accessor.getDestination());
+
+            // 세션에서 userId 조회
+            Long currentUserId = (Long) accessor.getSessionAttributes().get("userId");
+            if (currentUserId == null) {
+                log.warn("[웹소켓 오류] SUBSCRIBE 시점에 사용자 인증 정보가 없습니다.");
+                throw new CustomException(CommonErrorCode.FORBIDDEN);
+            }
 
             // 요청 경로
             String destination = accessor.getDestination();
@@ -71,8 +81,6 @@ public class StompHandler implements ChannelInterceptor {
             if(destination == null) {
                 return message;
             }
-
-            Long currentUserId = Long.valueOf(accessor.getUser().getName());
 
             // /sub/chats/{chatRoomId} 경로가 아닌 경우 권한 검사 생략
             if (antPathMatcher.match(chatSubPattern, destination)) {
