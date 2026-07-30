@@ -16,6 +16,7 @@ import com.tenure.domain.auth.dto.response.UsernameCheckResponse;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import com.tenure.domain.auth.dto.request.PasswordResetSendRequest;
+import com.tenure.domain.auth.dto.request.PasswordResetRequest;
 
 
 @Tag(name = "Auth", description = "인증 API")
@@ -53,5 +54,12 @@ public class AuthController {
     public BaseResponse<Void> sendPasswordResetCode(@Valid @RequestBody PasswordResetSendRequest request) {
         authService.sendPasswordResetCode(request.email());
         return BaseResponse.success(null, "인증번호가 발송되었습니다.");
+    }
+
+    @Operation(summary = "비밀번호 재설정", description = "새 비밀번호를 설정합니다.")
+    @PostMapping("/password/reset")
+    public BaseResponse<Void> resetPassword(@Valid @RequestBody PasswordResetRequest request) {
+        authService.resetPassword(request.email(), request.newPassword(), request.newPasswordConfirm());
+        return BaseResponse.success(null, "비밀번호가 재설정되었습니다.");
     }
 }
