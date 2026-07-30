@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.repository.query.Param;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 
@@ -111,6 +112,16 @@ public class SearchController {
 
         return BaseResponse.success(searchOotdCursorResponse);
     }
+
+    @Operation(summary = "검색어 자동완성", description = "입력 중인 키워드로 시작하는 인기 검색어 최대 5개 반환")
+    @GetMapping("/suggestions")
+    public BaseResponse<List<String>> getSuggestionKeywords(
+            @RequestParam(required = false, defaultValue = "") String keyword
+    ) {
+        List<String> suggestionKeywords = searchService.suggestionKeywords(keyword);
+        return BaseResponse.success(suggestionKeywords);
+    }
+
 
     @Operation(
             summary = "최근 본 OOTD 저장",

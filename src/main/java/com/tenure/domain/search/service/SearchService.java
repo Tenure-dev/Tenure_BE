@@ -65,10 +65,12 @@ public class SearchService {
 
         //최근 검색한 검색어 3개 조회
         List<RecentKeywordResponse> recentKeyword = recentSearchKeywordRepository
-                .findByUserTopKeywords(currentUserId, 3);
+                .findByUserTopKeywords(currentUserId, PageRequest.of(0, 3));
+
+        PageRequest pageRequest = PageRequest.of(0, 10);
 
         //추천 검색어 TOP 10 조회
-        List<String> suggestions = recentSearchKeywordRepository.findTopKeywords(10);
+        List<String> suggestions = recentSearchKeywordRepository.findTopKeywords(pageRequest);
 
         //종합 응답 dto 변환
         return SearchRecentResponse.from(recentUser, recentKeyword, suggestions);
@@ -126,6 +128,20 @@ public class SearchService {
 
         recentViewUserRepository.deleteRecentViewedUser(currentUserId, recentViewedUserId);
         log.info("[최근 본 사용자 api] 최근 본 사용자 삭제 완료.");
+
+    }
+
+    // 키워드 검색 시 검색어 자동완성
+    public List<String> suggestionKeywords(String keyword) {
+
+        log.info("[키워드 검색 자동완성] 키워드 = {}", keyword);
+
+        if(keyword == null || keyword.isBlank()) {
+            return Collections.emptyList();
+        }
+
+        PageRequest pageRequest = PageRequest.of(0, 5);
+        return recentSearchKeywordRepository.findBySuggestRecentKeywords(keyword, pageRequest);
 
     }
 
