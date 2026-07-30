@@ -112,6 +112,16 @@ public class SearchController {
         return BaseResponse.success(searchOotdCursorResponse);
     }
 
+    @Operation(summary = "검색어 자동완성", description = "입력 중인 키워드로 시작하는 인기 검색어 최대 5개 반환")
+    @GetMapping("/suggestions")
+    public BaseResponse<List<String>> getSuggestionKeywords(
+            @RequestParam(required = false, defaultValue = "") String keyword
+    ) {
+        List<String> suggestionKeywords = searchService.suggestionKeywords(keyword);
+        return BaseResponse.success(suggestionKeywords);
+    }
+
+
     @Operation(
             summary = "최근 본 OOTD 저장",
             description = "검색 결과에서 OOTD 클릭 시 최근 본 기록을 저장합니다. 이미 본 OOTD면 lastViewedAt만 갱신합니다."
