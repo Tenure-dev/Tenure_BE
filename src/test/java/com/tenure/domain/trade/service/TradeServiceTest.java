@@ -40,6 +40,8 @@ import com.tenure.domain.trade.enums.TradeViewerMode;
 import com.tenure.domain.trade.event.TradeStatusChangedEvent;
 import com.tenure.domain.trade.exception.TradeErrorCode;
 import com.tenure.domain.trade.repository.TradeRepository;
+import com.tenure.domain.follow.enums.FollowStatus;
+import com.tenure.domain.follow.repository.FollowRelationshipRepository;
 import com.tenure.domain.user.entity.User;
 import com.tenure.domain.user.repository.UserRepository;
 import com.tenure.domain.wish.repository.WishRepository;
@@ -96,13 +98,17 @@ class TradeServiceTest {
     @Mock
     private ApplicationEventPublisher eventPublisher;
 
+    @Mock
+    private FollowRelationshipRepository followRelationshipRepository;
+
     private TradeService tradeService;
 
     @BeforeEach
     void setUp() {
         tradeService = new TradeService(
                 tradeRepository, productRepository, itemRepository, userRepository,
-                purchaseOfferRepository, itemHistoryRepository, wishRepository, eventPublisher
+                purchaseOfferRepository, itemHistoryRepository, wishRepository, eventPublisher,
+                followRelationshipRepository
         );
     }
 
@@ -302,6 +308,56 @@ class TradeServiceTest {
         assertThat(response.buyerServiceFee()).isNull();
         assertThat(response.deliveryReceiverName()).isEqualTo("Buyer");
         assertThat(response.deliveryAddressLine1()).isEqualTo("Seoul Gangnam");
+    }
+
+    @Test
+    void getTradeDetail_asBuyer_returnsSellerAsCounterpart() {
+        Trade trade = trade(
+                110L,
+                user(CURRENT_USER_ID, "Buyer1", "https://image.url/buyer.jpg"),
+                user(2L, "Seller1", "https://image.url/seller.jpg"),
+                TradeStatus.PAID
+        );
+        when(tradeRepository.findById(110L)).thenReturn(Optional.of(trade));
+        when(followRelationshipRepository.countByFollowing_IdAndStatus(2L, FollowStatus.ACCEPTED)).thenReturn(1400L);
+
+        TradeDetailResponse response = tradeService.getTradeDetail(110L, CURRENT_USER_ID);
+
+        assertThat(response.counterpart().userId()).isEqualTo(2L);
+        assertThat(response.counterpart().username()).isEqualTo("Seller1");
+        assertThat(response.counterpart().profileImageUrl()).isEqualTo("https://image.url/seller.jpg");
+        assertThat(response.counterpart().followerCount()).isEqualTo(1400L);
+    }
+
+    @Test
+    void getTradeDetail_asSeller_returnsBuyerAsCounterpart() {
+        Trade trade = trade(
+                111L,
+                user(2L, "Buyer1", "https://image.url/buyer.jpg"),
+                user(CURRENT_USER_ID, "Seller1", "https://image.url/seller.jpg"),
+                TradeStatus.PAID
+        );
+        when(tradeRepository.findById(111L)).thenReturn(Optional.of(trade));
+        when(followRelationshipRepository.countByFollowing_IdAndStatus(2L, FollowStatus.ACCEPTED)).thenReturn(87L);
+
+        TradeDetailResponse response = tradeService.getTradeDetail(111L, CURRENT_USER_ID);
+
+        assertThat(response.counterpart().userId()).isEqualTo(2L);
+        assertThat(response.counterpart().username()).isEqualTo("Buyer1");
+        assertThat(response.counterpart().profileImageUrl()).isEqualTo("https://image.url/buyer.jpg");
+        assertThat(response.counterpart().followerCount()).isEqualTo(87L);
+    }
+
+    @Test
+    void getTradeDetail_queriesFollowerCountByCounterpartId_notCurrentUserId() {
+        Trade trade = trade(112L, CURRENT_USER_ID, 2L, TradeStatus.PAID);
+        when(tradeRepository.findById(112L)).thenReturn(Optional.of(trade));
+        when(followRelationshipRepository.countByFollowing_IdAndStatus(2L, FollowStatus.ACCEPTED)).thenReturn(5L);
+
+        tradeService.getTradeDetail(112L, CURRENT_USER_ID);
+
+        verify(followRelationshipRepository).countByFollowing_IdAndStatus(2L, FollowStatus.ACCEPTED);
+        verify(followRelationshipRepository, never()).countByFollowing_IdAndStatus(eq(CURRENT_USER_ID), any());
     }
 
     @Test
@@ -891,13 +947,17 @@ class TradeServiceTest {
     }
 
     private Trade trade(Long id, Long buyerId, Long sellerId, TradeStatus status) {
+        return trade(id, user(buyerId), user(sellerId), status);
+    }
+
+    private Trade trade(Long id, User buyer, User seller, TradeStatus status) {
         Trade trade = instantiate(Trade.class);
         ReflectionTestUtils.setField(trade, "id", id);
         ReflectionTestUtils.setField(trade, "sourceType", TradeSourceType.PURCHASE_INTENT);
         ReflectionTestUtils.setField(trade, "sourceId", 1L);
         ReflectionTestUtils.setField(trade, "item", item(10L));
-        ReflectionTestUtils.setField(trade, "buyer", user(buyerId));
-        ReflectionTestUtils.setField(trade, "seller", user(sellerId));
+        ReflectionTestUtils.setField(trade, "buyer", buyer);
+        ReflectionTestUtils.setField(trade, "seller", seller);
         ReflectionTestUtils.setField(trade, "itemPrice", 40000);
         ReflectionTestUtils.setField(trade, "buyerShippingFee", 3000);
         ReflectionTestUtils.setField(trade, "buyerServiceFee", 0);
@@ -939,8 +999,14 @@ class TradeServiceTest {
     }
 
     private User user(Long id) {
+        return user(id, null, null);
+    }
+
+    private User user(Long id, String username, String profileImageUrl) {
         User user = instantiate(User.class);
         ReflectionTestUtils.setField(user, "id", id);
+        ReflectionTestUtils.setField(user, "username", username);
+        ReflectionTestUtils.setField(user, "profileImageUrl", profileImageUrl);
         return user;
     }
 

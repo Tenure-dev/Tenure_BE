@@ -3,11 +3,14 @@ package com.tenure.domain.trade.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.tenure.domain.address.entity.DeliveryAddress;
 import com.tenure.domain.common.enums.FeePolicy;
 import com.tenure.domain.common.enums.PaymentAuthorizationStatus;
+import com.tenure.domain.follow.enums.FollowStatus;
+import com.tenure.domain.follow.repository.FollowRelationshipRepository;
 import com.tenure.domain.item.entity.Item;
 import com.tenure.domain.item.repository.ItemRepository;
 import com.tenure.domain.notification.service.NotificationFactory;
@@ -65,6 +68,13 @@ class PurchaseIntentAcceptServiceTest {
     @Mock
     private TradeRepository tradeRepository;
 
+    @Mock
+    private FollowRelationshipRepository followRelationshipRepository;
+
+
+    @Mock
+    private NotificationService notificationService;
+
     private PurchaseIntentAcceptService purchaseIntentAcceptService;
 
     private void setUpService() {
@@ -73,7 +83,8 @@ class PurchaseIntentAcceptServiceTest {
                 itemRepository,
                 purchaseIntentRepository,
                 tradeRepository,
-                new PurchaseIntentExpirationService(new NotificationFactory(), org.mockito.Mockito.mock(NotificationService.class))
+                new PurchaseIntentExpirationService(new NotificationFactory(), notificationService),
+                followRelationshipRepository
         );
     }
 
@@ -190,6 +201,35 @@ class PurchaseIntentAcceptServiceTest {
                 .isInstanceOf(CustomException.class)
                 .extracting("errorCode")
                 .isEqualTo(PurchaseIntentErrorCode.PURCHASE_INTENT_NOT_SENT);
+    }
+
+    @Test
+    void acceptPurchaseIntent_returnsBuyerAsCounterpart() {
+        setUpService();
+        User seller = user(SELLER_ID);
+        User buyer = user(BUYER_ID);
+        Item item = item(ITEM_ID, seller);
+        Product product = product(PRODUCT_ID, item, seller);
+        PurchaseIntent intent = existingIntent(INTENT_ID, product, buyer, seller, LocalDateTime.now().plusHours(2));
+
+        givenIntentDetail(product, item, intent);
+        when(purchaseIntentRepository.findSentByProductIdForUpdate(PRODUCT_ID, PurchaseIntentStatus.SENT))
+                .thenReturn(List.of());
+        when(tradeRepository.save(any(Trade.class))).thenAnswer(invocation -> {
+            Trade trade = invocation.getArgument(0);
+            ReflectionTestUtils.setField(trade, "id", 900L);
+            return trade;
+        });
+        when(followRelationshipRepository.countByFollowing_IdAndStatus(BUYER_ID, FollowStatus.ACCEPTED))
+                .thenReturn(7L);
+
+        TradeDetailResponse response = purchaseIntentAcceptService.acceptPurchaseIntent(INTENT_ID, SELLER_ID);
+
+        // 이 accept 흐름은 항상 SELLER 시점 응답이므로 counterpart는 buyer여야 한다.
+        assertThat(response.counterpart().userId()).isEqualTo(BUYER_ID);
+        assertThat(response.counterpart().username()).isEqualTo("user" + BUYER_ID);
+        assertThat(response.counterpart().followerCount()).isEqualTo(7L);
+        verify(followRelationshipRepository).countByFollowing_IdAndStatus(BUYER_ID, FollowStatus.ACCEPTED);
     }
 
     @Test

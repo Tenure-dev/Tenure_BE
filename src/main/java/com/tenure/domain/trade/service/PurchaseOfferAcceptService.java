@@ -1,5 +1,7 @@
 package com.tenure.domain.trade.service;
 
+import com.tenure.domain.follow.enums.FollowStatus;
+import com.tenure.domain.follow.repository.FollowRelationshipRepository;
 import com.tenure.domain.item.entity.Item;
 import com.tenure.domain.item.repository.ItemRepository;
 import com.tenure.domain.purchase.entity.PurchaseOffer;
@@ -41,6 +43,7 @@ public class PurchaseOfferAcceptService {
     private final PurchaseOfferRepository purchaseOfferRepository;
     private final TradeRepository tradeRepository;
     private final PurchaseOfferExpirationService purchaseOfferExpirationService;
+    private final FollowRelationshipRepository followRelationshipRepository;
 
     @Transactional(noRollbackFor = CustomException.class)
     public TradeDetailResponse acceptPurchaseOffer(Long offerId, Long currentUserId) {
@@ -72,7 +75,11 @@ public class PurchaseOfferAcceptService {
 
         TradeViewerMode viewerMode = TradeViewerMode.SELLER;
         List<TradeAction> availableActions = TradeTransition.resolveActions(trade.getStatus(), TradeActor.from(viewerMode));
-        return TradeDetailResponse.of(trade, viewerMode, availableActions);
+        long counterpartFollowerCount = followRelationshipRepository.countByFollowing_IdAndStatus(
+                trade.getBuyer().getId(),
+                FollowStatus.ACCEPTED
+        );
+        return TradeDetailResponse.of(trade, viewerMode, availableActions, counterpartFollowerCount);
     }
 
     private void validateOwner(PurchaseOffer offer, Long currentUserId) {
