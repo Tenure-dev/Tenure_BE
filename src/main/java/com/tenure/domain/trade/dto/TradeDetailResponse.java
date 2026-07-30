@@ -6,6 +6,7 @@ import com.tenure.domain.trade.enums.TradeAction;
 import com.tenure.domain.trade.enums.TradeSourceType;
 import com.tenure.domain.trade.enums.TradeStatus;
 import com.tenure.domain.trade.enums.TradeViewerMode;
+import com.tenure.domain.user.entity.User;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
@@ -105,11 +106,19 @@ public record TradeDetailResponse(
         LocalDateTime createdAt,
 
         @Schema(description = "거래 수정 시각", example = "2026-07-10T12:00:00")
-        LocalDateTime updatedAt
+        LocalDateTime updatedAt,
+
+        Counterpart counterpart
 ) {
 
-    public static TradeDetailResponse of(Trade trade, TradeViewerMode viewerMode, List<TradeAction> availableActions) {
+    public static TradeDetailResponse of(
+            Trade trade,
+            TradeViewerMode viewerMode,
+            List<TradeAction> availableActions,
+            long counterpartFollowerCount
+    ) {
         boolean isBuyerView = viewerMode == TradeViewerMode.BUYER;
+        User counterpartUser = isBuyerView ? trade.getSeller() : trade.getBuyer();
         return new TradeDetailResponse(
                 trade.getId(),
                 viewerMode,
@@ -141,7 +150,33 @@ public record TradeDetailResponse(
                 trade.getConfirmedAt(),
                 trade.getSettledAt(),
                 trade.getCreatedAt(),
-                trade.getUpdatedAt()
+                trade.getUpdatedAt(),
+                Counterpart.from(counterpartUser, counterpartFollowerCount)
         );
+    }
+
+    @Schema(description = "상대방(구매자 화면이면 판매자, 판매자 화면이면 구매자) 요약")
+    public record Counterpart(
+            @Schema(description = "상대방 사용자 ID", example = "2")
+            Long userId,
+
+            @Schema(description = "상대방 아이디", example = "Sujun")
+            String username,
+
+            @Schema(description = "상대방 프로필 이미지 URL", example = "https://image.url/profile.jpg")
+            String profileImageUrl,
+
+            @Schema(description = "상대방 팔로워 수", example = "1400")
+            long followerCount
+    ) {
+
+        static Counterpart from(User counterpartUser, long followerCount) {
+            return new Counterpart(
+                    counterpartUser.getId(),
+                    counterpartUser.getUsername(),
+                    counterpartUser.getProfileImageUrl(),
+                    followerCount
+            );
+        }
     }
 }

@@ -1,5 +1,7 @@
 package com.tenure.domain.trade.service;
 
+import com.tenure.domain.follow.enums.FollowStatus;
+import com.tenure.domain.follow.repository.FollowRelationshipRepository;
 import com.tenure.domain.item.repository.ItemHistoryRepository;
 import com.tenure.domain.item.repository.ItemRepository;
 import com.tenure.domain.product.repository.ProductRepository;
@@ -45,6 +47,7 @@ public class TradeService {
     private final ItemHistoryRepository itemHistoryRepository;
     private final WishRepository wishRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final FollowRelationshipRepository followRelationshipRepository;
 
     @Transactional(readOnly = true)
     public PageResponse<TradeListItemResponse> getTradeList(
@@ -69,7 +72,7 @@ public class TradeService {
         TradeViewerMode viewerMode = resolveViewerMode(trade, currentUserId);
         List<TradeAction> availableActions = resolveAvailableActions(viewerMode, trade.getStatus());
 
-        return TradeDetailResponse.of(trade, viewerMode, availableActions);
+        return TradeDetailResponse.of(trade, viewerMode, availableActions, resolveCounterpartFollowerCount(trade, viewerMode));
     }
 
     @Transactional
@@ -83,7 +86,7 @@ public class TradeService {
         Trade result = applyTransition(trade, actor, request.status(), request);
 
         List<TradeAction> availableActions = resolveAvailableActions(viewerMode, result.getStatus());
-        return TradeDetailResponse.of(result, viewerMode, availableActions);
+        return TradeDetailResponse.of(result, viewerMode, availableActions, resolveCounterpartFollowerCount(result, viewerMode));
     }
 
     /**
@@ -173,6 +176,13 @@ public class TradeService {
         }
         // 거래 ID는 순차 채번되어 403을 반환하면 거래 존재 여부가 노출되므로, 참여자가 아니면 404로 존재 자체를 숨긴다.
         throw new CustomException(TradeErrorCode.TRADE_NOT_FOUND);
+    }
+
+    private long resolveCounterpartFollowerCount(Trade trade, TradeViewerMode viewerMode) {
+        Long counterpartId = viewerMode == TradeViewerMode.BUYER
+                ? trade.getSeller().getId()
+                : trade.getBuyer().getId();
+        return followRelationshipRepository.countByFollowing_IdAndStatus(counterpartId, FollowStatus.ACCEPTED);
     }
 
     private List<TradeAction> resolveAvailableActions(TradeViewerMode viewerMode, TradeStatus status) {
