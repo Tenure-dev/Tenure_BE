@@ -181,4 +181,9 @@ public class User extends BaseTimeEntity {
     public boolean isWithdrawn() {
         return this.deletedAt != null;
     }
+
+    /** 비밀번호 변경 (이미 암호화된 해시를 받아 저장) */
+    public void changePassword(String encodedPassword) {
+        this.passwordHash = encodedPassword;
+    }
 }

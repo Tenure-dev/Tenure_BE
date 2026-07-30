@@ -6,6 +6,11 @@ import com.tenure.global.exception.CustomException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import com.tenure.domain.user.entity.User;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.beans.factory.annotation.Value;
+
 
 // 인증 로직
 @Slf4j
@@ -16,6 +21,10 @@ public class AuthService {
     private final UserRepository userRepository;
     private final EmailService emailService;
     private final EmailVerificationStore verificationStore;
+    private final PasswordEncoder passwordEncoder;
+
+    @Value("${app.email-verification-enabled:true}")
+    private boolean emailVerificationEnabled;
 
     /**
      * 이메일 인증번호 발송.
@@ -70,5 +79,38 @@ public class AuthService {
 
         verificationStore.save(email, code);
         emailService.sendPasswordResetCode(email, code);
+    }
+
+    /**
+     * 새 비밀번호 설정 (비밀번호 재설정 마지막 단계).
+     * 이메일 인증 완료 여부를 확인한 뒤 새 비밀번호를 저장한다.
+     * (app.email-verification-enabled=false 이면 인증 확인을 건너뜀)
+     */
+    @Transactional
+    public void resetPassword(String email, String newPassword, String newPasswordConfirm) {
+
+        // 1) 새 비밀번호 일치 확인
+        if (!newPassword.equals(newPasswordConfirm)) {
+            throw new CustomException(AuthErrorCode.PASSWORD_MISMATCH);
+        }
+
+        // 2) 이메일 인증 완료 여부 확인 (플래그 꺼져 있으면 건너뜀)
+        if (emailVerificationEnabled && !verificationStore.isVerified(email)) {
+            throw new CustomException(AuthErrorCode.EMAIL_NOT_VERIFIED);
+        }
+
+        // 3) 가입된 사용자 조회
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new CustomException(AuthErrorCode.EMAIL_NOT_FOUND));
+
+        // 4) 새 비밀번호 암호화 후 저장 (변경 감지로 자동 UPDATE)
+        user.changePassword(passwordEncoder.encode(newPassword));
+
+        // 5) 사용한 인증 정보 정리 (이메일 인증을 사용한 경우에만)
+        if (emailVerificationEnabled) {
+            verificationStore.remove(email);
+        }
+
+        log.info("비밀번호 재설정 완료: email={}", email);
     }
 }
