@@ -1,9 +1,11 @@
 package com.tenure.domain.user.controller;
 
 import com.tenure.domain.user.dto.request.SignupRequest;
+import com.tenure.domain.user.dto.request.UserReportCreateRequest;
 import com.tenure.domain.user.dto.response.BlockResponse;
 import com.tenure.domain.user.dto.response.BlockedUserResponse;
 import com.tenure.domain.user.dto.response.SignupResponse;
+import com.tenure.domain.user.dto.response.UserReportCreateResponse;
 import com.tenure.domain.user.service.UserService;
 import com.tenure.global.response.BaseResponse;
 import com.tenure.global.response.PageResponse;
@@ -142,5 +144,16 @@ public class UserController {
         Pageable pageable = PageRequest.of(page, size);
         PageResponse<BlockedUserResponse> response = userService.getBlockedUsers(currentUserId, pageable);
         return BaseResponse.success(response);
+    }
+
+    @Operation(summary = "사용자 신고", description = "채팅방에서 상대 사용자를 신고하는 API")
+    @PostMapping("/users/{userId}/reports")
+    public BaseResponse<UserReportCreateResponse> reportUser(
+            @PathVariable Long userId,
+            @Valid @RequestBody UserReportCreateRequest request
+    ) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        UserReportCreateResponse response = userService.reportUser(currentUserId, userId, request);
+        return BaseResponse.success(response, "신고가 접수되었습니다.");
     }
 }

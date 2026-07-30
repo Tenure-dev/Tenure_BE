@@ -11,10 +11,14 @@ import com.tenure.domain.purchase.repository.PurchaseIntentRepository;
 import com.tenure.domain.purchase.repository.PurchaseOfferRepository;
 import com.tenure.domain.user.dto.request.AccountSettingsUpdateRequest;
 import com.tenure.domain.user.dto.request.SignupRequest;
+import com.tenure.domain.user.dto.request.UserReportCreateRequest;
 import com.tenure.domain.user.dto.response.BlockedUserResponse;
 import com.tenure.domain.user.dto.response.SignupResponse;
+import com.tenure.domain.user.dto.response.UserReportCreateResponse;
 import com.tenure.domain.user.entity.User;
 import com.tenure.domain.user.entity.UserBlock;
+import com.tenure.domain.user.entity.UserReport;
+import com.tenure.domain.user.repository.UserReportRepository;
 import com.tenure.global.response.PageResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -64,6 +68,7 @@ public class UserService {
     private final FollowRelationshipRepository followRepository;
     private final PurchaseIntentRepository purchaseIntentRepository;
     private final PurchaseOfferRepository purchaseOfferRepository;
+    private final UserReportRepository userReportRepository;
 
     // 회원가입
     @Transactional
@@ -343,6 +348,35 @@ public class UserService {
     public PageResponse<BlockedUserResponse> getBlockedUsers(Long currentUserId, Pageable pageable) {
         Page<UserBlock> blocks = userBlockRepository.findByBlockerId(currentUserId, pageable);
         return PageResponse.from(blocks, ub -> BlockedUserResponse.of(ub.getBlocked(), ub.getCreatedAt()));
+    }
+
+    // 사용자 신고
+    @Transactional
+    public UserReportCreateResponse reportUser(Long currentUserId, Long targetUserId, UserReportCreateRequest request) {
+
+        // 1) 자기 자신 신고 불가
+        if (currentUserId.equals(targetUserId)) {
+            throw new CustomException(UserErrorCode.CANNOT_REPORT_SELF);
+        }
+
+        // 2) 신고 대상 사용자 존재 확인
+        User reported = userRepository.findById(targetUserId)
+            .orElseThrow(() -> new CustomException(UserErrorCode.USER_NOT_FOUND));
+
+        // 3) 같은 신고자 + 같은 대상 중복 신고 확인
+        userReportRepository.findByReporter_IdAndReported_Id(currentUserId, targetUserId)
+            .ifPresent(existing -> {
+                throw new CustomException(UserErrorCode.ALREADY_REPORTED, existing.getId());
+            });
+
+        // 4) 신고 저장
+        User reporter = userRepository.findById(currentUserId)
+            .orElseThrow(() -> new CustomException(UserErrorCode.USER_NOT_FOUND));
+        UserReport report = UserReport.create(reporter, reported, request.reasonType(), request.reasonDetail());
+        UserReport saved = userReportRepository.save(report);
+
+        log.info("사용자 신고: {} -> {}", currentUserId, targetUserId);
+        return UserReportCreateResponse.from(saved);
     }
 
 }
