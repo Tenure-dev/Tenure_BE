@@ -11,6 +11,8 @@ import com.tenure.domain.common.enums.PaymentAuthorizationStatus;
 import com.tenure.domain.item.entity.Item;
 import com.tenure.domain.item.enums.ItemStatus;
 import com.tenure.domain.item.repository.ItemRepository;
+import com.tenure.domain.notification.service.NotificationFactory;
+import com.tenure.domain.notification.service.NotificationService;
 import com.tenure.domain.purchase.dto.PurchaseOfferCancelResponse;
 import com.tenure.domain.purchase.entity.PurchaseOffer;
 import com.tenure.domain.purchase.enums.PurchaseOfferStatus;
@@ -57,17 +59,23 @@ class PurchaseOfferServiceTest {
     @Mock
     private TradeRepository tradeRepository;
 
+    @Mock
+    private NotificationService notificationService;
+
     private PurchaseOfferService purchaseOfferService;
 
     @BeforeEach
     void setUp() {
+        NotificationFactory notificationFactory = new NotificationFactory();
         purchaseOfferService = new PurchaseOfferService(
                 itemRepository,
                 purchaseOfferRepository,
-                new PurchaseOfferExpirationService(),
+                new PurchaseOfferExpirationService(notificationFactory, notificationService),
                 deliveryAddressRepository,
                 userRepository,
-                tradeRepository
+                tradeRepository,
+                notificationFactory,
+                notificationService
         );
     }
 

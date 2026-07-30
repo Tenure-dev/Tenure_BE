@@ -17,6 +17,8 @@ import com.tenure.domain.common.enums.PaymentAuthorizationStatus;
 import com.tenure.domain.follow.repository.FollowRelationshipRepository;
 import com.tenure.domain.item.entity.Item;
 import com.tenure.domain.item.repository.ItemRepository;
+import com.tenure.domain.notification.service.NotificationFactory;
+import com.tenure.domain.notification.service.NotificationService;
 import com.tenure.domain.product.entity.Product;
 import com.tenure.domain.product.enums.ProductStatus;
 import com.tenure.domain.product.repository.ProductRepository;
@@ -86,12 +88,16 @@ class PurchaseIntentServiceTest {
     @Mock
     private TradeRepository tradeRepository;
 
+    @Mock
+    private NotificationService notificationService;
+
     private PurchaseIntentService purchaseIntentService;
     private PurchaseIntentExpirationService purchaseIntentExpirationService;
 
     @BeforeEach
     void setUp() {
-        purchaseIntentExpirationService = new PurchaseIntentExpirationService();
+        NotificationFactory notificationFactory = new NotificationFactory();
+        purchaseIntentExpirationService = new PurchaseIntentExpirationService(notificationFactory, notificationService);
         purchaseIntentService = new PurchaseIntentService(
                 productRepository,
                 itemRepository,
@@ -100,7 +106,9 @@ class PurchaseIntentServiceTest {
                 userRepository,
                 followRelationshipRepository,
                 tradeRepository,
-                purchaseIntentExpirationService
+                purchaseIntentExpirationService,
+                notificationFactory,
+                notificationService
         );
     }
 
