@@ -703,11 +703,9 @@ class PurchaseIntentServiceTest {
                 eq(PurchaseIntentStatus.SENT),
                 any(LocalDateTime.class)
         )).thenReturn(expiredIntents);
-        when(purchaseIntentRepository.findSentListByBuyerWithCursor(
+        when(purchaseIntentRepository.findSentListByBuyerFirstPage(
                 eq(BUYER_ID),
                 any(),
-                isNull(),
-                isNull(),
                 any(Pageable.class)
         )).thenReturn(fetchedIntents);
     }
@@ -718,11 +716,9 @@ class PurchaseIntentServiceTest {
                 eq(PurchaseIntentStatus.SENT),
                 any(LocalDateTime.class)
         )).thenReturn(expiredIntents);
-        when(purchaseIntentRepository.findReceivedListBySellerWithCursor(
+        when(purchaseIntentRepository.findReceivedListBySellerFirstPage(
                 eq(SELLER_ID),
                 any(),
-                isNull(),
-                isNull(),
                 any(Pageable.class)
         )).thenReturn(fetchedIntents);
     }
