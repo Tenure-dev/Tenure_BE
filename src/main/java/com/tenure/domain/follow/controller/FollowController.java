@@ -56,4 +56,11 @@ public class FollowController {
         Long currentUserId = currentUserProvider.getCurrentUserId();
         return BaseResponse.success(followService.getFollowings(currentUserId, userId));
     }
+
+    @Operation(summary = "내 팔로워 목록", description = "나를 팔로우하는 사용자 목록을 조회합니다.")
+    @GetMapping("/me/followers")
+    public BaseResponse<List<FollowUserResponse>> getMyFollowers() {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        return BaseResponse.success(followService.getFollowers(currentUserId, currentUserId));
+    }
 }

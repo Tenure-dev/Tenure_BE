@@ -38,4 +38,11 @@ public interface FollowRelationshipRepository extends JpaRepository<FollowRelati
             "where fr.follower.id = :userId and fr.status = com.tenure.domain.follow.enums.FollowStatus.ACCEPTED " +
             "order by fr.createdAt desc")
     List<FollowRelationship> findFollowingsByUserId(@Param("userId") Long userId);
+
+    // 특정 유저를 팔로우하는 관계 목록 (팔로워) - follower 유저를 함께 로딩
+    @Query("select fr from FollowRelationship fr " +
+            "join fetch fr.follower " +
+            "where fr.following.id = :userId and fr.status = com.tenure.domain.follow.enums.FollowStatus.ACCEPTED " +
+            "order by fr.createdAt desc")
+    List<FollowRelationship> findFollowersByUserId(@Param("userId") Long userId);
 }

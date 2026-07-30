@@ -112,4 +112,25 @@ public class FollowService {
                 })
                 .toList();
     }
+
+    /**
+     * 특정 유저의 팔로워 목록 조회 (그 유저를 팔로우하는 사람들).
+     */
+    @Transactional(readOnly = true)
+    public List<FollowUserResponse> getFollowers(Long currentUserId, Long targetUserId) {
+        if (!userRepository.existsById(targetUserId)) {
+            throw new CustomException(UserErrorCode.USER_NOT_FOUND);
+        }
+
+        List<FollowRelationship> followers = followRepository.findFollowersByUserId(targetUserId);
+
+        return followers.stream()
+                .map(fr -> {
+                    User followerUser = fr.getFollower();
+                    boolean iFollow = followRepository.existsByFollower_IdAndFollowing_IdAndStatus(
+                            currentUserId, followerUser.getId(), FollowStatus.ACCEPTED);
+                    return FollowUserResponse.of(followerUser, iFollow);
+                })
+                .toList();
+    }
 }
