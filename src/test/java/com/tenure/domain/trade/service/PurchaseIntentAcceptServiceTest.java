@@ -13,6 +13,8 @@ import com.tenure.domain.follow.enums.FollowStatus;
 import com.tenure.domain.follow.repository.FollowRelationshipRepository;
 import com.tenure.domain.item.entity.Item;
 import com.tenure.domain.item.repository.ItemRepository;
+import com.tenure.domain.notification.service.NotificationFactory;
+import com.tenure.domain.notification.service.NotificationService;
 import com.tenure.domain.product.entity.Product;
 import com.tenure.domain.product.enums.ProductStatus;
 import com.tenure.domain.product.exception.ProductErrorCode;
@@ -69,6 +71,10 @@ class PurchaseIntentAcceptServiceTest {
     @Mock
     private FollowRelationshipRepository followRelationshipRepository;
 
+
+    @Mock
+    private NotificationService notificationService;
+
     private PurchaseIntentAcceptService purchaseIntentAcceptService;
 
     private void setUpService() {
@@ -77,7 +83,7 @@ class PurchaseIntentAcceptServiceTest {
                 itemRepository,
                 purchaseIntentRepository,
                 tradeRepository,
-                new PurchaseIntentExpirationService(),
+                new PurchaseIntentExpirationService(new NotificationFactory(), notificationService),
                 followRelationshipRepository
         );
     }

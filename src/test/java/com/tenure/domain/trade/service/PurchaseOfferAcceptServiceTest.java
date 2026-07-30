@@ -13,6 +13,8 @@ import com.tenure.domain.follow.enums.FollowStatus;
 import com.tenure.domain.follow.repository.FollowRelationshipRepository;
 import com.tenure.domain.item.entity.Item;
 import com.tenure.domain.item.repository.ItemRepository;
+import com.tenure.domain.notification.service.NotificationFactory;
+import com.tenure.domain.notification.service.NotificationService;
 import com.tenure.domain.purchase.entity.PurchaseOffer;
 import com.tenure.domain.purchase.enums.PurchaseOfferStatus;
 import com.tenure.domain.purchase.exception.PurchaseOfferErrorCode;
@@ -63,15 +65,17 @@ class PurchaseOfferAcceptServiceTest {
 
     @Mock
     private FollowRelationshipRepository followRelationshipRepository;
+    @Mock
+    private NotificationService notificationService;
 
     private PurchaseOfferAcceptService purchaseOfferAcceptService;
 
-    private void setUpService() {
+   private void setUpService() {
         purchaseOfferAcceptService = new PurchaseOfferAcceptService(
                 itemRepository,
                 purchaseOfferRepository,
                 tradeRepository,
-                new PurchaseOfferExpirationService(),
+                new PurchaseOfferExpirationService(new NotificationFactory(), notificationService),
                 followRelationshipRepository
         );
     }
