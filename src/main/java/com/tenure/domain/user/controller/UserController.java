@@ -2,13 +2,17 @@ package com.tenure.domain.user.controller;
 
 import com.tenure.domain.user.dto.request.SignupRequest;
 import com.tenure.domain.user.dto.response.BlockResponse;
+import com.tenure.domain.user.dto.response.BlockedUserResponse;
 import com.tenure.domain.user.dto.response.SignupResponse;
 import com.tenure.domain.user.service.UserService;
 import com.tenure.global.response.BaseResponse;
+import com.tenure.global.response.PageResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -126,5 +130,17 @@ public class UserController {
         Long currentUserId = currentUserProvider.getCurrentUserId();
         userService.userUnblock(currentUserId, userId);
         return BaseResponse.success(BlockResponse.of(userId, false), "사용자 차단이 해제되었습니다.");
+    }
+
+    @Operation(summary = "차단 목록 조회", description = "로그인 사용자가 차단한 사용자 목록을 조회하는 API")
+    @GetMapping("/blocks")
+    public BaseResponse<PageResponse<BlockedUserResponse>> getBlockedUsers(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        Pageable pageable = PageRequest.of(page, size);
+        PageResponse<BlockedUserResponse> response = userService.getBlockedUsers(currentUserId, pageable);
+        return BaseResponse.success(response);
     }
 }
