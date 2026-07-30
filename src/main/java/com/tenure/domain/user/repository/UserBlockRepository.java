@@ -1,6 +1,7 @@
 package com.tenure.domain.user.repository;
 
 import com.tenure.domain.user.entity.UserBlock;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -27,4 +28,11 @@ public interface UserBlockRepository extends JpaRepository<UserBlock, Long> {
                     + "WHERE ub.blocker.id = :blockerId AND b.deletedAt IS NULL"
     )
     Page<UserBlock> findByBlockerId(@Param("blockerId") Long blockerId, Pageable pageable);
+    // 양방향 차단 목록 조회
+    @Query("""
+            select ub from UserBlock ub
+            where (ub.blocker.id = :userId1 and ub.blocked.id = :userId2)
+               or (ub.blocker.id = :userId2 and ub.blocked.id = :userId1)
+            """)
+    List<UserBlock> findBlocksBetween(@Param("userId1") Long userId1, @Param("userId2") Long userId2);
 }

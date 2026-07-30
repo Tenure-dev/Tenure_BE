@@ -17,6 +17,9 @@ import com.tenure.domain.item.exception.ItemErrorCode;
 import com.tenure.domain.item.repository.CategoryRepository;
 import com.tenure.domain.item.repository.ItemHistoryRepository;
 import com.tenure.domain.item.repository.ItemRepository;
+import com.tenure.domain.notification.entity.Notification;
+import com.tenure.domain.notification.service.NotificationFactory;
+import com.tenure.domain.notification.service.NotificationService;
 import com.tenure.domain.ootd.entity.Ootd;
 import com.tenure.domain.ootd.enums.OotdPublicationStatus;
 import com.tenure.domain.ootd.repository.OotdRepository;
@@ -48,6 +51,7 @@ import com.tenure.domain.tag.repository.OotdTagRepository;
 import com.tenure.domain.user.entity.User;
 import com.tenure.domain.user.enums.AccountVisibility;
 import com.tenure.domain.user.enums.UserGrade;
+import com.tenure.domain.wish.repository.WishRepository;
 import com.tenure.global.exception.CommonErrorCode;
 import com.tenure.global.exception.CustomException;
 import java.io.IOException;
@@ -80,6 +84,9 @@ public class ProductService {
     private final FollowRelationshipRepository followRelationshipRepository;
     private final PurchaseIntentRepository purchaseIntentRepository;
     private final PurchaseOfferRepository purchaseOfferRepository;
+    private final WishRepository wishRepository;
+    private final NotificationFactory notificationFactory;
+    private final NotificationService notificationService;
     private final ObjectMapper objectMapper;
 
     @Transactional
@@ -130,6 +137,7 @@ public class ProductService {
         productAttachedOotdRepository.saveAll(attachedOotds);
 
         item.markOnSale();
+        notifyWishedUsers(item, receiver -> notificationFactory.productCreated(receiver, item));
 
         return ProductCreateResponse.of(product, item, request.attachedOotdIds());
     }
@@ -175,6 +183,7 @@ public class ProductService {
             updateItemInfoPartially(item, request);
         }
         validateBasicUserPolicy(product.getSeller(), request);
+        Integer oldPrice = product.getPrice();
 
         List<Long> attachedOotdIds = null;
         if (request.attachedOotdIds() != null) {
@@ -192,6 +201,14 @@ public class ProductService {
                 writeJsonOrNull(request.conditionFlags()),
                 request.sellerDescription()
         );
+        if (request.price() != null && !request.price().equals(oldPrice)) {
+            notifyWishedUsers(item, receiver -> notificationFactory.productPriceChanged(
+                    receiver,
+                    item,
+                    oldPrice,
+                    request.price()
+            ));
+        }
 
         if (attachedOotdIds == null) {
             attachedOotdIds = findAttachedOotdIds(product.getId());
@@ -230,6 +247,7 @@ public class ProductService {
         product.markExternalSold();
         item.markSold();
         closeOpenHistoryForExternalSale(item.getId());
+        notifyWishedUsers(item, receiver -> notificationFactory.productSold(receiver, item));
 
         return ProductExternalCompleteResponse.of(
                 product,
@@ -259,8 +277,19 @@ public class ProductService {
 
         product.hide();
         item.markOwned();
+        notifyWishedUsers(item, receiver -> notificationFactory.productReturnedToUnsold(receiver, item));
 
         return ProductDeleteResponse.of(product, item);
+    }
+
+    private void notifyWishedUsers(Item item, Function<User, Notification> notificationCreator) {
+        List<User> receivers = wishRepository.findNotificationReceiversByItemId(item.getId());
+        if (receivers == null || receivers.isEmpty()) {
+            return;
+        }
+        notificationService.saveAll(receivers.stream()
+                .map(notificationCreator)
+                .toList());
     }
 
     private void validateOwner(Item item, Long currentUserId) {

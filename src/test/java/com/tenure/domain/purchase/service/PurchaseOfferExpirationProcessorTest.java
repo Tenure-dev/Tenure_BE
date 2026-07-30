@@ -7,6 +7,8 @@ import static org.mockito.Mockito.when;
 import com.tenure.domain.common.enums.PaymentAuthorizationStatus;
 import com.tenure.domain.item.entity.Item;
 import com.tenure.domain.item.repository.ItemRepository;
+import com.tenure.domain.notification.service.NotificationFactory;
+import com.tenure.domain.notification.service.NotificationService;
 import com.tenure.domain.purchase.entity.PurchaseOffer;
 import com.tenure.domain.purchase.enums.PurchaseOfferStatus;
 import com.tenure.domain.purchase.repository.PurchaseOfferRepository;
@@ -45,7 +47,7 @@ class PurchaseOfferExpirationProcessorTest {
         processor = new PurchaseOfferExpirationProcessor(
                 itemRepository,
                 purchaseOfferRepository,
-                new PurchaseOfferExpirationService()
+                new PurchaseOfferExpirationService(new NotificationFactory(), org.mockito.Mockito.mock(NotificationService.class))
         );
     }
 

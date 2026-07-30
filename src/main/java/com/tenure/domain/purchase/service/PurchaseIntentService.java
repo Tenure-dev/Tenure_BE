@@ -7,6 +7,8 @@ import com.tenure.domain.follow.enums.FollowStatus;
 import com.tenure.domain.follow.repository.FollowRelationshipRepository;
 import com.tenure.domain.item.entity.Item;
 import com.tenure.domain.item.repository.ItemRepository;
+import com.tenure.domain.notification.service.NotificationFactory;
+import com.tenure.domain.notification.service.NotificationService;
 import com.tenure.domain.product.entity.Product;
 import com.tenure.domain.product.enums.ProductStatus;
 import com.tenure.domain.product.repository.ProductRepository;
@@ -59,6 +61,8 @@ public class PurchaseIntentService {
     private final FollowRelationshipRepository followRelationshipRepository;
     private final TradeRepository tradeRepository;
     private final PurchaseIntentExpirationService purchaseIntentExpirationService;
+    private final NotificationFactory notificationFactory;
+    private final NotificationService notificationService;
 
     @Transactional
     public PurchaseIntentCreateResponse createPurchaseIntent(
@@ -104,6 +108,12 @@ public class PurchaseIntentService {
         );
 
         purchaseIntentRepository.save(intent);
+        notificationService.save(notificationFactory.purchaseIntentSent(
+                product.getSeller(),
+                buyer,
+                item,
+                intent.getId()
+        ));
         return PurchaseIntentCreateResponse.from(intent, now);
     }
 
@@ -167,7 +177,7 @@ public class PurchaseIntentService {
                 .orElseThrow(() -> new CustomException(PurchaseIntentErrorCode.PURCHASE_INTENT_NOT_FOUND));
         Product product = productRepository.findByIdForUpdate(productId)
                 .orElseThrow(() -> new CustomException(PurchaseIntentErrorCode.PRODUCT_NOT_FOUND));
-        itemRepository.findByIdForUpdate(product.getItem().getId())
+        Item item = itemRepository.findByIdForUpdate(product.getItem().getId())
                 .orElseThrow(() -> new CustomException(PurchaseIntentErrorCode.ITEM_NOT_FOUND));
         PurchaseIntent intent = purchaseIntentRepository.findByIdForUpdate(intentId)
                 .orElseThrow(() -> new CustomException(PurchaseIntentErrorCode.PURCHASE_INTENT_NOT_FOUND));
@@ -184,7 +194,7 @@ public class PurchaseIntentService {
                 .orElseThrow(() -> new CustomException(PurchaseIntentErrorCode.PURCHASE_INTENT_NOT_FOUND));
         Product product = productRepository.findByIdForUpdate(productId)
                 .orElseThrow(() -> new CustomException(PurchaseIntentErrorCode.PRODUCT_NOT_FOUND));
-        itemRepository.findByIdForUpdate(product.getItem().getId())
+        Item item = itemRepository.findByIdForUpdate(product.getItem().getId())
                 .orElseThrow(() -> new CustomException(PurchaseIntentErrorCode.ITEM_NOT_FOUND));
         PurchaseIntent intent = purchaseIntentRepository.findByIdForUpdate(intentId)
                 .orElseThrow(() -> new CustomException(PurchaseIntentErrorCode.PURCHASE_INTENT_NOT_FOUND));
@@ -200,6 +210,11 @@ public class PurchaseIntentService {
         }
 
         intent.rejectAndReleaseAuthorization();
+        notificationService.save(notificationFactory.requestRejectedForIntent(
+                intent.getBuyer(),
+                item,
+                intent.getId()
+        ));
         return PurchaseIntentRejectResponse.from(intent, now);
     }
 
@@ -209,7 +224,7 @@ public class PurchaseIntentService {
                 .orElseThrow(() -> new CustomException(PurchaseIntentErrorCode.PURCHASE_INTENT_NOT_FOUND));
         Product product = productRepository.findByIdForUpdate(productId)
                 .orElseThrow(() -> new CustomException(PurchaseIntentErrorCode.PRODUCT_NOT_FOUND));
-        itemRepository.findByIdForUpdate(product.getItem().getId())
+        Item item = itemRepository.findByIdForUpdate(product.getItem().getId())
                 .orElseThrow(() -> new CustomException(PurchaseIntentErrorCode.ITEM_NOT_FOUND));
         PurchaseIntent intent = purchaseIntentRepository.findByIdForUpdate(intentId)
                 .orElseThrow(() -> new CustomException(PurchaseIntentErrorCode.PURCHASE_INTENT_NOT_FOUND));
@@ -225,6 +240,13 @@ public class PurchaseIntentService {
         }
 
         intent.cancelAndReleaseAuthorization();
+        notificationService.save(notificationFactory.requestCanceledByRequester(
+                intent.getSeller(),
+                intent.getBuyer(),
+                item,
+                intent.getId(),
+                true
+        ));
         return PurchaseIntentCancelResponse.from(intent, now);
     }
 

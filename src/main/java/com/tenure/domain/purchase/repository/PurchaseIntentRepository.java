@@ -1,9 +1,11 @@
 package com.tenure.domain.purchase.repository;
 
+import com.tenure.domain.product.entity.Product;
 import com.tenure.domain.purchase.entity.PurchaseIntent;
 import com.tenure.domain.purchase.entity.PurchaseOffer;
 import com.tenure.domain.purchase.enums.PurchaseIntentStatus;
 import com.tenure.domain.purchase.enums.PurchaseOfferStatus;
+import com.tenure.domain.user.entity.User;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -205,5 +207,9 @@ public interface PurchaseIntentRepository extends JpaRepository<PurchaseIntent, 
         @Param("userId2") Long userId2,
         @Param("status") PurchaseIntentStatus status
     );
+
+
+    boolean existsByBuyerIdAndSellerIdAndProductIdAndStatus(
+            Long buyerId, Long sellerId, Long productId, PurchaseIntentStatus status);
 
 }

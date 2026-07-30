@@ -9,6 +9,8 @@ import com.tenure.domain.common.enums.FeePolicy;
 import com.tenure.domain.common.enums.PaymentAuthorizationStatus;
 import com.tenure.domain.item.entity.Item;
 import com.tenure.domain.item.repository.ItemRepository;
+import com.tenure.domain.notification.service.NotificationFactory;
+import com.tenure.domain.notification.service.NotificationService;
 import com.tenure.domain.product.entity.Product;
 import com.tenure.domain.product.repository.ProductRepository;
 import com.tenure.domain.purchase.entity.PurchaseIntent;
@@ -54,7 +56,7 @@ class PurchaseIntentExpirationProcessorTest {
                 productRepository,
                 itemRepository,
                 purchaseIntentRepository,
-                new PurchaseIntentExpirationService()
+                new PurchaseIntentExpirationService(new NotificationFactory(), org.mockito.Mockito.mock(NotificationService.class))
         );
     }
 
