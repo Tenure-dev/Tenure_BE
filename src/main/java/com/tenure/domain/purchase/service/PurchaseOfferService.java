@@ -134,13 +134,21 @@ public class PurchaseOfferService {
         LocalDateTime now = LocalDateTime.now();
         expireSentOffersForProposer(currentUserId, now);
 
-        List<PurchaseOffer> fetched = purchaseOfferRepository.findSentListByProposerWithCursor(
-                currentUserId,
-                normalizeStatuses(statuses),
-                cursorCreatedAt == null ? null : cursorCreatedAt.toLocalDateTime(),
-                cursorOfferId,
-                PageRequest.of(0, pageSize + 1)
-        );
+        List<PurchaseOfferStatus> normalizedStatuses = normalizeStatuses(statuses);
+        PageRequest pageRequest = PageRequest.of(0, pageSize + 1);
+        List<PurchaseOffer> fetched = cursorCreatedAt == null
+                ? purchaseOfferRepository.findSentListByProposerFirstPage(
+                        currentUserId,
+                        normalizedStatuses,
+                        pageRequest
+                )
+                : purchaseOfferRepository.findSentListByProposerWithCursor(
+                        currentUserId,
+                        normalizedStatuses,
+                        cursorCreatedAt.toLocalDateTime(),
+                        cursorOfferId,
+                        pageRequest
+                );
         boolean hasNext = fetched.size() > pageSize;
         List<PurchaseOffer> pageItems = hasNext ? fetched.subList(0, pageSize) : fetched;
         return PurchaseOfferSentListResponse.of(pageItems, findTradeIds(pageItems), now, hasNext);
@@ -159,13 +167,21 @@ public class PurchaseOfferService {
         LocalDateTime now = LocalDateTime.now();
         expireSentOffersForOwner(currentUserId, now);
 
-        List<PurchaseOffer> fetched = purchaseOfferRepository.findReceivedListByOwnerWithCursor(
-                currentUserId,
-                normalizeStatuses(statuses),
-                cursorCreatedAt == null ? null : cursorCreatedAt.toLocalDateTime(),
-                cursorOfferId,
-                PageRequest.of(0, pageSize + 1)
-        );
+        List<PurchaseOfferStatus> normalizedStatuses = normalizeStatuses(statuses);
+        PageRequest pageRequest = PageRequest.of(0, pageSize + 1);
+        List<PurchaseOffer> fetched = cursorCreatedAt == null
+                ? purchaseOfferRepository.findReceivedListByOwnerFirstPage(
+                        currentUserId,
+                        normalizedStatuses,
+                        pageRequest
+                )
+                : purchaseOfferRepository.findReceivedListByOwnerWithCursor(
+                        currentUserId,
+                        normalizedStatuses,
+                        cursorCreatedAt.toLocalDateTime(),
+                        cursorOfferId,
+                        pageRequest
+                );
         boolean hasNext = fetched.size() > pageSize;
         List<PurchaseOffer> pageItems = hasNext ? fetched.subList(0, pageSize) : fetched;
         return PurchaseOfferReceivedListResponse.of(pageItems, findTradeIds(pageItems), now, hasNext);
