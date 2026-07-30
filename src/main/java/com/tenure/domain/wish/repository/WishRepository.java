@@ -1,8 +1,10 @@
 package com.tenure.domain.wish.repository;
 
 import com.tenure.domain.product.enums.ProductStatus;
+import com.tenure.domain.user.entity.User;
 import com.tenure.domain.wish.entity.Wish;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import org.springframework.data.domain.Page;
@@ -75,4 +77,12 @@ public interface WishRepository extends JpaRepository<Wish, Long> {
     );
 
     long countByUser_Id(Long userId);
+
+    @Query("""
+            select wish.user
+            from Wish wish
+            where wish.item.id = :itemId
+              and wish.notificationEnabled = true
+            """)
+    List<User> findNotificationReceiversByItemId(@Param("itemId") Long itemId);
 }

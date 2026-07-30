@@ -202,4 +202,8 @@ public interface PurchaseOfferRepository extends JpaRepository<PurchaseOffer, Lo
         @Param("userId2") Long userId2,
         @Param("status") PurchaseOfferStatus status
     );
+
+
+    boolean existsByProposerIdAndOwnerIdAndItemIdAndStatus(
+            Long proposerId, Long ownerId, Long itemId, PurchaseOfferStatus status);
 }
