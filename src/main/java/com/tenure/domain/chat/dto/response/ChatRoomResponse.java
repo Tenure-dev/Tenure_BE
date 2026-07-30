@@ -16,6 +16,7 @@ import java.time.LocalDate;
 public class ChatRoomResponse {
 
     private Long chatRoomId;
+    private Long opponentUserId;            // 상대방 userId (차단 API 호출용)
     private String opponentUsername;        // 상대방 이름
     private String opponentProfileImage;    // 상대방 프로필 이미지
     private Long itemId;                    // 구매 의사/제안 API 호출용 아이템 ID
@@ -42,6 +43,10 @@ public class ChatRoomResponse {
     {
         boolean isBuyer = currentUserId.equals(chatRoom.getBuyer().getId());
 
+        Long opponentUserId = isBuyer
+                ? chatRoom.getSeller().getId()
+                : chatRoom.getBuyer().getId();
+
         String opponentUsername = isBuyer
                 ? chatRoom.getSeller().getUsername()
                 : chatRoom.getBuyer().getUsername();
@@ -50,7 +55,7 @@ public class ChatRoomResponse {
                 ? chatRoom.getSeller().getProfileImageUrl()
                 : chatRoom.getBuyer().getProfileImageUrl();
 
-        return new ChatRoomResponse(chatRoom.getId(), opponentUsername, opponentProfileImage,item.getId(),
+        return new ChatRoomResponse(chatRoom.getId(), opponentUserId, opponentUsername, opponentProfileImage, item.getId(),
                 item.getRepresentativeImageUrl(), item.getBrandName(), item.getItemName(), product.getProductStatus(), product.getPrice(),
                 item.getLastWornAt(), isBuyer, tradeId, product.getId(), hasPurchaseIntent, hasPurchaseOffer, isBlocked, isOpponentExited
         );
