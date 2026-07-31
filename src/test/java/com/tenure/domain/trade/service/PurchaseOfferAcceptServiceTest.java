@@ -112,6 +112,7 @@ class PurchaseOfferAcceptServiceTest {
         assertThat(response.settlementAmount()).isEqualTo(365000);
         assertThat(response.productId()).isNull();
         assertThat(response.sourceId()).isEqualTo(OFFER_ID);
+        assertThat(response.tradeRequestNote()).isEqualTo("상품 상태가 사진과 동일하다면 바로 거래 진행하고 싶어요.");
 
         assertThat(offer.getStatus()).isEqualTo(PurchaseOfferStatus.ACCEPTED);
         assertThat(offer.getPaymentAuthorizationStatus()).isEqualTo(PaymentAuthorizationStatus.CAPTURED);
@@ -362,6 +363,7 @@ class PurchaseOfferAcceptServiceTest {
                 365000,
                 "mock_offer_auth_existing",
                 "MOCK_CARD",
+                "상품 상태가 사진과 동일하다면 바로 거래 진행하고 싶어요.",
                 expiresAt
         );
         ReflectionTestUtils.setField(offer, "id", id);

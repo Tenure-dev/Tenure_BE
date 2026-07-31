@@ -102,7 +102,8 @@ public class PurchaseIntentAcceptService {
                 intent.getDeliveryAddressLine1(),
                 intent.getDeliveryAddressLine2(),
                 intent.getDeliveryPostalCode(),
-                intent.getDeliveryRequestNote()
+                intent.getDeliveryRequestNote(),
+                null
         );
     }
 

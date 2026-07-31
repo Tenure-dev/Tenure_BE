@@ -99,6 +99,7 @@ public class PurchaseOfferService {
                 ownerSettlementAmount,
                 createMockPaymentAuthorizationId(),
                 request.paymentMethodId(),
+                request.tradeRequestNote(),
                 now.plusHours(RESPONSE_HOURS)
         );
         purchaseOfferRepository.save(offer);
