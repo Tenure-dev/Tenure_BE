@@ -74,6 +74,9 @@ public class Ootd extends BaseTimeEntity {
     @Column(name = "view_count", nullable = false)
     private Integer viewCount = 0;
 
+    @Column(name = "hot_score", nullable = false)
+    private Double hotScore = 0.0;
+
     public static Ootd create(User owner, String imageUrl, OotdSource source) {
         Ootd ootd = new Ootd();
         ootd.owner = owner;

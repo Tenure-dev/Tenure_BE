@@ -65,6 +65,9 @@ tenure:
     auto-confirm:
       interval-minutes: 10
       confirm-hours: 72
+  ootd:
+    hot-score:
+      interval-minutes: 10
   ai:
     gemini:
       api-key: ${GEMINI_API_KEY:}
