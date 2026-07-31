@@ -20,12 +20,14 @@ import com.tenure.domain.user.entity.User;
 import com.tenure.domain.user.repository.UserRepository;
 import com.tenure.global.exception.CustomException;
 import com.tenure.global.response.PageResponse;
+import com.tenure.global.storage.ImageStorageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -47,6 +49,8 @@ public class ItemService {
 
     private static final String AI_PENDING_CATEGORY_NAME = "AI 분류 대기";
     private static final int DETAIL_CATEGORY_DEPTH = 2;
+
+    private final ImageStorageService imageStorageService;
 
     @Transactional
     public ItemCreateResponse createItem(Long currentUserId, ItemCreateRequest request) {
@@ -339,5 +343,10 @@ public class ItemService {
                         result.getTogetherCount()
                 ))
                 .toList();
+    }
+
+    @Transactional
+    public String uploadItemImage(MultipartFile image) {
+        return imageStorageService.store(image, "items");
     }
 }
