@@ -11,4 +11,6 @@ public interface ItemHistoryRepository extends JpaRepository<ItemHistory, Long> 
     Page<ItemHistory> findByItemIdOrderByStartedAtDesc(Long itemId, Pageable pageable);
 
     Optional<ItemHistory> findByItemIdAndEndedAtIsNull(Long itemId);
+
+    Optional<ItemHistory> findByIdAndItemId(Long historyId, Long itemId);
 }
