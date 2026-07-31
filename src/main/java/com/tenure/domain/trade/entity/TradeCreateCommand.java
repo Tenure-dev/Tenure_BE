@@ -25,6 +25,7 @@ public record TradeCreateCommand(
         String deliveryAddressLine1,
         String deliveryAddressLine2,
         String deliveryPostalCode,
-        String deliveryRequestNote
+        String deliveryRequestNote,
+        String tradeRequestNote
 ) {
 }

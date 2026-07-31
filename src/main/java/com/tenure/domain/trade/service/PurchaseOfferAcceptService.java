@@ -118,7 +118,8 @@ public class PurchaseOfferAcceptService {
                 offer.getDeliveryAddressLine1(),
                 offer.getDeliveryAddressLine2(),
                 offer.getDeliveryPostalCode(),
-                offer.getDeliveryRequestNote()
+                offer.getDeliveryRequestNote(),
+                offer.getTradeRequestNote()
         );
     }
 
