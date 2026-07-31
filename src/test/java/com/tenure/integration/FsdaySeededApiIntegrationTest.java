@@ -5,6 +5,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -85,12 +86,19 @@ class FsdaySeededApiIntegrationTest {
         assertThat(buyer.userId()).isEqualTo(BUYER_ID);
         assertThat(seller.userId()).isEqualTo(SELLER_ID);
 
+        assertSeedStaticResourceIsServed();
         assertBaseApiSurfaceIsUsable(buyer, seller);
         long createdOotdId = postOotdWithTaggedItemAndVerifyFeedAndMyPage(buyer);
         assertThat(createdOotdId).isPositive();
 
         completeDirectPurchaseFlowAndVerifyItemHistory(buyer, seller);
         createAndCancelPurchaseOfferForExploration(buyer);
+    }
+
+    private void assertSeedStaticResourceIsServed() throws Exception {
+        mockMvc.perform(get("/files/seed/ootd-seller-08.jpg"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.IMAGE_JPEG));
     }
 
     private void assertBaseApiSurfaceIsUsable(Session buyer, Session seller) throws Exception {

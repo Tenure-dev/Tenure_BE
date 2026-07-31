@@ -11,11 +11,12 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 public class WebConfig implements WebMvcConfigurer {
 
     private final StorageProperties storageProperties;
+    private static final String CLASSPATH_FILES_LOCATION = "classpath:/static/files/";
 
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
         String location = Paths.get(storageProperties.baseDir()).toAbsolutePath().toUri().toString();
         registry.addResourceHandler(storageProperties.baseUrl() + "/**")
-                .addResourceLocations(location);
+                .addResourceLocations(location, CLASSPATH_FILES_LOCATION);
     }
 }
