@@ -12,6 +12,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import com.tenure.domain.follow.dto.response.FollowUserResponse;
+import org.springframework.web.bind.annotation.GetMapping;
+import java.util.List;
 
 
 @Tag(name = "Follow", description = "팔로우 API")
@@ -37,5 +40,12 @@ public class FollowController {
         Long currentUserId = currentUserProvider.getCurrentUserId();
         FollowResponse response = followService.unfollow(currentUserId, userId);
         return BaseResponse.success(response, "언팔로우했습니다.");
+    }
+
+    @Operation(summary = "내 팔로잉 목록", description = "내가 팔로우하는 사용자 목록을 조회합니다.")
+    @GetMapping("/me/followings")
+    public BaseResponse<List<FollowUserResponse>> getMyFollowings() {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        return BaseResponse.success(followService.getFollowings(currentUserId, currentUserId));
     }
 }
