@@ -4,14 +4,15 @@ import com.tenure.domain.ootd.entity.Ootd;
 import com.tenure.domain.ootd.enums.OotdPublicationStatus;
 import com.tenure.domain.tag.entity.OotdTag;
 import com.tenure.domain.tag.enums.TagStatus;
-import java.util.Collection;
-import java.util.List;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import org.springframework.data.domain.Pageable;
+
+import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 
 public interface OotdTagRepository extends JpaRepository<OotdTag, Long> {
@@ -243,6 +244,50 @@ public interface OotdTagRepository extends JpaRepository<OotdTag, Long> {
             """)
     List<FrequentlyWornTogetherItemProjection> findFrequentlyWornTogetherItems(
             @Param("itemId") Long itemId,
+            @Param("publicationStatus") OotdPublicationStatus publicationStatus,
+            @Param("tagStatus") TagStatus tagStatus,
+            Pageable pageable
+    );
+
+    // 종료되지 않은 히스토리: startedAt 이후 OOTD 조회
+    @Query("""
+        select distinct ootd
+        from OotdTag tag
+        join tag.ootd ootd
+        where tag.item.id = :itemId
+          and ootd.owner.id = :ownerUserId
+          and tag.status = :tagStatus
+          and ootd.publicationStatus = :publicationStatus
+          and ootd.createdAt >= :startedAt
+        order by ootd.createdAt desc, ootd.id desc
+        """)
+    Page<Ootd> findCurrentItemHistoryOotds(
+            @Param("itemId") Long itemId,
+            @Param("ownerUserId") Long ownerUserId,
+            @Param("startedAt") LocalDateTime startedAt,
+            @Param("publicationStatus") OotdPublicationStatus publicationStatus,
+            @Param("tagStatus") TagStatus tagStatus,
+            Pageable pageable
+    );
+
+    // 종료된 히스토리: startedAt ~ endedAt 사이 OOTD 조회
+    @Query("""
+        select distinct ootd
+        from OotdTag tag
+        join tag.ootd ootd
+        where tag.item.id = :itemId
+          and ootd.owner.id = :ownerUserId
+          and tag.status = :tagStatus
+          and ootd.publicationStatus = :publicationStatus
+          and ootd.createdAt >= :startedAt
+          and ootd.createdAt <= :endedAt
+        order by ootd.createdAt desc, ootd.id desc
+        """)
+    Page<Ootd> findClosedItemHistoryOotds(
+            @Param("itemId") Long itemId,
+            @Param("ownerUserId") Long ownerUserId,
+            @Param("startedAt") LocalDateTime startedAt,
+            @Param("endedAt") LocalDateTime endedAt,
             @Param("publicationStatus") OotdPublicationStatus publicationStatus,
             @Param("tagStatus") TagStatus tagStatus,
             Pageable pageable

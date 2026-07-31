@@ -170,4 +170,25 @@ public class ItemController {
 
         return BaseResponse.success(response, "자주 같이 입은 옷 조회에 성공했습니다.");
     }
+
+    //아이템 히스토리 OOTD 조회(더보기)
+    @Operation(
+            summary = "아이템 히스토리 OOTD 조회",
+            description = "특정 아이템 히스토리 기준으로 해당 소유자가 해당 아이템을 태그한 OOTD 목록을 조회합니다."
+    )
+    @GetMapping("/items/{itemId}/histories/{historyId}/ootds")
+    public BaseResponse<PageResponse<ItemHistoryOotdResponse>> getItemHistoryOotds(
+            @PathVariable Long itemId,
+            @PathVariable Long historyId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        Pageable pageable = PageRequest.of(page, size);
+
+        PageResponse<ItemHistoryOotdResponse> response =
+                itemService.getItemHistoryOotds(currentUserId, itemId, historyId, pageable);
+
+        return BaseResponse.success(response, "아이템 히스토리 OOTD 조회에 성공했습니다.");
+    }
 }
