@@ -40,6 +40,7 @@ public class SecurityConfig {
             "/auth/username/check",
             "/auth/password/reset/**",
             "/images/profile",
+            "/files/**",
             "/health",
             "/ws/**" // SockJS 및 웹소켓 핸드셰이크 허용
     };
