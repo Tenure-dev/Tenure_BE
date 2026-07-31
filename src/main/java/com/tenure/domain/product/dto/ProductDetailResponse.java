@@ -62,6 +62,7 @@ public record ProductDetailResponse(
             Product product,
             ProductViewerMode viewerMode,
             List<ProductAction> availableActions,
+            boolean wished,
             ProductMeasurements measurements,
             ProductConditionFlags conditionFlags,
             List<ProductAttachedOotd> attachedOotds
@@ -71,7 +72,7 @@ public record ProductDetailResponse(
                 viewerMode,
                 availableActions,
                 product.getProductStatus(),
-                ItemSummary.from(product.getItem()),
+                ItemSummary.from(product.getItem(), wished),
                 SellerSummary.from(product.getSeller()),
                 product.getPrice(),
                 product.getShippingFee(),
@@ -113,10 +114,13 @@ public record ProductDetailResponse(
             Integer ootdVerifiedWearCount,
 
             @Schema(description = "위시 수", example = "12")
-            Integer wishCount
+            Integer wishCount,
+
+            @Schema(description = "Current user's wish status", example = "true")
+            boolean wished
     ) {
 
-        static ItemSummary from(Item item) {
+        static ItemSummary from(Item item, boolean wished) {
             Category category = item.getCategory();
             Category parent = category.getParent();
             String categoryLarge = parent == null ? category.getName() : parent.getName();
@@ -130,7 +134,8 @@ public record ProductDetailResponse(
                     categoryLarge,
                     categorySmall,
                     item.getOotdVerifiedWearCount(),
-                    item.getWishCount()
+                    item.getWishCount(),
+                    wished
             );
         }
     }
