@@ -15,6 +15,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
 public interface OotdRepository extends JpaRepository<Ootd, Long> {
 
@@ -451,6 +452,17 @@ public interface OotdRepository extends JpaRepository<Ootd, Long> {
 
     long countByOwner_IdAndPublicationStatus(Long ownerUserId, OotdPublicationStatus publicationStatus);
 
+    // hotScore 갱신 매서드 (스냅샷 배치처리 방식)
+    @Modifying
+    @Query(value = """
+            UPDATE ootds
+            SET hot_score = (COALESCE(save_count, 0) * 3.0 + COALESCE(heart_count, 0) * 2.0 + COALESCE(view_count, 0) * 0.05 + 1.0)
+                            / SQRT(1.0 + EXTRACT(EPOCH FROM (NOW() - created_at)) / 86400.0)
+            WHERE publication_status = 'ACTIVE'
+            """, nativeQuery = true)
+    @Transactional
+    int bulkUpdateHotScores();
+
     // 추천순 — 검색어 있는 경우 (matchScore + hotScore 정렬)
     @Query(value = """
             SELECT sub.id AS id, sub.matchScore AS matchScore, sub.hotScore AS hotScore
@@ -475,9 +487,7 @@ public interface OotdRepository extends JpaRepository<Ootd, Long> {
                              WHEN pc.name IS NOT NULL AND LOWER(pc.name) LIKE '%' || LOWER(:keyword) || '%' THEN 40
                              ELSE 0 END
                     )), 0) AS matchScore,
-                    (COALESCE(o.save_count, 0) * 3.0 + COALESCE(o.heart_count, 0) * 2.0 + COALESCE(o.view_count, 0) * 0.05 + 1.0)
-                    / SQRT(1.0 + EXTRACT(EPOCH FROM (NOW() - o.created_at)) / 86400.0) AS hotScore,
-                    o.created_at AS createdAt
+                    o.hot_score AS hotScore
                 FROM ootds o
                 JOIN users u ON u.id = o.owner_user_id
                 JOIN ootd_tags ot ON ot.ootd_id = o.id AND ot.item_id IS NOT NULL AND ot.status = 'CONFIRMED'
@@ -504,15 +514,13 @@ public interface OotdRepository extends JpaRepository<Ootd, Long> {
                                            WHERE ot2.ootd_id = o.id AND ot2.item_id IS NOT NULL AND ot2.status = 'CONFIRMED'
                                            AND i2.item_status <> 'ON_SALE')
                       ))
-                GROUP BY o.id, o.save_count, o.heart_count, o.view_count, o.created_at
+                GROUP BY o.id
             ) sub
             WHERE sub.matchScore > 0
-              AND (:cursorMatchScore IS NULL
-                   OR sub.matchScore < :cursorMatchScore
-                   OR (sub.matchScore = :cursorMatchScore AND sub.hotScore < :cursorHotScore)
-                   OR (sub.matchScore = :cursorMatchScore AND sub.hotScore = :cursorHotScore AND sub.createdAt < :cursor)
-                   OR (sub.matchScore = :cursorMatchScore AND sub.hotScore = :cursorHotScore AND sub.createdAt = :cursor AND sub.id < :cursorId))
-            ORDER BY sub.matchScore DESC, sub.hotScore DESC, sub.createdAt DESC, sub.id DESC
+              AND (:cursorHotScore IS NULL
+                   OR sub.hotScore < :cursorHotScore
+                   OR (sub.hotScore = :cursorHotScore AND sub.id < :cursorId))
+            ORDER BY sub.matchScore DESC, sub.hotScore DESC, sub.id DESC
             LIMIT :size
             """, nativeQuery = true)
     List<OotdRecommendProjection> searchOotdsByRecommendWithKeyword(
@@ -526,9 +534,7 @@ public interface OotdRepository extends JpaRepository<Ootd, Long> {
             @Param("catIds") List<Long> catIds,
             @Param("itemStatus") String itemStatus,
             @Param("onSaleOnly") boolean onSaleOnly,
-            @Param("cursorMatchScore") Double cursorMatchScore,
             @Param("cursorHotScore") Double cursorHotScore,
-            @Param("cursor") LocalDateTime cursor,
             @Param("cursorId") Long cursorId,
             @Param("size") int size
     );
@@ -539,9 +545,7 @@ public interface OotdRepository extends JpaRepository<Ootd, Long> {
             FROM (
                 SELECT
                     o.id,
-                    (COALESCE(o.save_count, 0) * 3.0 + COALESCE(o.heart_count, 0) * 2.0 + COALESCE(o.view_count, 0) * 0.05 + 1.0)
-                    / SQRT(1.0 + EXTRACT(EPOCH FROM (NOW() - o.created_at)) / 86400.0) AS hotScore,
-                    o.created_at AS createdAt
+                    o.hot_score AS hotScore
                 FROM ootds o
                 JOIN users u ON u.id = o.owner_user_id
                 WHERE o.publication_status = 'ACTIVE'
@@ -573,9 +577,8 @@ public interface OotdRepository extends JpaRepository<Ootd, Long> {
             ) sub
             WHERE (:cursorHotScore IS NULL
                    OR sub.hotScore < :cursorHotScore
-                   OR (sub.hotScore = :cursorHotScore AND sub.createdAt < :cursor)
-                   OR (sub.hotScore = :cursorHotScore AND sub.createdAt = :cursor AND sub.id < :cursorId))
-            ORDER BY sub.hotScore DESC, sub.createdAt DESC, sub.id DESC
+                   OR (sub.hotScore = :cursorHotScore AND sub.id < :cursorId))
+            ORDER BY sub.hotScore DESC, sub.id DESC
             LIMIT :size
             """, nativeQuery = true)
     List<OotdRecommendProjection> searchOotdsByRecommendFilterOnly(
@@ -589,7 +592,6 @@ public interface OotdRepository extends JpaRepository<Ootd, Long> {
             @Param("itemStatus") String itemStatus,
             @Param("onSaleOnly") boolean onSaleOnly,
             @Param("cursorHotScore") Double cursorHotScore,
-            @Param("cursor") LocalDateTime cursor,
             @Param("cursorId") Long cursorId,
             @Param("size") int size
     );

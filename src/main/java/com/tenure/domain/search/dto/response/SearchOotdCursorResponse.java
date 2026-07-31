@@ -1,7 +1,6 @@
 package com.tenure.domain.search.dto.response;
 
 import com.tenure.domain.ootd.entity.Ootd;
-import com.tenure.domain.ootd.repository.OotdRecommendProjection;
 import com.tenure.domain.search.enums.SearchSortType;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -20,10 +19,9 @@ public class SearchOotdCursorResponse {
     private LocalDateTime nextCursorCreatedAt;
     private Integer nextCursorValue;
     private Long nextCursorId;
+    private Double nextCursorHotScore;
     private boolean hasNext;
     private Long count;
-    private Double nextCursorMatchScore;  // RECOMMEND + 검색어 있을 때
-    private Double nextCursorHotScore;    // RECOMMEND일 때
 
     public static SearchOotdCursorResponse from(Slice<Ootd> slice, SearchSortType sort,
                                                         Long count, Set<Long> heartedOotdIds, Set<Long> saveOotdIds) {
@@ -51,24 +49,21 @@ public class SearchOotdCursorResponse {
                 .toList();
 
         return new SearchOotdCursorResponse(content, nextCursorCreatedAt,
-                nextCursorValue, nextCursorId, hasNext, count, null, null);
+                nextCursorValue, nextCursorId, null, hasNext, count);
     }
 
     // RECOMMEND 전용 팩토리
     public static SearchOotdCursorResponse fromRecommend(
-            List<Ootd> ootds, List<OotdRecommendProjection> projections,
-            boolean hasNext, Long count,
+            List<Ootd> ootds, boolean hasNext, Long count,
             Set<Long> heartedOotdIds, Set<Long> saveOotdIds) {
 
-        Long nextCursorId = null;
-        Double nextCursorMatchScore = null;
         Double nextCursorHotScore = null;
+        Long nextCursorId = null;
 
-        if (hasNext && !projections.isEmpty()) {
-            OotdRecommendProjection last = projections.get(projections.size() - 1);
-            nextCursorId = last.getId();
-            nextCursorMatchScore = last.getMatchScore();
+        if (hasNext && !ootds.isEmpty()) {
+            Ootd last = ootds.get(ootds.size() - 1);
             nextCursorHotScore = last.getHotScore();
+            nextCursorId = last.getId();
         }
 
         List<SearchOotdResponse> content = ootds.stream()
@@ -76,8 +71,7 @@ public class SearchOotdCursorResponse {
                 .toList();
 
         return new SearchOotdCursorResponse(
-                content, null, null, nextCursorId, hasNext, count,
-                nextCursorMatchScore, nextCursorHotScore
+                content, null, null, nextCursorId, nextCursorHotScore, hasNext, count
         );
     }
 

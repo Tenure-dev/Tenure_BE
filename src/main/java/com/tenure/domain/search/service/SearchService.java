@@ -156,8 +156,7 @@ public class SearchService {
             Integer weightMin, Integer weightMax,
             List<Long> categoryIds, ItemStatusFilter itemStatusFilter, SearchSortType sort,
             LocalDateTime cursor, Long cursorId,
-            Integer cursorValue,
-            Double cursorMatchScore, Double cursorHotScore,
+            Integer cursorValue, Double cursorHotScore,
             int size
     ) {
 
@@ -197,7 +196,7 @@ public class SearchService {
                     currentUserId, keyword, gender,
                     heightMin, heightMax, weightMin, weightMax,
                     categoryIds, itemStatus, onSaleOnly,
-                    cursorMatchScore, cursorHotScore, cursor, cursorId, size);
+                    cursorHotScore, cursorId, size);
         }
 
         Slice<Ootd> ootds;
@@ -534,7 +533,7 @@ public class SearchService {
             Long currentUserId, String keyword, UserGender gender,
             Integer heightMin, Integer heightMax, Integer weightMin, Integer weightMax,
             List<Long> categoryIds, ItemStatus itemStatus, boolean onSaleOnly,
-            Double cursorMatchScore, Double cursorHotScore, LocalDateTime cursor, Long cursorId,
+            Double cursorHotScore, Long cursorId,
             int size) {
 
         // 키워드가 있는지
@@ -556,21 +555,18 @@ public class SearchService {
             rawProjections = ootdRepository.searchOotdsByRecommendWithKeyword(
                     keyword, genderStr, heightMin, heightMax, weightMin, weightMax,
                     hasCat, catIds, itemStatusStr, onSaleOnly,
-                    cursorMatchScore, cursorHotScore, cursor, cursorId, size + 1);
-        } else { // 필터만 있는 경우 - 인기·최신성 점수(hotScore) 기준으로만 빠르게 정렬합니다.
+                    cursorHotScore, cursorId, size + 1);
+        } else { // 필터만 있는 경우 - 인기·최신성 점수(hotScore) 기준으로만 빠르게 정렬.
             rawProjections = ootdRepository.searchOotdsByRecommendFilterOnly(
                     genderStr, heightMin, heightMax, weightMin, weightMax,
                     hasCat, catIds, itemStatusStr, onSaleOnly,
-                    cursorHotScore, cursor, cursorId, size + 1);
+                    cursorHotScore, cursorId, size + 1);
         }
 
         boolean hasNext = rawProjections.size() > size;
 
-        List<OotdRecommendProjection> projections = hasNext
-                ? rawProjections.subList(0, size) : rawProjections;
-
-        // 게시글 id만 추출
-        List<Long> ids = projections.stream().map(OotdRecommendProjection::getId).toList();
+        List<Long> ids = (hasNext ? rawProjections.subList(0, size) : rawProjections)
+                .stream().map(OotdRecommendProjection::getId).toList();
 
         // 게시글 Id를 기반으로 실제 Ootd 엔티티 fetch (정렬 순서 유지)
         Map<Long, Ootd> ootdMap = ids.isEmpty() ? Collections.emptyMap() :
@@ -597,8 +593,8 @@ public class SearchService {
         }
 
         log.debug("[RECOMMEND 검색] 조회 {}건, hasNext={}", ootds.size(), hasNext);
-        return SearchOotdCursorResponse.fromRecommend(
-                ootds, projections, hasNext, count, heartedOotdIds, saveOotdIds);
+        return SearchOotdCursorResponse
+                .fromRecommend(ootds, hasNext, count, heartedOotdIds, saveOotdIds);
     }
 
     private Set<Long> buildExcludeIds(List<Ootd> result, Long sourceOotdId) {
