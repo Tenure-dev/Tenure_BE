@@ -137,6 +137,9 @@ public class Trade extends BaseTimeEntity {
     @Column(name = "delivery_request_note", length = 300)
     private String deliveryRequestNote;
 
+    @Column(name = "trade_request_note", length = 500)
+    private String tradeRequestNote;
+
     public static Trade create(TradeCreateCommand command) {
         Trade trade = new Trade();
         trade.sourceType = command.sourceType();
@@ -160,6 +163,7 @@ public class Trade extends BaseTimeEntity {
         trade.deliveryAddressLine2 = command.deliveryAddressLine2();
         trade.deliveryPostalCode = command.deliveryPostalCode();
         trade.deliveryRequestNote = command.deliveryRequestNote();
+        trade.tradeRequestNote = command.tradeRequestNote();
         return trade;
     }
 }
