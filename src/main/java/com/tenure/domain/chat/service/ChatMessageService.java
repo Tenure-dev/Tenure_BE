@@ -117,7 +117,7 @@ public class ChatMessageService {
         SimpUser user = simpUserRegistry.getUser(receiver.getId().toString());
         boolean isOnline = isOnline(chatRoomId, user);
 
-        // 채팅방 접속중이 아닐경우 안읽음 카운트 + 1;
+        // 상대방이 채팅방 접속중이 아닐경우 안읽음 카운트 + 1;
         if(!isOnline) {
             receiverMember.incrementUnRead();
         } else {
@@ -145,7 +145,7 @@ public class ChatMessageService {
                     Notification chatNotification = notificationFactory
                             .chatMessage(receiver, sender, chatRoom, item, lastMessage);
 
-                    notificationService.save(chatNotification);
+                    notificationService.updateChatNotification(chatNotification);
                 }
             }
         });

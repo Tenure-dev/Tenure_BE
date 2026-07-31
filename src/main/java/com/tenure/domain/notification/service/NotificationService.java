@@ -13,6 +13,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -105,5 +106,25 @@ public class NotificationService {
         //안읽은 게시물 모두 읽음 처리
         int count = notificationRepository.markAllRead(currentUserId, LocalDateTime.now());
         log.debug("[알림 모두 읽기 처리 완료] 총 {}건", count);
+    }
+
+    // 채팅 전송 기존 알림이 있다면 현재 알림으로 업데이트, 없다면 생성
+    // afterCommit() 내에서 호출되므로 REQUIRES_NEW로 새 트랜잭션 강제 생성
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void updateChatNotification(Notification notification) {
+
+        log.info("[채팅 알림 업데이트]");
+
+        if(notification == null) {
+            log.warn("[채팅 알림 업데이트] Notification을 찾을 수 없습니다. ");
+            throw new CustomException(NotificationErrorCode.NOTIFICATION_NOT_FOUND);
+        }
+
+        notificationRepository.findByReceiverIdAndTargetIdAndType(
+                notification.getReceiver().getId(), notification.getTargetId(), notification.getType())
+                .ifPresentOrElse(
+                        present -> present.update(notification.getBody()),
+                        () -> save(notification)
+                );
     }
 }
