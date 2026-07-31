@@ -99,6 +99,8 @@ public class SearchController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime cursor,
             @RequestParam(required = false) Long cursorId,
             @RequestParam(required = false) Integer cursorValue,
+            @RequestParam(required = false) Double cursorMatchScore,
+            @RequestParam(required = false) Double cursorHotScore,
             @RequestParam(defaultValue = "20") int size)
     {
         log.info("[OOTD 검색 api 호출] keyword = {}, sort = {}", keyword, sort);
@@ -107,7 +109,7 @@ public class SearchController {
                 .searchOotds(currentUserProvider.getCurrentUserId(),
                         keyword, gender, heightMin, heightMax,
                         weightMin, weightMax, categoryIds, itemStatusFilter, sort,
-                        cursor, cursorId, cursorValue, size);
+                        cursor, cursorId, cursorValue, cursorMatchScore, cursorHotScore, size);
 
         return BaseResponse.success(searchOotdCursorResponse);
     }

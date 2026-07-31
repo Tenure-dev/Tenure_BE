@@ -450,4 +450,147 @@ public interface OotdRepository extends JpaRepository<Ootd, Long> {
     );
 
     long countByOwner_IdAndPublicationStatus(Long ownerUserId, OotdPublicationStatus publicationStatus);
+
+    // 추천순 — 검색어 있는 경우 (matchScore + hotScore 정렬)
+    @Query(value = """
+            SELECT sub.id AS id, sub.matchScore AS matchScore, sub.hotScore AS hotScore
+            FROM (
+                SELECT
+                    o.id,
+                    COALESCE(MAX(GREATEST(
+                        CASE WHEN LOWER(i.item_name) = LOWER(:keyword) THEN 115
+                             WHEN LOWER(i.item_name) LIKE LOWER(:keyword) || '%' THEN 85
+                             WHEN LOWER(i.item_name) LIKE '%' || LOWER(:keyword) || '%' THEN 55
+                             ELSE 0 END,
+                        CASE WHEN LOWER(i.brand_name) = LOWER(:keyword) THEN 110
+                             WHEN LOWER(i.brand_name) LIKE LOWER(:keyword) || '%' THEN 80
+                             WHEN LOWER(i.brand_name) LIKE '%' || LOWER(:keyword) || '%' THEN 50
+                             ELSE 0 END,
+                        CASE WHEN c.name IS NOT NULL AND LOWER(c.name) = LOWER(:keyword) THEN 105
+                             WHEN c.name IS NOT NULL AND LOWER(c.name) LIKE LOWER(:keyword) || '%' THEN 75
+                             WHEN c.name IS NOT NULL AND LOWER(c.name) LIKE '%' || LOWER(:keyword) || '%' THEN 45
+                             ELSE 0 END,
+                        CASE WHEN pc.name IS NOT NULL AND LOWER(pc.name) = LOWER(:keyword) THEN 100
+                             WHEN pc.name IS NOT NULL AND LOWER(pc.name) LIKE LOWER(:keyword) || '%' THEN 70
+                             WHEN pc.name IS NOT NULL AND LOWER(pc.name) LIKE '%' || LOWER(:keyword) || '%' THEN 40
+                             ELSE 0 END
+                    )), 0) AS matchScore,
+                    (COALESCE(o.save_count, 0) * 3.0 + COALESCE(o.heart_count, 0) * 2.0 + COALESCE(o.view_count, 0) * 0.05 + 1.0)
+                    / SQRT(1.0 + EXTRACT(EPOCH FROM (NOW() - o.created_at)) / 86400.0) AS hotScore,
+                    o.created_at AS createdAt
+                FROM ootds o
+                JOIN users u ON u.id = o.owner_user_id
+                JOIN ootd_tags ot ON ot.ootd_id = o.id AND ot.item_id IS NOT NULL AND ot.status = 'CONFIRMED'
+                JOIN items i ON i.id = ot.item_id
+                LEFT JOIN categories c ON c.id = i.category_id
+                LEFT JOIN categories pc ON pc.id = c.parent_id
+                WHERE o.publication_status = 'ACTIVE'
+                  AND (:gender IS NULL OR u.gender = :gender)
+                  AND (:heightMin IS NULL OR u.height_cm >= :heightMin)
+                  AND (:heightMax IS NULL OR u.height_cm <= :heightMax)
+                  AND (:weightMin IS NULL OR u.weight_kg >= :weightMin)
+                  AND (:weightMax IS NULL OR u.weight_kg <= :weightMax)
+                  AND (:hasCat = false OR i.category_id IN (:catIds) OR c.parent_id IN (:catIds))
+                  AND (:itemStatus IS NULL OR EXISTS (
+                           SELECT 1 FROM ootd_tags ot2 JOIN items i2 ON i2.id = ot2.item_id
+                           WHERE ot2.ootd_id = o.id AND ot2.item_id IS NOT NULL AND ot2.status = 'CONFIRMED'
+                           AND i2.item_status = :itemStatus
+                      ))
+                  AND (:onSaleOnly = false OR (
+                           EXISTS (SELECT 1 FROM ootd_tags ot2 JOIN items i2 ON i2.id = ot2.item_id
+                                   WHERE ot2.ootd_id = o.id AND ot2.item_id IS NOT NULL AND ot2.status = 'CONFIRMED'
+                                   AND i2.item_status = 'ON_SALE')
+                           AND NOT EXISTS (SELECT 1 FROM ootd_tags ot2 JOIN items i2 ON i2.id = ot2.item_id
+                                           WHERE ot2.ootd_id = o.id AND ot2.item_id IS NOT NULL AND ot2.status = 'CONFIRMED'
+                                           AND i2.item_status <> 'ON_SALE')
+                      ))
+                GROUP BY o.id, o.save_count, o.heart_count, o.view_count, o.created_at
+            ) sub
+            WHERE sub.matchScore > 0
+              AND (:cursorMatchScore IS NULL
+                   OR sub.matchScore < :cursorMatchScore
+                   OR (sub.matchScore = :cursorMatchScore AND sub.hotScore < :cursorHotScore)
+                   OR (sub.matchScore = :cursorMatchScore AND sub.hotScore = :cursorHotScore AND sub.createdAt < :cursor)
+                   OR (sub.matchScore = :cursorMatchScore AND sub.hotScore = :cursorHotScore AND sub.createdAt = :cursor AND sub.id < :cursorId))
+            ORDER BY sub.matchScore DESC, sub.hotScore DESC, sub.createdAt DESC, sub.id DESC
+            LIMIT :size
+            """, nativeQuery = true)
+    List<OotdRecommendProjection> searchOotdsByRecommendWithKeyword(
+            @Param("keyword") String keyword,
+            @Param("gender") String gender,
+            @Param("heightMin") Integer heightMin,
+            @Param("heightMax") Integer heightMax,
+            @Param("weightMin") Integer weightMin,
+            @Param("weightMax") Integer weightMax,
+            @Param("hasCat") boolean hasCat,
+            @Param("catIds") List<Long> catIds,
+            @Param("itemStatus") String itemStatus,
+            @Param("onSaleOnly") boolean onSaleOnly,
+            @Param("cursorMatchScore") Double cursorMatchScore,
+            @Param("cursorHotScore") Double cursorHotScore,
+            @Param("cursor") LocalDateTime cursor,
+            @Param("cursorId") Long cursorId,
+            @Param("size") int size
+    );
+
+    // 추천순 — 필터만 있는 경우 (hotScore 정렬, matchScore 계산 없음)
+    @Query(value = """
+            SELECT sub.id AS id, CAST(0 AS DOUBLE PRECISION) AS matchScore, sub.hotScore AS hotScore
+            FROM (
+                SELECT
+                    o.id,
+                    (COALESCE(o.save_count, 0) * 3.0 + COALESCE(o.heart_count, 0) * 2.0 + COALESCE(o.view_count, 0) * 0.05 + 1.0)
+                    / SQRT(1.0 + EXTRACT(EPOCH FROM (NOW() - o.created_at)) / 86400.0) AS hotScore,
+                    o.created_at AS createdAt
+                FROM ootds o
+                JOIN users u ON u.id = o.owner_user_id
+                WHERE o.publication_status = 'ACTIVE'
+                  AND EXISTS (SELECT 1 FROM ootd_tags ot WHERE ot.ootd_id = o.id AND ot.item_id IS NOT NULL AND ot.status = 'CONFIRMED')
+                  AND (:gender IS NULL OR u.gender = :gender)
+                  AND (:heightMin IS NULL OR u.height_cm >= :heightMin)
+                  AND (:heightMax IS NULL OR u.height_cm <= :heightMax)
+                  AND (:weightMin IS NULL OR u.weight_kg >= :weightMin)
+                  AND (:weightMax IS NULL OR u.weight_kg <= :weightMax)
+                  AND (:hasCat = false OR EXISTS (
+                           SELECT 1 FROM ootd_tags ot JOIN items i ON i.id = ot.item_id
+                           LEFT JOIN categories c ON c.id = i.category_id
+                           WHERE ot.ootd_id = o.id AND ot.item_id IS NOT NULL AND ot.status = 'CONFIRMED'
+                           AND (i.category_id IN (:catIds) OR c.parent_id IN (:catIds))
+                      ))
+                  AND (:itemStatus IS NULL OR EXISTS (
+                           SELECT 1 FROM ootd_tags ot2 JOIN items i2 ON i2.id = ot2.item_id
+                           WHERE ot2.ootd_id = o.id AND ot2.item_id IS NOT NULL AND ot2.status = 'CONFIRMED'
+                           AND i2.item_status = :itemStatus
+                      ))
+                  AND (:onSaleOnly = false OR (
+                           EXISTS (SELECT 1 FROM ootd_tags ot2 JOIN items i2 ON i2.id = ot2.item_id
+                                   WHERE ot2.ootd_id = o.id AND ot2.item_id IS NOT NULL AND ot2.status = 'CONFIRMED'
+                                   AND i2.item_status = 'ON_SALE')
+                           AND NOT EXISTS (SELECT 1 FROM ootd_tags ot2 JOIN items i2 ON i2.id = ot2.item_id
+                                           WHERE ot2.ootd_id = o.id AND ot2.item_id IS NOT NULL AND ot2.status = 'CONFIRMED'
+                                           AND i2.item_status <> 'ON_SALE')
+                      ))
+            ) sub
+            WHERE (:cursorHotScore IS NULL
+                   OR sub.hotScore < :cursorHotScore
+                   OR (sub.hotScore = :cursorHotScore AND sub.createdAt < :cursor)
+                   OR (sub.hotScore = :cursorHotScore AND sub.createdAt = :cursor AND sub.id < :cursorId))
+            ORDER BY sub.hotScore DESC, sub.createdAt DESC, sub.id DESC
+            LIMIT :size
+            """, nativeQuery = true)
+    List<OotdRecommendProjection> searchOotdsByRecommendFilterOnly(
+            @Param("gender") String gender,
+            @Param("heightMin") Integer heightMin,
+            @Param("heightMax") Integer heightMax,
+            @Param("weightMin") Integer weightMin,
+            @Param("weightMax") Integer weightMax,
+            @Param("hasCat") boolean hasCat,
+            @Param("catIds") List<Long> catIds,
+            @Param("itemStatus") String itemStatus,
+            @Param("onSaleOnly") boolean onSaleOnly,
+            @Param("cursorHotScore") Double cursorHotScore,
+            @Param("cursor") LocalDateTime cursor,
+            @Param("cursorId") Long cursorId,
+            @Param("size") int size
+    );
 }
