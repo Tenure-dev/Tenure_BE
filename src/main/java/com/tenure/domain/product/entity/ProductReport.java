@@ -64,4 +64,21 @@ public class ProductReport {
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
     }
+
+    public static ProductReport create(
+            User reporter,
+            User seller,
+            Product product,
+            ProductReportReason reasonType,
+            String reasonDetail
+    ) {
+        ProductReport report = new ProductReport();
+        report.reporter = reporter;
+        report.seller = seller;
+        report.product = product;
+        report.reasonType = reasonType;
+        report.reasonDetail = reasonDetail;
+        report.status = ReportStatus.RECEIVED;
+        return report;
+    }
 }

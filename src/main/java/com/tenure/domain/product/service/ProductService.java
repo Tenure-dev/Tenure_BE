@@ -32,13 +32,17 @@ import com.tenure.domain.product.dto.ProductExternalCompleteResponse;
 import com.tenure.domain.product.dto.ProductMeasurements;
 import com.tenure.domain.product.dto.ProductUpdateRequest;
 import com.tenure.domain.product.dto.ProductUpdateResponse;
+import com.tenure.domain.product.dto.ProductReportCreateRequest;
+import com.tenure.domain.product.dto.ProductReportCreateResponse;
 import com.tenure.domain.product.entity.Product;
 import com.tenure.domain.product.entity.ProductAttachedOotd;
+import com.tenure.domain.product.entity.ProductReport;
 import com.tenure.domain.product.enums.ProductAction;
 import com.tenure.domain.product.enums.ProductStatus;
 import com.tenure.domain.product.enums.ProductViewerMode;
 import com.tenure.domain.product.exception.ProductErrorCode;
 import com.tenure.domain.product.repository.ProductAttachedOotdRepository;
+import com.tenure.domain.product.repository.ProductReportRepository;
 import com.tenure.domain.product.repository.ProductRepository;
 import com.tenure.domain.purchase.entity.PurchaseIntent;
 import com.tenure.domain.purchase.entity.PurchaseOffer;
@@ -51,6 +55,8 @@ import com.tenure.domain.tag.repository.OotdTagRepository;
 import com.tenure.domain.user.entity.User;
 import com.tenure.domain.user.enums.AccountVisibility;
 import com.tenure.domain.user.enums.UserGrade;
+import com.tenure.domain.user.exception.UserErrorCode;
+import com.tenure.domain.user.repository.UserRepository;
 import com.tenure.domain.wish.repository.WishRepository;
 import com.tenure.global.exception.CommonErrorCode;
 import com.tenure.global.exception.CustomException;
@@ -88,6 +94,8 @@ public class ProductService {
     private final NotificationFactory notificationFactory;
     private final NotificationService notificationService;
     private final ObjectMapper objectMapper;
+    private final UserRepository userRepository;
+    private final ProductReportRepository productReportRepository;
 
     @Transactional
     public ProductCreateResponse createProduct(Long itemId, Long currentUserId, ProductCreateRequest request) {
@@ -685,5 +693,35 @@ public class ProductService {
         } catch (IOException | IllegalArgumentException e) {
             throw new CustomException(ProductErrorCode.PRODUCT_DETAIL_DATA_INVALID);
         }
+    }
+
+    // 상품 신고
+    @Transactional
+    public ProductReportCreateResponse reportProduct(Long currentUserId, Long productId, ProductReportCreateRequest request) {
+
+        // 1) 신고 대상 상품 존재 확인
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new CustomException(ProductErrorCode.PRODUCT_NOT_FOUND));
+
+        // 2) 본인이 판매하는 상품은 신고 불가
+        if (product.getSeller().getId().equals(currentUserId)) {
+            throw new CustomException(ProductErrorCode.CANNOT_REPORT_OWN_PRODUCT);
+        }
+
+        // 3) 같은 신고자 + 같은 상품 중복 신고 확인
+        productReportRepository.findByReporter_IdAndProduct_Id(currentUserId, productId)
+                .ifPresent(existing -> {
+                    throw new CustomException(ProductErrorCode.PRODUCT_ALREADY_REPORTED, existing.getId());
+                });
+
+        // 4) 신고 저장
+        User reporter = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new CustomException(UserErrorCode.USER_NOT_FOUND));
+        ProductReport report = ProductReport.create(
+                reporter, product.getSeller(), product, request.reasonType(), request.reasonDetail()
+        );
+        ProductReport saved = productReportRepository.save(report);
+
+        return ProductReportCreateResponse.from(saved);
     }
 }

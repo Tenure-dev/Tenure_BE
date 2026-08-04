@@ -5,6 +5,8 @@ import com.tenure.domain.product.dto.ProductCreateResponse;
 import com.tenure.domain.product.dto.ProductDeleteResponse;
 import com.tenure.domain.product.dto.ProductDetailResponse;
 import com.tenure.domain.product.dto.ProductExternalCompleteResponse;
+import com.tenure.domain.product.dto.ProductReportCreateRequest;
+import com.tenure.domain.product.dto.ProductReportCreateResponse;
 import com.tenure.domain.product.dto.ProductUpdateRequest;
 import com.tenure.domain.product.dto.ProductUpdateResponse;
 import com.tenure.domain.product.service.ProductService;
@@ -119,5 +121,16 @@ public class ProductController {
         Long currentUserId = currentUserProvider.getCurrentUserId();
         ProductDeleteResponse response = productService.deleteProduct(productId, currentUserId);
         return BaseResponse.success(response, "판매 게시를 삭제했습니다.");
+    }
+
+    @Operation(summary = "상품 신고", description = "판매 상품을 신고하는 API")
+    @PostMapping("/products/{productId}/reports")
+    public BaseResponse<ProductReportCreateResponse> reportProduct(
+            @PathVariable Long productId,
+            @Valid @RequestBody ProductReportCreateRequest request
+    ) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        ProductReportCreateResponse response = productService.reportProduct(currentUserId, productId, request);
+        return BaseResponse.success(response, "신고가 접수되었습니다.");
     }
 }
