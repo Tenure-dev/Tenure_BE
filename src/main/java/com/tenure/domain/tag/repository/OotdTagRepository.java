@@ -292,4 +292,23 @@ public interface OotdTagRepository extends JpaRepository<OotdTag, Long> {
             @Param("tagStatus") TagStatus tagStatus,
             Pageable pageable
     );
+
+        // 판매 전환 대표 OOTD 후보 조회
+    @Query("""
+            select distinct ootd
+            from OotdTag tag
+            join tag.ootd ootd
+            where tag.item.id = :itemId
+              and ootd.owner.id = :ownerUserId
+              and tag.status = :tagStatus
+              and ootd.publicationStatus = :publicationStatus
+            order by ootd.createdAt desc, ootd.id desc
+            """)
+    Page<Ootd> findItemOotdCandidates(
+            @Param("itemId") Long itemId,
+            @Param("ownerUserId") Long ownerUserId,
+            @Param("tagStatus") TagStatus tagStatus,
+            @Param("publicationStatus") OotdPublicationStatus publicationStatus,
+            Pageable pageable
+    );
 }

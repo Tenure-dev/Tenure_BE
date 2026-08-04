@@ -206,4 +206,27 @@ public class ItemController {
         String imageUrl = itemService.uploadItemImage(image);
         return BaseResponse.success(new ItemImageUploadResponse(imageUrl));
     }
+
+    // 판매 전환 대표 OOTD 후보 조회
+    @Operation(
+            summary = "판매 전환 대표 OOTD 후보 조회",
+            description = "판매 전환 시 대표 OOTD로 선택할 수 있도록 해당 아이템이 태그된 OOTD 목록을 조회합니다."
+    )
+    @GetMapping("/items/{itemId}/ootds")
+    public BaseResponse<PageResponse<ItemOotdCandidateResponse>> getItemOotdCandidates(
+            @PathVariable Long itemId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        Pageable pageable = PageRequest.of(page, size);
+
+        PageResponse<ItemOotdCandidateResponse> response = itemService.getItemOotdCandidates(
+                currentUserId,
+                itemId,
+                pageable
+        );
+
+        return BaseResponse.success(response, "판매 전환 대표 OOTD 후보 조회에 성공했습니다.");
+    }
 }
