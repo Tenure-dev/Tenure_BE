@@ -99,6 +99,7 @@ public class SearchController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime cursor,
             @RequestParam(required = false) Long cursorId,
             @RequestParam(required = false) Integer cursorValue,
+            @RequestParam(required = false) Double cursorHotScore,
             @RequestParam(defaultValue = "20") int size)
     {
         log.info("[OOTD 검색 api 호출] keyword = {}, sort = {}", keyword, sort);
@@ -107,10 +108,20 @@ public class SearchController {
                 .searchOotds(currentUserProvider.getCurrentUserId(),
                         keyword, gender, heightMin, heightMax,
                         weightMin, weightMax, categoryIds, itemStatusFilter, sort,
-                        cursor, cursorId, cursorValue, size);
+                        cursor, cursorId, cursorValue, cursorHotScore, size);
 
         return BaseResponse.success(searchOotdCursorResponse);
     }
+
+    @Operation(summary = "검색어 자동완성", description = "입력 중인 키워드로 시작하는 인기 검색어 최대 5개 반환")
+    @GetMapping("/suggestions")
+    public BaseResponse<List<String>> getSuggestionKeywords(
+            @RequestParam(required = false, defaultValue = "") String keyword
+    ) {
+        List<String> suggestionKeywords = searchService.suggestionKeywords(keyword);
+        return BaseResponse.success(suggestionKeywords);
+    }
+
 
     @Operation(
             summary = "최근 본 OOTD 저장",

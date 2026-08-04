@@ -42,6 +42,9 @@ public record PurchaseOfferDetailResponse(
         Amounts amounts,
         Delivery delivery,
 
+        @Schema(description = "거래 요청사항", example = "상품 상태가 사진과 동일하다면 바로 거래 진행하고 싶어요. 확인 후 답변 부탁드립니다.")
+        String tradeRequestNote,
+
         @Schema(description = "배송지 노출 상태", example = "VISIBLE")
         DeliveryDisclosureStatus deliveryDisclosureStatus,
 
@@ -72,6 +75,7 @@ public record PurchaseOfferDetailResponse(
                 UserSummary.from(offer.getOwner()),
                 Amounts.from(offer, viewerRole),
                 deliveryVisible ? Delivery.from(offer) : null,
+                offer.getTradeRequestNote(),
                 deliveryVisible ? DeliveryDisclosureStatus.VISIBLE : DeliveryDisclosureStatus.AFTER_ACCEPTANCE,
                 offer.getPaymentMethodId()
         );

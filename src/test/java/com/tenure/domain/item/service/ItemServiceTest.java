@@ -42,6 +42,8 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.test.util.ReflectionTestUtils;
+import com.tenure.domain.tag.repository.OotdTagRepository;
+import com.tenure.global.storage.ImageStorageService;
 
 @ExtendWith(MockitoExtension.class)
 class ItemServiceTest {
@@ -67,13 +69,17 @@ class ItemServiceTest {
     @Mock
     private ItemHistoryRepository itemHistoryRepository;
 
+    @Mock
+    private ImageStorageService imageStorageService;
+
     private ItemService itemService;
 
     @BeforeEach
     void setUp() {
         itemService = new ItemService(
-                ootdTagRepository, productRepository, itemRepository,
-                categoryRepository, userRepository, itemHistoryRepository
+                 productRepository, itemRepository,
+                categoryRepository, userRepository, itemHistoryRepository,
+                ootdTagRepository,imageStorageService
         );
     }
 

@@ -80,7 +80,8 @@ public class UserService {
         }
 
         // 2) 이메일 인증 완료 여부 검증
-        if (!verificationStore.isVerified(request.email())) {
+        //    (app.email-verification-enabled=false 이면 시연 기간 임시로 건너뜀)
+        if (emailVerificationEnabled && !verificationStore.isVerified(request.email())) {
             throw new CustomException(UserErrorCode.EMAIL_NOT_VERIFIED);
         }
 
@@ -119,8 +120,10 @@ public class UserService {
         );
         addressRepository.save(address);
 
-        // 7) 인증 정보 정리 (가입 완료됐으므로 저장소에서 제거)
-        verificationStore.remove(request.email());
+        // 7) 인증 정보 정리 (이메일 인증을 사용한 경우에만)
+        if (emailVerificationEnabled) {
+            verificationStore.remove(request.email());
+        }
 
         log.info("회원가입 완료: userId={}, email={}", savedUser.getId(), savedUser.getEmail());
         return SignupResponse.from(savedUser);
@@ -360,7 +363,7 @@ public class UserService {
         }
 
         // 2) 신고 대상 사용자 존재 확인
-        User reported = userRepository.findById(targetUserId)
+        User reported = userRepository.findById(targetUserId)/
             .orElseThrow(() -> new CustomException(UserErrorCode.USER_NOT_FOUND));
 
         // 3) 같은 신고자 + 같은 대상 중복 신고 확인
@@ -379,4 +382,6 @@ public class UserService {
         return UserReportCreateResponse.from(saved);
     }
 
+    @org.springframework.beans.factory.annotation.Value("${app.email-verification-enabled:true}")
+    private boolean emailVerificationEnabled;
 }

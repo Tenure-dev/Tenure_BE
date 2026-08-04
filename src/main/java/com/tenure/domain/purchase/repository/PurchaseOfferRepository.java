@@ -74,6 +74,21 @@ public interface PurchaseOfferRepository extends JpaRepository<PurchaseOffer, Lo
             Pageable pageable
     );
 
+    @Query("""
+            select offer
+            from PurchaseOffer offer
+            join fetch offer.item item
+            join fetch offer.owner owner
+            where offer.proposer.id = :proposerUserId
+              and offer.status in :statuses
+            order by offer.createdAt desc, offer.id desc
+            """)
+    List<PurchaseOffer> findSentListByProposerFirstPage(
+            @Param("proposerUserId") Long proposerUserId,
+            @Param("statuses") Collection<PurchaseOfferStatus> statuses,
+            Pageable pageable
+    );
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             select offer
@@ -133,6 +148,21 @@ public interface PurchaseOfferRepository extends JpaRepository<PurchaseOffer, Lo
             @Param("statuses") Collection<PurchaseOfferStatus> statuses,
             @Param("cursorCreatedAt") LocalDateTime cursorCreatedAt,
             @Param("cursorOfferId") Long cursorOfferId,
+            Pageable pageable
+    );
+
+    @Query("""
+            select offer
+            from PurchaseOffer offer
+            join fetch offer.item item
+            join fetch offer.proposer proposer
+            where offer.owner.id = :ownerUserId
+              and offer.status in :statuses
+            order by offer.createdAt desc, offer.id desc
+            """)
+    List<PurchaseOffer> findReceivedListByOwnerFirstPage(
+            @Param("ownerUserId") Long ownerUserId,
+            @Param("statuses") Collection<PurchaseOfferStatus> statuses,
             Pageable pageable
     );
 

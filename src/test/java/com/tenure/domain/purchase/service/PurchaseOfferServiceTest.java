@@ -3,6 +3,7 @@ package com.tenure.domain.purchase.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.tenure.domain.address.entity.DeliveryAddress;
@@ -14,6 +15,8 @@ import com.tenure.domain.item.repository.ItemRepository;
 import com.tenure.domain.notification.service.NotificationFactory;
 import com.tenure.domain.notification.service.NotificationService;
 import com.tenure.domain.purchase.dto.PurchaseOfferCancelResponse;
+import com.tenure.domain.purchase.dto.PurchaseOfferCreateRequest;
+import com.tenure.domain.purchase.dto.PurchaseOfferCreateResponse;
 import com.tenure.domain.purchase.entity.PurchaseOffer;
 import com.tenure.domain.purchase.enums.PurchaseOfferStatus;
 import com.tenure.domain.purchase.exception.PurchaseOfferErrorCode;
@@ -30,6 +33,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -77,6 +81,40 @@ class PurchaseOfferServiceTest {
                 notificationFactory,
                 notificationService
         );
+    }
+
+    @Test
+    void createPurchaseOffer_savesTradeRequestNote() {
+        User owner = user(OWNER_ID);
+        User proposer = user(PROPOSER_ID);
+        Item item = item(ITEM_ID, owner);
+        DeliveryAddress address = address(proposer);
+        PurchaseOfferCreateRequest request = new PurchaseOfferCreateRequest(
+                360000,
+                ADDRESS_ID,
+                "MOCK_CARD",
+                "상품 상태가 사진과 동일하다면 바로 거래 진행하고 싶어요.",
+                true
+        );
+
+        when(itemRepository.findByIdForUpdate(ITEM_ID)).thenReturn(Optional.of(item));
+        when(userRepository.findById(PROPOSER_ID)).thenReturn(Optional.of(proposer));
+        when(purchaseOfferRepository.findByItemIdAndProposerIdForUpdate(ITEM_ID, PROPOSER_ID))
+                .thenReturn(Optional.empty());
+        when(deliveryAddressRepository.findByIdAndUser_Id(ADDRESS_ID, PROPOSER_ID))
+                .thenReturn(Optional.of(address));
+
+        PurchaseOfferCreateResponse response = purchaseOfferService.createPurchaseOffer(
+                ITEM_ID,
+                PROPOSER_ID,
+                request
+        );
+
+        ArgumentCaptor<PurchaseOffer> offerCaptor = ArgumentCaptor.forClass(PurchaseOffer.class);
+        verify(purchaseOfferRepository).save(offerCaptor.capture());
+        PurchaseOffer savedOffer = offerCaptor.getValue();
+        assertThat(savedOffer.getTradeRequestNote()).isEqualTo(request.tradeRequestNote());
+        assertThat(response.status()).isEqualTo(PurchaseOfferStatus.SENT);
     }
 
     @Test
@@ -208,6 +246,7 @@ class PurchaseOfferServiceTest {
                 365000,
                 "mock_offer_auth_existing",
                 "MOCK_CARD",
+                "상품 상태가 사진과 동일하다면 바로 거래 진행하고 싶어요.",
                 expiresAt
         );
         ReflectionTestUtils.setField(offer, "id", id);

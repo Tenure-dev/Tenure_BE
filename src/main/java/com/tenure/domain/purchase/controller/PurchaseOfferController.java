@@ -55,6 +55,7 @@ public class PurchaseOfferController {
                                               "offerPrice": 360000,
                                               "deliveryAddressId": 1,
                                               "paymentMethodId": "MOCK_CARD",
+                                              "tradeRequestNote": "상품 상태가 사진과 동일하다면 바로 거래 진행하고 싶어요. 확인 후 답변 부탁드립니다.",
                                               "agreement": true
                                             }
                                             """

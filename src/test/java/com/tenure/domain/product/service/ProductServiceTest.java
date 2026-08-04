@@ -302,6 +302,7 @@ class ProductServiceTest {
                 200L,
                 OotdPublicationStatus.ACTIVE
         )).thenReturn(List.of());
+        when(wishRepository.existsByUserIdAndItemId(999L, ITEM_ID)).thenReturn(true);
 
         ProductDetailResponse response = productService.getProductDetail(200L, 999L);
 
@@ -312,6 +313,7 @@ class ProductServiceTest {
                 ProductAction.SHARE,
                 ProductAction.REPORT
         );
+        assertThat(response.item().wished()).isTrue();
     }
 
     @Test

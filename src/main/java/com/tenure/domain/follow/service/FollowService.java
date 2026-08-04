@@ -14,6 +14,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.tenure.domain.follow.dto.response.FollowUserResponse;
+import com.tenure.domain.follow.entity.FollowRelationship;
+import com.tenure.domain.user.entity.User;
+import com.tenure.domain.user.exception.UserErrorCode;
+import java.util.List;
+
+
 
 /**
  * 팔로우 관련 비즈니스 로직.
@@ -79,5 +86,51 @@ public class FollowService {
         // 갱신된 팔로워 수와 함께 응답
         long followerCount = followRepository.countByFollowing_IdAndStatus(targetUserId, FollowStatus.ACCEPTED);
         return new FollowResponse(targetUserId, false, followerCount);
+    }
+
+    /**
+     * 특정 유저의 팔로잉 목록 조회 (그 유저가 팔로우하는 사람들).
+     * 각 항목에는 현재 로그인 유저가 그 사람을 팔로우 중인지도 표시한다.
+     */
+    @Transactional(readOnly = true)
+    public List<FollowUserResponse> getFollowings(Long currentUserId, Long targetUserId) {
+        // 대상 유저 존재 확인
+        if (!userRepository.existsById(targetUserId)) {
+            throw new CustomException(UserErrorCode.USER_NOT_FOUND);
+        }
+
+        // 대상 유저가 팔로우하는 관계들
+        List<FollowRelationship> followings = followRepository.findFollowingsByUserId(targetUserId);
+
+        // 각 항목마다 "현재 로그인 유저가 이 사람을 팔로우 중인지" 계산
+        return followings.stream()
+                .map(fr -> {
+                    User followingUser = fr.getFollowing();
+                    boolean iFollow = followRepository.existsByFollower_IdAndFollowing_IdAndStatus(
+                            currentUserId, followingUser.getId(), FollowStatus.ACCEPTED);
+                    return FollowUserResponse.of(followingUser, iFollow);
+                })
+                .toList();
+    }
+
+    /**
+     * 특정 유저의 팔로워 목록 조회 (그 유저를 팔로우하는 사람들).
+     */
+    @Transactional(readOnly = true)
+    public List<FollowUserResponse> getFollowers(Long currentUserId, Long targetUserId) {
+        if (!userRepository.existsById(targetUserId)) {
+            throw new CustomException(UserErrorCode.USER_NOT_FOUND);
+        }
+
+        List<FollowRelationship> followers = followRepository.findFollowersByUserId(targetUserId);
+
+        return followers.stream()
+                .map(fr -> {
+                    User followerUser = fr.getFollower();
+                    boolean iFollow = followRepository.existsByFollower_IdAndFollowing_IdAndStatus(
+                            currentUserId, followerUser.getId(), FollowStatus.ACCEPTED);
+                    return FollowUserResponse.of(followerUser, iFollow);
+                })
+                .toList();
     }
 }

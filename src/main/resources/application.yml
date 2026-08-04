@@ -54,6 +54,7 @@ server:
 app:
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173}
+  email-verification-enabled: ${APP_EMAIL_VERIFICATION_ENABLED:true}
 
 tenure:
   storage:
@@ -64,6 +65,9 @@ tenure:
     auto-confirm:
       interval-minutes: 10
       confirm-hours: 72
+  ootd:
+    hot-score:
+      interval-minutes: 10
   ai:
     gemini:
       api-key: ${GEMINI_API_KEY:}

@@ -104,6 +104,9 @@ public class PurchaseOffer extends BaseTimeEntity {
     @Column(name = "delivery_request_note", length = 300)
     private String deliveryRequestNote;
 
+    @Column(name = "trade_request_note", length = 500)
+    private String tradeRequestNote;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private PurchaseOfferStatus status = PurchaseOfferStatus.SENT;
@@ -124,6 +127,7 @@ public class PurchaseOffer extends BaseTimeEntity {
             Integer ownerSettlementAmount,
             String paymentAuthorizationId,
             String paymentMethodId,
+            String tradeRequestNote,
             LocalDateTime expiresAt
     ) {
         PurchaseOffer offer = new PurchaseOffer();
@@ -146,6 +150,7 @@ public class PurchaseOffer extends BaseTimeEntity {
         offer.deliveryAddressLine2 = deliveryAddress.getAddressLine2();
         offer.deliveryPostalCode = deliveryAddress.getPostalCode();
         offer.deliveryRequestNote = deliveryAddress.getRequestNote();
+        offer.tradeRequestNote = tradeRequestNote;
         offer.status = PurchaseOfferStatus.SENT;
         offer.expiresAt = expiresAt;
         return offer;

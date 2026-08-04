@@ -128,6 +128,22 @@ public interface PurchaseIntentRepository extends JpaRepository<PurchaseIntent, 
             from PurchaseIntent intent
             join fetch intent.product product
             join fetch product.item item
+            join fetch intent.seller seller
+            where intent.buyer.id = :buyerUserId
+              and intent.status in :statuses
+            order by intent.createdAt desc, intent.id desc
+            """)
+    List<PurchaseIntent> findSentListByBuyerFirstPage(
+            @Param("buyerUserId") Long buyerUserId,
+            @Param("statuses") Collection<PurchaseIntentStatus> statuses,
+            Pageable pageable
+    );
+
+    @Query("""
+            select intent
+            from PurchaseIntent intent
+            join fetch intent.product product
+            join fetch product.item item
             join fetch intent.buyer buyer
             where intent.seller.id = :sellerUserId
               and intent.status in :statuses
@@ -143,6 +159,22 @@ public interface PurchaseIntentRepository extends JpaRepository<PurchaseIntent, 
             @Param("statuses") Collection<PurchaseIntentStatus> statuses,
             @Param("cursorCreatedAt") LocalDateTime cursorCreatedAt,
             @Param("cursorIntentId") Long cursorIntentId,
+            Pageable pageable
+    );
+
+    @Query("""
+            select intent
+            from PurchaseIntent intent
+            join fetch intent.product product
+            join fetch product.item item
+            join fetch intent.buyer buyer
+            where intent.seller.id = :sellerUserId
+              and intent.status in :statuses
+            order by intent.createdAt desc, intent.id desc
+            """)
+    List<PurchaseIntent> findReceivedListBySellerFirstPage(
+            @Param("sellerUserId") Long sellerUserId,
+            @Param("statuses") Collection<PurchaseIntentStatus> statuses,
             Pageable pageable
     );
 

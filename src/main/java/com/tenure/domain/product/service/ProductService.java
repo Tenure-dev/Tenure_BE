@@ -160,6 +160,11 @@ public class ProductService {
         validateHiddenProduct(product, viewerMode);
         validateProductVisibility(seller, currentUserId, viewerMode);
 
+        boolean wished = wishRepository.existsByUserIdAndItemId(
+                currentUserId,
+                product.getItem().getId()
+        );
+
         List<ProductAttachedOotd> representativeOotds =
                 productAttachedOotdRepository.findActiveByProductIdOrderByOotdCreatedAtDesc(
                         product.getId(),
@@ -170,6 +175,7 @@ public class ProductService {
                 product,
                 viewerMode,
                 resolveAvailableActions(viewerMode, product.getProductStatus()),
+                wished,
                 readMeasurementsOrEmpty(product.getMeasurements()),
                 readConditionFlagsOrEmpty(product.getConditionFlags()),
                 representativeOotds

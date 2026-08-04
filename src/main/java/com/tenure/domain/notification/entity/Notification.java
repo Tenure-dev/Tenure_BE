@@ -71,7 +71,7 @@ public class Notification {
     @Column(name = "sender_username", length = 50)
     private String senderUsername;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
+    @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
     @PrePersist
@@ -103,5 +103,12 @@ public class Notification {
         if(this.readAt == null) {
             this.readAt = LocalDateTime.now();
         }
+    }
+
+    // 업데이트 매서드
+    public void update(String body) {
+        this.body = body;
+        this.createdAt = LocalDateTime.now();
+        this.readAt = null; // 새로운 메시지 이므로 다시 null
     }
 }
