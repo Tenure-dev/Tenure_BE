@@ -42,6 +42,7 @@ public record PurchaseOfferReceivedListResponse(
         return value.atZone(SEOUL_ZONE).toOffsetDateTime();
     }
 
+    @Schema(name = "PurchaseOfferReceivedCursor")
     public record Cursor(
             @Schema(description = "Next page createdAt cursor", example = "2026-07-12T10:00:00+09:00")
             OffsetDateTime cursorCreatedAt,
@@ -51,6 +52,7 @@ public record PurchaseOfferReceivedListResponse(
     ) {
     }
 
+    @Schema(name = "PurchaseOfferReceivedItem")
     public record Item(
             Long offerId,
             PurchaseOfferStatus status,
