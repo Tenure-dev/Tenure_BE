@@ -14,6 +14,8 @@ public enum UserErrorCode implements ErrorCode {
     CANNOT_BLOCK_SELF("USER_400", "자기 자신은 차단할 수 없습니다.", HttpStatus.BAD_REQUEST),
     ALREADY_BLOCKED("USER_409", "이미 차단한 사용자입니다.", HttpStatus.CONFLICT),
     BLOCK_NOT_FOUND("USER_404", "차단 관계를 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
+    CANNOT_REPORT_SELF("USER_400", "자기 자신은 신고할 수 없습니다.", HttpStatus.BAD_REQUEST),
+    ALREADY_REPORTED("USER_409", "이미 접수된 신고입니다.", HttpStatus.CONFLICT),
 
     // 회원가입, 인증 관련 추가
     EMAIL_ALREADY_EXISTS("USER_1001", "이미 존재하는 이메일입니다.", HttpStatus.CONFLICT),
