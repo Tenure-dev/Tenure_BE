@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -169,5 +170,63 @@ public class ItemController {
                 itemService.getFrequentlyWornTogetherItems(currentUserId, itemId);
 
         return BaseResponse.success(response, "자주 같이 입은 옷 조회에 성공했습니다.");
+    }
+
+    //아이템 히스토리 OOTD 조회(더보기)
+    @Operation(
+            summary = "아이템 히스토리 OOTD 조회",
+            description = "특정 아이템 히스토리 기준으로 해당 소유자가 해당 아이템을 태그한 OOTD 목록을 조회합니다."
+    )
+    @GetMapping("/items/{itemId}/histories/{historyId}/ootds")
+    public BaseResponse<PageResponse<ItemHistoryOotdResponse>> getItemHistoryOotds(
+            @PathVariable Long itemId,
+            @PathVariable Long historyId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        Pageable pageable = PageRequest.of(page, size);
+
+        PageResponse<ItemHistoryOotdResponse> response =
+                itemService.getItemHistoryOotds(currentUserId, itemId, historyId, pageable);
+
+        return BaseResponse.success(response, "아이템 히스토리 OOTD 조회에 성공했습니다.");
+    }
+
+    //아이템 이미지 업로드
+    @Operation(
+            summary = "아이템 이미지 업로드",
+            description = "아이템 대표 이미지를 업로드하고 저장된 URL을 반환합니다. "
+                    + "반환된 URL을 아이템 등록/수정의 representativeImageUrl에 사용합니다."
+    )
+    @PostMapping(value = "/images/items", consumes = "multipart/form-data")
+    public BaseResponse<ItemImageUploadResponse> uploadItemImage(
+            @RequestPart("image") MultipartFile image
+    ) {
+        String imageUrl = itemService.uploadItemImage(image);
+        return BaseResponse.success(new ItemImageUploadResponse(imageUrl));
+    }
+
+    // 판매 전환 대표 OOTD 후보 조회
+    @Operation(
+            summary = "판매 전환 대표 OOTD 후보 조회",
+            description = "판매 전환 시 대표 OOTD로 선택할 수 있도록 해당 아이템이 태그된 OOTD 목록을 조회합니다."
+    )
+    @GetMapping("/items/{itemId}/ootds")
+    public BaseResponse<PageResponse<ItemOotdCandidateResponse>> getItemOotdCandidates(
+            @PathVariable Long itemId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        Pageable pageable = PageRequest.of(page, size);
+
+        PageResponse<ItemOotdCandidateResponse> response = itemService.getItemOotdCandidates(
+                currentUserId,
+                itemId,
+                pageable
+        );
+
+        return BaseResponse.success(response, "판매 전환 대표 OOTD 후보 조회에 성공했습니다.");
     }
 }

@@ -131,13 +131,20 @@ public class PurchaseIntentService {
         expireSentIntentsForBuyer(currentUserId, now);
 
         List<PurchaseIntentStatus> normalizedStatuses = normalizeStatuses(statuses);
-        List<PurchaseIntent> fetched = purchaseIntentRepository.findSentListByBuyerWithCursor(
-                currentUserId,
-                normalizedStatuses,
-                cursorCreatedAt == null ? null : cursorCreatedAt.toLocalDateTime(),
-                cursorIntentId,
-                PageRequest.of(0, pageSize + 1)
-        );
+        PageRequest pageRequest = PageRequest.of(0, pageSize + 1);
+        List<PurchaseIntent> fetched = cursorCreatedAt == null
+                ? purchaseIntentRepository.findSentListByBuyerFirstPage(
+                        currentUserId,
+                        normalizedStatuses,
+                        pageRequest
+                )
+                : purchaseIntentRepository.findSentListByBuyerWithCursor(
+                        currentUserId,
+                        normalizedStatuses,
+                        cursorCreatedAt.toLocalDateTime(),
+                        cursorIntentId,
+                        pageRequest
+                );
         boolean hasNext = fetched.size() > pageSize;
         List<PurchaseIntent> pageItems = hasNext ? fetched.subList(0, pageSize) : fetched;
         Map<Long, Long> tradeIdByIntentId = findTradeIds(pageItems);
@@ -158,13 +165,20 @@ public class PurchaseIntentService {
         expireSentIntentsForSeller(currentUserId, now);
 
         List<PurchaseIntentStatus> normalizedStatuses = normalizeStatuses(statuses);
-        List<PurchaseIntent> fetched = purchaseIntentRepository.findReceivedListBySellerWithCursor(
-                currentUserId,
-                normalizedStatuses,
-                cursorCreatedAt == null ? null : cursorCreatedAt.toLocalDateTime(),
-                cursorIntentId,
-                PageRequest.of(0, pageSize + 1)
-        );
+        PageRequest pageRequest = PageRequest.of(0, pageSize + 1);
+        List<PurchaseIntent> fetched = cursorCreatedAt == null
+                ? purchaseIntentRepository.findReceivedListBySellerFirstPage(
+                        currentUserId,
+                        normalizedStatuses,
+                        pageRequest
+                )
+                : purchaseIntentRepository.findReceivedListBySellerWithCursor(
+                        currentUserId,
+                        normalizedStatuses,
+                        cursorCreatedAt.toLocalDateTime(),
+                        cursorIntentId,
+                        pageRequest
+                );
         boolean hasNext = fetched.size() > pageSize;
         List<PurchaseIntent> pageItems = hasNext ? fetched.subList(0, pageSize) : fetched;
         Map<Long, Long> tradeIdByIntentId = findTradeIds(pageItems);

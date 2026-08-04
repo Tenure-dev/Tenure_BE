@@ -90,6 +90,9 @@ public record TradeDetailResponse(
         @Schema(description = "배송 요청사항", example = "문 앞에 놓아주세요")
         String deliveryRequestNote,
 
+        @Schema(description = "거래 요청사항", example = "상품 상태가 사진과 동일하다면 바로 거래 진행하고 싶어요. 확인 후 답변 부탁드립니다.")
+        String tradeRequestNote,
+
         @Schema(description = "발송 시각", example = "2026-07-11T09:00:00")
         LocalDateTime shippedAt,
 
@@ -145,6 +148,7 @@ public record TradeDetailResponse(
                 trade.getDeliveryAddressLine2(),
                 trade.getDeliveryPostalCode(),
                 trade.getDeliveryRequestNote(),
+                trade.getTradeRequestNote(),
                 trade.getShippedAt(),
                 trade.getDeliveredAt(),
                 trade.getConfirmedAt(),

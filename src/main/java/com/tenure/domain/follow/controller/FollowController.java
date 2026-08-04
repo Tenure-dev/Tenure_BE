@@ -12,6 +12,10 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import com.tenure.domain.follow.dto.response.FollowUserResponse;
+import org.springframework.web.bind.annotation.GetMapping;
+import java.util.List;
+import org.springframework.web.bind.annotation.PathVariable;
 
 
 @Tag(name = "Follow", description = "팔로우 API")
@@ -37,5 +41,33 @@ public class FollowController {
         Long currentUserId = currentUserProvider.getCurrentUserId();
         FollowResponse response = followService.unfollow(currentUserId, userId);
         return BaseResponse.success(response, "언팔로우했습니다.");
+    }
+
+    @Operation(summary = "내 팔로잉 목록", description = "내가 팔로우하는 사용자 목록을 조회합니다.")
+    @GetMapping("/me/followings")
+    public BaseResponse<List<FollowUserResponse>> getMyFollowings() {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        return BaseResponse.success(followService.getFollowings(currentUserId, currentUserId));
+    }
+
+    @Operation(summary = "특정 유저 팔로잉 목록", description = "특정 사용자가 팔로우하는 목록을 조회합니다.")
+    @GetMapping("/{userId}/followings")
+    public BaseResponse<List<FollowUserResponse>> getUserFollowings(@PathVariable Long userId) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        return BaseResponse.success(followService.getFollowings(currentUserId, userId));
+    }
+
+    @Operation(summary = "내 팔로워 목록", description = "나를 팔로우하는 사용자 목록을 조회합니다.")
+    @GetMapping("/me/followers")
+    public BaseResponse<List<FollowUserResponse>> getMyFollowers() {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        return BaseResponse.success(followService.getFollowers(currentUserId, currentUserId));
+    }
+
+    @Operation(summary = "특정 유저 팔로워 목록", description = "특정 사용자를 팔로우하는 목록을 조회합니다.")
+    @GetMapping("/{userId}/followers")
+    public BaseResponse<List<FollowUserResponse>> getUserFollowers(@PathVariable Long userId) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        return BaseResponse.success(followService.getFollowers(currentUserId, userId));
     }
 }

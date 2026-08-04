@@ -15,6 +15,9 @@ import com.tenure.domain.chat.repository.ChatRoomRepository;
 import com.tenure.domain.item.entity.Item;
 import com.tenure.domain.item.exception.ItemErrorCode;
 import com.tenure.domain.item.repository.ItemRepository;
+import com.tenure.domain.notification.entity.Notification;
+import com.tenure.domain.notification.enums.NotificationType;
+import com.tenure.domain.notification.repository.NotificationRepository;
 import com.tenure.domain.product.entity.Product;
 import com.tenure.domain.product.exception.ProductErrorCode;
 import com.tenure.domain.product.repository.ProductRepository;
@@ -67,6 +70,7 @@ public class ChatRoomService {
     private final PurchaseOfferRepository purchaseOfferRepository;
     private final ImageStorageService localImageStoreService;
     private final SimpMessagingTemplate simpMessagingTemplate;
+    private final NotificationRepository notificationRepository;
 
     // 채팅 이미지 전송시 허용되는 형식
     private static final List<String> ALLOWED_IMAGE_TYPES = List.of(
@@ -184,6 +188,7 @@ public class ChatRoomService {
     }
 
     //채팅방 목록에서 채팅방 접속
+    @Transactional
     public ChatRoomResponse enterChatroom(Long currentUserId, Long chatRoomId) {
 
         log.info("[채팅방 진입] currentUserId = {}, chatRoomId = {}", currentUserId, chatRoomId);
@@ -233,6 +238,10 @@ public class ChatRoomService {
         boolean isOpponentExited = chatRoomMemberRepository.findByUserIdAndChatRoomId(opponentId, chatRoomId)
                 .map(ChatRoomMember::isExited)
                 .orElse(false);
+
+        // 채팅방 접속 시 앓림이 있다면 읽음 처리, 아니면 넘어감
+        notificationRepository.findByReceiverIdAndTargetIdAndType(currentUserId, chatRoomId, NotificationType.CHAT_MESSAGE_CREATED)
+                .ifPresent(Notification::markRead);
 
         return ChatRoomResponse
                 .from(chatRoom, item, product, currentUserId, tradeId, hasPurchaseIntent, hasPurchaseOffer, isBlocked, isOpponentExited);
