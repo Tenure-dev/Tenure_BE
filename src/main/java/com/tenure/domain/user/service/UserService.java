@@ -363,7 +363,7 @@ public class UserService {
         }
 
         // 2) 신고 대상 사용자 존재 확인
-        User reported = userRepository.findById(targetUserId)/
+        User reported = userRepository.findById(targetUserId)
             .orElseThrow(() -> new CustomException(UserErrorCode.USER_NOT_FOUND));
 
         // 3) 같은 신고자 + 같은 대상 중복 신고 확인
