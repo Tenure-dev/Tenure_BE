@@ -4,11 +4,15 @@ import com.tenure.domain.item.entity.Item;
 import com.tenure.domain.item.enums.ItemStatus;
 import com.tenure.domain.item.repository.ItemRepository;
 import com.tenure.domain.ootd.ai.AiTagResult;
+import com.tenure.domain.ootd.ai.AiTagService;
+import com.tenure.domain.ootd.ai.RegionAnalysisResult;
 import com.tenure.domain.ootd.entity.Ootd;
 import com.tenure.domain.ootd.enums.OotdPublicationStatus;
 import com.tenure.domain.ootd.repository.OotdRepository;
+import com.tenure.domain.tag.dto.request.OotdTagAnalyzeRequest;
 import com.tenure.domain.tag.dto.request.OotdTagBatchRequest;
 import com.tenure.domain.tag.dto.request.OotdTagCreateRequest;
+import com.tenure.domain.tag.dto.response.OotdTagAnalyzeResponse;
 import com.tenure.domain.tag.dto.response.OotdTagBatchResponse;
 import com.tenure.domain.tag.dto.response.OotdTagResponse;
 import com.tenure.domain.tag.dto.request.OotdTagUpdateRequest;
@@ -52,6 +56,7 @@ public class OotdTagService {
     private final ItemRepository itemRepository;
     private final OotdTagRepository ootdTagRepository;
     private final AiTagProperties aiTagProperties;
+    private final AiTagService aiTagService;
 
     @Transactional
     public void saveAiTags(Long ootdId, List<AiTagResult> results) {
@@ -70,9 +75,9 @@ public class OotdTagService {
         );
 
         List<OotdTag> tags = results.stream()
-                .filter(this::meetsConfidenceThreshold)
+                .filter(result -> meetsConfidenceThreshold(result.confidence()))
                 .filter(this::hasValidBbox)
-                .map(result -> findMatchingItem(ownedItems, result)
+                .map(result -> findMatchingItem(ownedItems, result.labelText(), result.categorySmall())
                         .map(item -> OotdTag.createAiTag(
                                 ootd,
                                 item,
@@ -92,28 +97,59 @@ public class OotdTagService {
         log.info("AI 태그 저장 완료 - ootdId={}, 저장된 태그 수={}/{} (보유 아이템 매칭 실패분 제외)", ootdId, tags.size(), results.size());
     }
 
+    @Transactional(readOnly = true)
+    public OotdTagAnalyzeResponse analyzeTagArea(Long ootdId, Long currentUserId, OotdTagAnalyzeRequest request) {
+        Ootd ootd = ootdRepository.findById(ootdId)
+                .orElseThrow(() -> new CustomException(TagErrorCode.OOTD_NOT_FOUND));
+        validateOwner(ootd, currentUserId);
+
+        RegionAnalysisResult result = aiTagService.analyzeRegion(
+                ootd.getImageUrl(),
+                request.bbox().x(),
+                request.bbox().y(),
+                request.bbox().width(),
+                request.bbox().height()
+        );
+
+        if (result.labelText() == null || result.labelText().isBlank()) {
+            return OotdTagAnalyzeResponse.of(null, null, null, null);
+        }
+
+        Long matchedItemId = null;
+        if (meetsConfidenceThreshold(result.confidence())) {
+            List<Item> ownedItems = itemRepository.findByOwner_IdAndItemStatusOrderByCreatedAtDesc(
+                    currentUserId, ItemStatus.OWNED
+            );
+            matchedItemId = findMatchingItem(ownedItems, result.labelText(), result.categorySmall())
+                    .map(Item::getId)
+                    .orElse(null);
+        }
+
+        return OotdTagAnalyzeResponse.of(result.labelText(), result.categoryLarge(), result.categorySmall(), matchedItemId);
+    }
+
     // 보유 아이템 중 카테고리가 일치하고, 라벨/브랜드명이 겹치는 것만 매칭으로 인정한다.
     // 카테고리만 같고 텍스트가 전혀 안 겹치면 잘못된 아이템에 연결될 위험이 있어 매칭 실패로 처리한다.
-    private Optional<Item> findMatchingItem(List<Item> ownedItems, AiTagResult result) {
+    private Optional<Item> findMatchingItem(List<Item> ownedItems, String labelText, String categorySmall) {
         List<Item> categoryMatches = ownedItems.stream()
-                .filter(item -> matchesCategory(item, result))
+                .filter(item -> matchesCategory(item, categorySmall))
                 .toList();
         if (categoryMatches.isEmpty()) {
             return Optional.empty();
         }
         return categoryMatches.stream()
-                .filter(item -> matchesLabel(item, result))
+                .filter(item -> matchesLabel(item, labelText))
                 .findFirst();
     }
 
-    private boolean matchesCategory(Item item, AiTagResult result) {
-        return result.categorySmall() != null
+    private boolean matchesCategory(Item item, String categorySmall) {
+        return categorySmall != null
                 && item.getCategory() != null
-                && result.categorySmall().equalsIgnoreCase(item.getCategory().getName());
+                && categorySmall.equalsIgnoreCase(item.getCategory().getName());
     }
 
-    private boolean matchesLabel(Item item, AiTagResult result) {
-        String normalizedLabel = normalize(result.labelText());
+    private boolean matchesLabel(Item item, String labelText) {
+        String normalizedLabel = normalize(labelText);
         if (normalizedLabel.isEmpty()) {
             return false;
         }
@@ -319,9 +355,9 @@ public class OotdTagService {
         return BigDecimal.valueOf(MOCK_RANDOM.nextDouble(0.85, 0.99)).setScale(4, RoundingMode.HALF_UP);
     }
 
-    private boolean meetsConfidenceThreshold(AiTagResult result) {
-        return result.confidence() != null
-                && result.confidence().compareTo(aiTagProperties.confidenceThreshold()) >= 0;
+    private boolean meetsConfidenceThreshold(BigDecimal confidence) {
+        return confidence != null
+                && confidence.compareTo(aiTagProperties.confidenceThreshold()) >= 0;
     }
 
     private boolean hasValidBbox(AiTagResult result) {

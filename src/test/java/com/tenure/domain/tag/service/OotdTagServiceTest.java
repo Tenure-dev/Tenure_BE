@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -13,13 +14,17 @@ import com.tenure.domain.item.entity.Item;
 import com.tenure.domain.item.enums.ItemStatus;
 import com.tenure.domain.item.repository.ItemRepository;
 import com.tenure.domain.ootd.ai.AiTagResult;
+import com.tenure.domain.ootd.ai.AiTagService;
+import com.tenure.domain.ootd.ai.RegionAnalysisResult;
 import com.tenure.domain.ootd.entity.Ootd;
 import com.tenure.domain.ootd.enums.OotdPublicationStatus;
 import com.tenure.domain.ootd.enums.OotdTagStatus;
 import com.tenure.domain.ootd.repository.OotdRepository;
+import com.tenure.domain.tag.dto.request.OotdTagAnalyzeRequest;
 import com.tenure.domain.tag.dto.request.OotdTagBatchRequest;
 import com.tenure.domain.tag.dto.request.OotdTagCreateRequest;
 import com.tenure.domain.tag.dto.request.OotdTagCreateRequest.BboxRequest;
+import com.tenure.domain.tag.dto.response.OotdTagAnalyzeResponse;
 import com.tenure.domain.tag.dto.response.OotdTagBatchResponse;
 import com.tenure.domain.tag.dto.response.OotdTagResponse;
 import com.tenure.domain.tag.dto.request.OotdTagUpdateRequest;
@@ -62,12 +67,15 @@ class OotdTagServiceTest {
     @Mock
     private OotdTagRepository ootdTagRepository;
 
+    @Mock
+    private AiTagService aiTagService;
+
     private OotdTagService ootdTagService;
 
     @BeforeEach
     void setUp() {
         AiTagProperties aiTagProperties = new AiTagProperties(BigDecimal.valueOf(0.6));
-        ootdTagService = new OotdTagService(ootdRepository, itemRepository, ootdTagRepository, aiTagProperties);
+        ootdTagService = new OotdTagService(ootdRepository, itemRepository, ootdTagRepository, aiTagProperties, aiTagService);
     }
 
     @Test
@@ -666,6 +674,126 @@ class OotdTagServiceTest {
         ootdTagService.saveAiTags(OOTD_ID, List.of(aiTagResult("블루종 자켓", "아우터", BigDecimal.valueOf(0.9))));
 
         verify(ootdTagRepository, never()).saveAll(anyList());
+    }
+
+    @Test
+    void analyzeTagArea_returnsMatchedItemWhenConfidentAndMatching() {
+        User owner = user(OWNER_ID);
+        Ootd ootd = ootd(OOTD_ID, owner);
+        Item jacket = itemWithCategory(30L, "아우터", "Uniqlo", "블루종 자켓");
+
+        when(ootdRepository.findById(OOTD_ID)).thenReturn(Optional.of(ootd));
+        when(aiTagService.analyzeRegion(
+                eq(ootd.getImageUrl()),
+                any(BigDecimal.class),
+                any(BigDecimal.class),
+                any(BigDecimal.class),
+                any(BigDecimal.class)
+        )).thenReturn(new RegionAnalysisResult("블루종 자켓", "아우터", "아우터", BigDecimal.valueOf(0.9)));
+        when(itemRepository.findByOwner_IdAndItemStatusOrderByCreatedAtDesc(OWNER_ID, ItemStatus.OWNED))
+                .thenReturn(List.of(jacket));
+
+        OotdTagAnalyzeResponse response = ootdTagService.analyzeTagArea(OOTD_ID, OWNER_ID, analyzeRequest());
+
+        assertThat(response.labelText()).isEqualTo("블루종 자켓");
+        assertThat(response.categoryLarge()).isEqualTo("아우터");
+        assertThat(response.matchedItemId()).isEqualTo(30L);
+    }
+
+    @Test
+    void analyzeTagArea_returnsNullMatchedItemWhenNoOwnedItemMatches() {
+        User owner = user(OWNER_ID);
+        Ootd ootd = ootd(OOTD_ID, owner);
+
+        when(ootdRepository.findById(OOTD_ID)).thenReturn(Optional.of(ootd));
+        when(aiTagService.analyzeRegion(
+                eq(ootd.getImageUrl()),
+                any(BigDecimal.class),
+                any(BigDecimal.class),
+                any(BigDecimal.class),
+                any(BigDecimal.class)
+        )).thenReturn(new RegionAnalysisResult("블루종 자켓", "아우터", "아우터", BigDecimal.valueOf(0.9)));
+        when(itemRepository.findByOwner_IdAndItemStatusOrderByCreatedAtDesc(OWNER_ID, ItemStatus.OWNED))
+                .thenReturn(List.of());
+
+        OotdTagAnalyzeResponse response = ootdTagService.analyzeTagArea(OOTD_ID, OWNER_ID, analyzeRequest());
+
+        assertThat(response.labelText()).isEqualTo("블루종 자켓");
+        assertThat(response.matchedItemId()).isNull();
+    }
+
+    @Test
+    void analyzeTagArea_returnsNullMatchedItemWhenBelowConfidenceThreshold() {
+        User owner = user(OWNER_ID);
+        Ootd ootd = ootd(OOTD_ID, owner);
+        Item jacket = itemWithCategory(30L, "아우터", "Uniqlo", "블루종 자켓");
+
+        when(ootdRepository.findById(OOTD_ID)).thenReturn(Optional.of(ootd));
+        when(aiTagService.analyzeRegion(
+                eq(ootd.getImageUrl()),
+                any(BigDecimal.class),
+                any(BigDecimal.class),
+                any(BigDecimal.class),
+                any(BigDecimal.class)
+        )).thenReturn(new RegionAnalysisResult("블루종 자켓", "아우터", "아우터", BigDecimal.valueOf(0.2)));
+
+        OotdTagAnalyzeResponse response = ootdTagService.analyzeTagArea(OOTD_ID, OWNER_ID, analyzeRequest());
+
+        assertThat(response.labelText()).isEqualTo("블루종 자켓");
+        assertThat(response.matchedItemId()).isNull();
+        verify(itemRepository, never()).findByOwner_IdAndItemStatusOrderByCreatedAtDesc(any(), any());
+    }
+
+    @Test
+    void analyzeTagArea_returnsAllNullWhenItemNotIdentified() {
+        User owner = user(OWNER_ID);
+        Ootd ootd = ootd(OOTD_ID, owner);
+
+        when(ootdRepository.findById(OOTD_ID)).thenReturn(Optional.of(ootd));
+        when(aiTagService.analyzeRegion(
+                eq(ootd.getImageUrl()),
+                any(BigDecimal.class),
+                any(BigDecimal.class),
+                any(BigDecimal.class),
+                any(BigDecimal.class)
+        )).thenReturn(RegionAnalysisResult.empty());
+
+        OotdTagAnalyzeResponse response = ootdTagService.analyzeTagArea(OOTD_ID, OWNER_ID, analyzeRequest());
+
+        assertThat(response.labelText()).isNull();
+        assertThat(response.categoryLarge()).isNull();
+        assertThat(response.categorySmall()).isNull();
+        assertThat(response.matchedItemId()).isNull();
+    }
+
+    @Test
+    void analyzeTagArea_rejectsMissingOotd() {
+        when(ootdRepository.findById(OOTD_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> ootdTagService.analyzeTagArea(OOTD_ID, OWNER_ID, analyzeRequest()))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(TagErrorCode.OOTD_NOT_FOUND);
+    }
+
+    @Test
+    void analyzeTagArea_rejectsNonOwner() {
+        User owner = user(OWNER_ID);
+        Ootd ootd = ootd(OOTD_ID, owner);
+
+        when(ootdRepository.findById(OOTD_ID)).thenReturn(Optional.of(ootd));
+
+        Long strangerId = 999L;
+        assertThatThrownBy(() -> ootdTagService.analyzeTagArea(OOTD_ID, strangerId, analyzeRequest()))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(TagErrorCode.TAG_OWNER_ONLY);
+    }
+
+    private OotdTagAnalyzeRequest analyzeRequest() {
+        return new OotdTagAnalyzeRequest(
+                new BboxRequest(BigDecimal.valueOf(0.1), BigDecimal.valueOf(0.2), BigDecimal.valueOf(0.3), BigDecimal.valueOf(0.4))
+        );
     }
 
     private OotdTagCreateRequest request(Long itemId, String status) {
