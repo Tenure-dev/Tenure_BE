@@ -22,6 +22,9 @@ public record ItemTagDraftCreateRequest(
         WearingTarget wearingTarget,
 
         @Schema(description = "최초 보유 날짜", example = "2026-05-24")
-        LocalDate firstOwnedAt
+        LocalDate firstOwnedAt,
+
+        @Schema(description = "대표 이미지 URL", example = "/files/items/abc123.jpg")
+        String representativeImageUrl
 ) {
 }

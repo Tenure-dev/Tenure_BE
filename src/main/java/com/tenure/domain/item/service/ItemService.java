@@ -312,7 +312,7 @@ public class ItemService {
                 null,
                 null,
                 request.firstOwnedAt(),
-                null
+                request.representativeImageUrl()
         );
 
         Item savedItem = itemRepository.save(item);
