@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -115,6 +116,55 @@ class OotdServiceTest {
         when(userRepository.findById(CURRENT_USER_ID)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> ootdService.createAutoTagOotd(CURRENT_USER_ID, image, "CAMERA"))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(CommonErrorCode.UNAUTHORIZED);
+    }
+
+    @Test
+    void createManualTagOotd_savesOotdWithoutPublishingEvent() {
+        User owner = user(CURRENT_USER_ID);
+        MultipartFile image = new MockMultipartFile("image", "photo.jpg", "image/jpeg", "content".getBytes());
+
+        when(userRepository.findById(CURRENT_USER_ID)).thenReturn(Optional.of(owner));
+        when(imageStorageService.store(eq(image), anyString())).thenReturn("/files/ootds/photo.jpg");
+
+        OotdCreateResponse response = ootdService.createManualTagOotd(CURRENT_USER_ID, image, "CAMERA");
+
+        assertThat(response.imageUrl()).isEqualTo("/files/ootds/photo.jpg");
+        assertThat(response.ownerId()).isEqualTo(CURRENT_USER_ID);
+
+        verify(ootdRepository).save(any(Ootd.class));
+        verify(eventPublisher, never()).publishEvent(any());
+    }
+
+    @Test
+    void createManualTagOotd_rejectsMissingImage() {
+        MultipartFile emptyImage = new MockMultipartFile("image", new byte[0]);
+
+        assertThatThrownBy(() -> ootdService.createManualTagOotd(CURRENT_USER_ID, emptyImage, "CAMERA"))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(OotdErrorCode.OOTD_IMAGE_REQUIRED);
+    }
+
+    @Test
+    void createManualTagOotd_rejectsNonCameraSource() {
+        MultipartFile image = new MockMultipartFile("image", "photo.jpg", "image/jpeg", "content".getBytes());
+
+        assertThatThrownBy(() -> ootdService.createManualTagOotd(CURRENT_USER_ID, image, "GALLERY"))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(OotdErrorCode.OOTD_SOURCE_INVALID);
+    }
+
+    @Test
+    void createManualTagOotd_rejectsUnknownUser() {
+        MultipartFile image = new MockMultipartFile("image", "photo.jpg", "image/jpeg", "content".getBytes());
+
+        when(userRepository.findById(CURRENT_USER_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> ootdService.createManualTagOotd(CURRENT_USER_ID, image, "CAMERA"))
                 .isInstanceOf(CustomException.class)
                 .extracting("errorCode")
                 .isEqualTo(CommonErrorCode.UNAUTHORIZED);

@@ -35,6 +35,27 @@ public class OotdService {
             MultipartFile image,
             String source
     ) {
+        Ootd ootd = createOotdEntity(currentUserId, image, source);
+
+        eventPublisher.publishEvent(new OotdCreatedEvent(ootd.getId(), ootd.getOwner().getId(), ootd.getImageUrl()));
+
+        return OotdCreateResponse.of(ootd);
+    }
+
+    // 태그 작성 화면에서 사용자가 박스를 그릴 때마다 별도 분석 API를 호출하는 흐름이라,
+    // 게시 시점에는 자동 분석을 트리거하지 않는다.
+    @Transactional
+    public OotdCreateResponse createManualTagOotd(
+            Long currentUserId,
+            MultipartFile image,
+            String source
+    ) {
+        Ootd ootd = createOotdEntity(currentUserId, image, source);
+
+        return OotdCreateResponse.of(ootd);
+    }
+
+    private Ootd createOotdEntity(Long currentUserId, MultipartFile image, String source) {
         validateImage(image);
         OotdSource ootdSource = validateSource(source);
 
@@ -45,10 +66,7 @@ public class OotdService {
 
         Ootd ootd = Ootd.create(owner, imageUrl, ootdSource);
         ootdRepository.save(ootd);
-
-        eventPublisher.publishEvent(new OotdCreatedEvent(ootd.getId(), owner.getId(), imageUrl));
-
-        return OotdCreateResponse.of(ootd);
+        return ootd;
     }
 
     @Transactional
