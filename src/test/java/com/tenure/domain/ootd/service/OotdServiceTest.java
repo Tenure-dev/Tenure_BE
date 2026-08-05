@@ -5,8 +5,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -16,17 +14,12 @@ import com.tenure.domain.ootd.enums.OotdPublicationStatus;
 import com.tenure.domain.ootd.event.OotdCreatedEvent;
 import com.tenure.domain.ootd.exception.OotdErrorCode;
 import com.tenure.domain.ootd.repository.OotdRepository;
-import com.tenure.domain.tag.dto.request.OotdTagBatchRequest;
-import com.tenure.domain.tag.dto.request.OotdTagCreateRequest.BboxRequest;
-import com.tenure.domain.tag.service.OotdTagService;
 import com.tenure.domain.user.entity.User;
 import com.tenure.domain.user.repository.UserRepository;
 import com.tenure.global.exception.CommonErrorCode;
 import com.tenure.global.exception.CustomException;
 import com.tenure.global.storage.ImageStorageService;
 import java.lang.reflect.Constructor;
-import java.math.BigDecimal;
-import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -57,25 +50,22 @@ class OotdServiceTest {
     @Mock
     private ApplicationEventPublisher eventPublisher;
 
-    @Mock
-    private OotdTagService ootdTagService;
-
     private OotdService ootdService;
 
     @BeforeEach
     void setUp() {
-        ootdService = new OotdService(ootdRepository, userRepository, imageStorageService, eventPublisher, ootdTagService);
+        ootdService = new OotdService(ootdRepository, userRepository, imageStorageService, eventPublisher);
     }
 
     @Test
-    void createOotd_savesOotdAndPublishesEventOnSuccess() {
+    void createAutoTagOotd_savesOotdAndPublishesEventOnSuccess() {
         User owner = user(CURRENT_USER_ID);
         MultipartFile image = new MockMultipartFile("image", "photo.jpg", "image/jpeg", "content".getBytes());
 
         when(userRepository.findById(CURRENT_USER_ID)).thenReturn(Optional.of(owner));
         when(imageStorageService.store(eq(image), anyString())).thenReturn("/files/ootds/photo.jpg");
 
-        OotdCreateResponse response = ootdService.createOotd(CURRENT_USER_ID, image, "CAMERA", null);
+        OotdCreateResponse response = ootdService.createAutoTagOotd(CURRENT_USER_ID, image, "CAMERA");
 
         assertThat(response.imageUrl()).isEqualTo("/files/ootds/photo.jpg");
         assertThat(response.ownerId()).isEqualTo(CURRENT_USER_ID);
@@ -86,62 +76,45 @@ class OotdServiceTest {
         verify(eventPublisher).publishEvent(captor.capture());
         assertThat(captor.getValue().ownerId()).isEqualTo(CURRENT_USER_ID);
         assertThat(captor.getValue().imageUrl()).isEqualTo("/files/ootds/photo.jpg");
-
-        verify(ootdTagService, never()).createTagsBatch(any(), any(), any());
     }
 
     @Test
-    void createOotd_createsTagsWhenTagsProvided() {
-        User owner = user(CURRENT_USER_ID);
-        MultipartFile image = new MockMultipartFile("image", "photo.jpg", "image/jpeg", "content".getBytes());
-        OotdTagBatchRequest tags = batchRequest(10L);
-
-        when(userRepository.findById(CURRENT_USER_ID)).thenReturn(Optional.of(owner));
-        when(imageStorageService.store(eq(image), anyString())).thenReturn("/files/ootds/photo.jpg");
-
-        ootdService.createOotd(CURRENT_USER_ID, image, "CAMERA", tags);
-
-        verify(ootdTagService).createTagsBatch(isNull(), eq(CURRENT_USER_ID), eq(tags));
-        verify(eventPublisher).publishEvent(any(OotdCreatedEvent.class));
-    }
-
-    @Test
-    void createOotd_rejectsMissingImage() {
+    void createAutoTagOotd_rejectsMissingImage() {
         MultipartFile emptyImage = new MockMultipartFile("image", new byte[0]);
 
-        assertThatThrownBy(() -> ootdService.createOotd(CURRENT_USER_ID, emptyImage, "CAMERA", null))
+        assertThatThrownBy(() -> ootdService.createAutoTagOotd(CURRENT_USER_ID, emptyImage, "CAMERA"))
                 .isInstanceOf(CustomException.class)
                 .extracting("errorCode")
                 .isEqualTo(OotdErrorCode.OOTD_IMAGE_REQUIRED);
     }
 
     @Test
-    void createOotd_rejectsNonCameraSource() {
+    void createAutoTagOotd_rejectsNonCameraSource() {
         MultipartFile image = new MockMultipartFile("image", "photo.jpg", "image/jpeg", "content".getBytes());
 
-        assertThatThrownBy(() -> ootdService.createOotd(CURRENT_USER_ID, image, "GALLERY", null))
+        assertThatThrownBy(() -> ootdService.createAutoTagOotd(CURRENT_USER_ID, image, "GALLERY"))
                 .isInstanceOf(CustomException.class)
                 .extracting("errorCode")
                 .isEqualTo(OotdErrorCode.OOTD_SOURCE_INVALID);
     }
 
     @Test
-    void createOotd_rejectsNullSource() {
+    void createAutoTagOotd_rejectsNullSource() {
         MultipartFile image = new MockMultipartFile("image", "photo.jpg", "image/jpeg", "content".getBytes());
 
-        assertThatThrownBy(() -> ootdService.createOotd(CURRENT_USER_ID, image, null, null))
+        assertThatThrownBy(() -> ootdService.createAutoTagOotd(CURRENT_USER_ID, image, null))
                 .isInstanceOf(CustomException.class)
                 .extracting("errorCode")
                 .isEqualTo(OotdErrorCode.OOTD_SOURCE_INVALID);
     }
 
     @Test
-    void createOotd_rejectsUnknownUser() {
+    void createAutoTagOotd_rejectsUnknownUser() {
         MultipartFile image = new MockMultipartFile("image", "photo.jpg", "image/jpeg", "content".getBytes());
 
         when(userRepository.findById(CURRENT_USER_ID)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> ootdService.createOotd(CURRENT_USER_ID, image, "CAMERA", null))
+        assertThatThrownBy(() -> ootdService.createAutoTagOotd(CURRENT_USER_ID, image, "CAMERA"))
                 .isInstanceOf(CustomException.class)
                 .extracting("errorCode")
                 .isEqualTo(CommonErrorCode.UNAUTHORIZED);
@@ -197,15 +170,6 @@ class OotdServiceTest {
                 .isInstanceOf(CustomException.class)
                 .extracting("errorCode")
                 .isEqualTo(OotdErrorCode.OOTD_NOT_FOUND);
-    }
-
-    private OotdTagBatchRequest batchRequest(Long itemId) {
-        OotdTagBatchRequest.TagItem tagItem = new OotdTagBatchRequest.TagItem(
-                itemId,
-                new BboxRequest(BigDecimal.valueOf(0.1), BigDecimal.valueOf(0.2), BigDecimal.valueOf(0.3), BigDecimal.valueOf(0.4)),
-                "라벨"
-        );
-        return new OotdTagBatchRequest(List.of(tagItem));
     }
 
     private User user(Long id) {

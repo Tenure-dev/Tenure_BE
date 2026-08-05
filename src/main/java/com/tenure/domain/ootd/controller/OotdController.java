@@ -11,21 +11,13 @@ import com.tenure.domain.ootd.service.OotdReactionListService;
 import com.tenure.domain.ootd.service.OotdReactionService;
 import com.tenure.domain.ootd.service.OotdRelatedService;
 import com.tenure.domain.ootd.service.OotdService;
-import com.tenure.domain.tag.dto.request.OotdTagBatchRequest;
-import com.tenure.global.exception.CommonErrorCode;
-import com.tenure.global.exception.CustomException;
 import com.tenure.global.response.BaseResponse;
 import com.tenure.global.security.CurrentUserProvider;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.ConstraintViolation;
-import jakarta.validation.Validator;
 import java.time.LocalDateTime;
-import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.MediaType;
@@ -36,7 +28,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -53,8 +44,6 @@ public class OotdController {
     private final OotdReactionService ootdReactionService;
     private final OotdReactionListService ootdReactionListService;
     private final CurrentUserProvider currentUserProvider;
-    private final ObjectMapper objectMapper;
-    private final Validator validator;
 
     @Operation(
             summary = "My OOTD posts",
@@ -118,51 +107,27 @@ public class OotdController {
     }
 
     @Operation(
-            summary = "OOTD 게시",
+            summary = "OOTD 게시 (자동 태그)",
             description = "앱 전용 카메라로 촬영한 착장 사진을 OOTD로 게시합니다. "
                     + "게시 응답은 AI 태그 분석을 기다리지 않고 즉시 반환하며, "
-                    + "OOTD_CREATED 이벤트를 통해 백그라운드에서 비동기로 AI 태그 분석을 항상 진행합니다 "
-                    + "(분석 결과 중 유사도가 Threshold 이상인 태그만 AUTO_UNCONFIRMED 상태로 저장됨). "
-                    + "tags 파트(JSON 문자열)를 함께 보내면 게시와 동시에 해당 태그들을 CONFIRMED 상태로도 등록합니다(선택). "
-                    + "예: {\"tags\":[{\"itemId\":1,\"bbox\":{\"x\":0.1,\"y\":0.1,\"width\":0.3,\"height\":0.3},\"labelText\":\"라벨\"}]}"
+                    + "게시 직후 백그라운드에서 비동기로 사진 전체에 대한 AI 태그 분석이 자동으로 진행됩니다. "
+                    + "분석이 끝나면 tagStatus가 ANALYZING에서 AUTO_UNCONFIRMED로 바뀝니다."
     )
     @ApiResponse(
             responseCode = "200",
             description = "OOTD 게시 성공",
             content = @Content(schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = OotdCreateResponse.class))
     )
-    @ApiResponse(responseCode = "400", description = "업로드 이미지 누락, 앱 카메라 촬영이 아닌 이미지, tags JSON 파싱 실패, 또는 tags 내 유효하지 않은 아이템 포함")
-    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public BaseResponse<OotdCreateResponse> createOotd(
+    @ApiResponse(responseCode = "400", description = "업로드 이미지 누락 또는 앱 카메라 촬영이 아닌 이미지")
+    @PostMapping(value = "/auto-tag", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public BaseResponse<OotdCreateResponse> createAutoTagOotd(
             @RequestParam("image") MultipartFile image,
-            @RequestParam(value = "source", required = false) String source,
-            @RequestPart(value = "tags", required = false) String tagsJson
+            @RequestParam(value = "source", required = false) String source
     ) {
         Long currentUserId = currentUserProvider.getCurrentUserId();
-        OotdTagBatchRequest tags = parseTags(tagsJson);
-        OotdCreateResponse response = ootdService.createOotd(currentUserId, image, source, tags);
+        OotdCreateResponse response = ootdService.createAutoTagOotd(currentUserId, image, source);
 
         return BaseResponse.success(response, "OOTD가 게시되었습니다.");
-    }
-
-    private OotdTagBatchRequest parseTags(String tagsJson) {
-        if (tagsJson == null || tagsJson.isBlank()) {
-            return null;
-        }
-
-        OotdTagBatchRequest tags;
-        try {
-            tags = objectMapper.readValue(tagsJson, OotdTagBatchRequest.class);
-        } catch (JsonProcessingException e) {
-            throw new CustomException(CommonErrorCode.INVALID_REQUEST);
-        }
-
-        Set<ConstraintViolation<OotdTagBatchRequest>> violations = validator.validate(tags);
-        if (!violations.isEmpty()) {
-            throw new CustomException(CommonErrorCode.INVALID_REQUEST);
-        }
-
-        return tags;
     }
 
     @Operation(
