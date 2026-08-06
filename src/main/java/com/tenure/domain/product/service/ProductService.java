@@ -60,6 +60,7 @@ import com.tenure.domain.user.repository.UserRepository;
 import com.tenure.domain.wish.repository.WishRepository;
 import com.tenure.global.exception.CommonErrorCode;
 import com.tenure.global.exception.CustomException;
+import com.tenure.global.storage.ImageStorageService;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -96,6 +97,7 @@ public class ProductService {
     private final ObjectMapper objectMapper;
     private final UserRepository userRepository;
     private final ProductReportRepository productReportRepository;
+    private final ImageStorageService imageStorageService;
 
     @Transactional
     public ProductCreateResponse createProduct(Long itemId, Long currentUserId, ProductCreateRequest request) {
@@ -133,6 +135,7 @@ public class ProductService {
                 writeJsonOrNull(request.conditionFlags()),
                 request.sellerDescription()
         );
+        product.updateMainImageMetadata(request.mainImageUrl(), resolveObjectKey(request.mainImageUrl()));
         productRepository.save(product);
 
         List<Ootd> ootds = ootdRepository.findAllById(request.attachedOotdIds());
@@ -215,6 +218,9 @@ public class ProductService {
                 writeJsonOrNull(request.conditionFlags()),
                 request.sellerDescription()
         );
+        if (request.mainImageUrl() != null) {
+            product.updateMainImageMetadata(request.mainImageUrl(), resolveObjectKey(request.mainImageUrl()));
+        }
         if (request.price() != null && !request.price().equals(oldPrice)) {
             notifyWishedUsers(item, receiver -> notificationFactory.productPriceChanged(
                     receiver,
@@ -379,6 +385,7 @@ public class ProductService {
                 firstOwnedAt,
                 representativeImageUrl
         );
+        item.updateRepresentativeImageMetadata(representativeImageUrl, resolveObjectKey(representativeImageUrl));
     }
 
     private void updateItemInfoPartially(Item item, ProductUpdateRequest request) {
@@ -398,6 +405,12 @@ public class ProductService {
                 coalesce(request.firstOwnedAt(), item.getFirstOwnedAt()),
                 coalesce(request.representativeImageUrl(), item.getRepresentativeImageUrl())
         );
+        if (request.representativeImageUrl() != null) {
+            item.updateRepresentativeImageMetadata(
+                    request.representativeImageUrl(),
+                    resolveObjectKey(request.representativeImageUrl())
+            );
+        }
     }
 
     private Category findLargeCategory(String categoryLarge) {
@@ -696,6 +709,10 @@ public class ProductService {
     }
 
     // 상품 신고
+    private String resolveObjectKey(String imageUrl) {
+        return imageStorageService.objectKeyFromUrl(imageUrl).orElse(null);
+    }
+
     @Transactional
     public ProductReportCreateResponse reportProduct(Long currentUserId, Long productId, ProductReportCreateRequest request) {
 

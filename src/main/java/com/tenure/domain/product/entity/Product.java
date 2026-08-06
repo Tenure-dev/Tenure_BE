@@ -60,6 +60,9 @@ public class Product extends BaseTimeEntity {
     @Column(name = "main_image_url", length = 500)
     private String mainImageUrl;
 
+    @Column(name = "main_image_object_key", length = 700)
+    private String mainImageObjectKey;
+
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
     private String measurements;
@@ -100,6 +103,11 @@ public class Product extends BaseTimeEntity {
         product.sellerDescription = sellerDescription;
         product.productStatus = ProductStatus.ON_SALE;
         return product;
+    }
+
+    public void updateMainImageMetadata(String mainImageUrl, String mainImageObjectKey) {
+        this.mainImageUrl = mainImageUrl;
+        this.mainImageObjectKey = mainImageObjectKey;
     }
 
     public void update(

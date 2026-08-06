@@ -452,6 +452,14 @@ public interface OotdRepository extends JpaRepository<Ootd, Long> {
 
     long countByOwner_IdAndPublicationStatus(Long ownerUserId, OotdPublicationStatus publicationStatus);
 
+    @Query("""
+            select ootd.imageObjectKey
+            from Ootd ootd
+            where ootd.owner.id = :ownerUserId
+              and ootd.imageObjectKey is not null
+            """)
+    List<String> findImageObjectKeysByOwnerId(@Param("ownerUserId") Long ownerUserId);
+
     // hotScore 갱신 매서드 (스냅샷 배치처리 방식)
     @Modifying
     @Query(value = """

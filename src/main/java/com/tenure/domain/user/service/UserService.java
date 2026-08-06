@@ -3,6 +3,9 @@ package com.tenure.domain.user.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tenure.domain.follow.repository.FollowRelationshipRepository;
+import com.tenure.domain.item.repository.ItemRepository;
+import com.tenure.domain.ootd.repository.OotdRepository;
+import com.tenure.domain.product.repository.ProductRepository;
 import com.tenure.domain.purchase.entity.PurchaseIntent;
 import com.tenure.domain.purchase.entity.PurchaseOffer;
 import com.tenure.domain.purchase.enums.PurchaseIntentStatus;
@@ -29,7 +32,9 @@ import com.tenure.domain.user.entity.UserWithdrawal;
 import com.tenure.domain.user.repository.UserWithdrawalRepository;
 import com.tenure.global.exception.CommonErrorCode;
 import com.tenure.global.exception.CustomException;
+import com.tenure.global.storage.ImageDeletionService;
 import com.tenure.global.storage.ImageStorageService;
+import com.tenure.global.storage.validation.ImageValidator;
 import org.springframework.web.multipart.MultipartFile;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -48,6 +53,9 @@ import com.tenure.domain.user.repository.UserBlockRepository;
 import com.tenure.domain.auth.service.EmailVerificationStore;
 import com.tenure.domain.address.entity.DeliveryAddress;
 import com.tenure.domain.address.repository.DeliveryAddressRepository;
+
+import java.util.ArrayList;
+import java.util.List;
 
 
 @Slf4j
@@ -69,6 +77,11 @@ public class UserService {
     private final PurchaseIntentRepository purchaseIntentRepository;
     private final PurchaseOfferRepository purchaseOfferRepository;
     private final UserReportRepository userReportRepository;
+    private final ItemRepository itemRepository;
+    private final OotdRepository ootdRepository;
+    private final ProductRepository productRepository;
+    private final ImageDeletionService imageDeletionService;
+    private final ImageValidator imageValidator;
 
     // 회원가입
     @Transactional
@@ -105,6 +118,7 @@ public class UserService {
                 request.weightKg(),
                 request.profileImageUrl()   // 선택값, 없으면 null
         );
+        user.updateProfileImageMetadata(request.profileImageUrl(), resolveObjectKey(request.profileImageUrl()));
         User savedUser = userRepository.save(user);
 
         // 6) 온보딩 주소를 첫 배송지이자 기본 배송지로 등록
@@ -171,6 +185,7 @@ public class UserService {
     public UserProfileResponse updateMyProfile(Long currentUserId, ProfileUpdateRequest request) {
         User user = userRepository.findById(currentUserId)
                 .orElseThrow(() -> new CustomException(UserErrorCode.USER_NOT_FOUND));
+        String previousProfileImageObjectKey = user.getProfileImageObjectKey();
 
         // 닉네임을 바꾸려는 경우에만 중복 검사.
         // 현재 자기 닉네임과 다르고, 그 닉네임을 이미 누군가 쓰고 있으면 에러
@@ -188,6 +203,11 @@ public class UserService {
                 request.weightKg(),
                 request.profileImageUrl()
         );
+        if (request.profileImageUrl() != null) {
+            String newProfileImageObjectKey = resolveObjectKey(request.profileImageUrl());
+            user.updateProfileImageMetadata(request.profileImageUrl(), newProfileImageObjectKey);
+            deleteIfChanged(previousProfileImageObjectKey, newProfileImageObjectKey);
+        }
 
         return UserProfileResponse.from(user);
     }
@@ -265,18 +285,23 @@ public class UserService {
         if (user.isWithdrawn()) {
             throw new CustomException(UserErrorCode.USER_NOT_FOUND);
         }
+        List<String> imageObjectKeys = collectOwnedImageObjectKeys(user);
 
         // 1) 탈퇴 사유 기록
         userWithdrawalRepository.save(UserWithdrawal.create(currentUserId, request.reason()));
 
         // 2) User 익명화 (변경 감지로 자동 UPDATE)
         user.withdraw();
+        imageObjectKeys.stream()
+                .distinct()
+                .forEach(imageDeletionService::deleteAfterCommit);
 
         log.info("회원 탈퇴 완료: userId={}, reason={}", currentUserId, request.reason());
     }
 
     // 프로필 이미지 업로드
     public String uploadProfileImage(MultipartFile image) {
+        imageValidator.validateGeneralImage(image);
         // 파일 검증
         if (image == null || image.isEmpty()) {
             throw new CustomException(CommonErrorCode.INVALID_REQUEST);
@@ -289,6 +314,28 @@ public class UserService {
 
         // "profile" 디렉토리에 저장하고 URL 반환
         return imageStorageService.store(image, "profile");
+    }
+
+    private List<String> collectOwnedImageObjectKeys(User user) {
+        Long userId = user.getId();
+        List<String> imageObjectKeys = new ArrayList<>();
+        if (user.getProfileImageObjectKey() != null) {
+            imageObjectKeys.add(user.getProfileImageObjectKey());
+        }
+        imageObjectKeys.addAll(itemRepository.findRepresentativeImageObjectKeysByOwnerId(userId));
+        imageObjectKeys.addAll(ootdRepository.findImageObjectKeysByOwnerId(userId));
+        imageObjectKeys.addAll(productRepository.findMainImageObjectKeysBySellerId(userId));
+        return imageObjectKeys;
+    }
+
+    private void deleteIfChanged(String previousObjectKey, String nextObjectKey) {
+        if (previousObjectKey != null && !previousObjectKey.equals(nextObjectKey)) {
+            imageDeletionService.deleteAfterCommit(previousObjectKey);
+        }
+    }
+
+    private String resolveObjectKey(String imageUrl) {
+        return imageStorageService.objectKeyFromUrl(imageUrl).orElse(null);
     }
 
     @Transactional

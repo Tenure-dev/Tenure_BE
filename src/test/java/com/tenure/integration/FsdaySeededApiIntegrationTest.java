@@ -14,10 +14,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tenure.domain.ootd.ai.AiTagResult;
 import com.tenure.domain.ootd.ai.AiTagService;
 import com.tenure.domain.ootd.ai.RegionAnalysisResult;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import javax.imageio.ImageIO;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -147,7 +150,7 @@ class FsdaySeededApiIntegrationTest {
                 "image",
                 "fsday-ootd.jpg",
                 MediaType.IMAGE_JPEG_VALUE,
-                new byte[] {1, 2, 3, 4, 5}
+                jpegBytes()
         );
 
         JsonNode createResponse = performOk(multipart("/ootds/auto-tag")
@@ -185,6 +188,13 @@ class FsdaySeededApiIntegrationTest {
         assertThat(myPage.path("data").path("feedCount").asLong()).isGreaterThanOrEqualTo(2);
 
         return ootdId;
+    }
+
+    private byte[] jpegBytes() throws Exception {
+        BufferedImage image = new BufferedImage(1, 1, BufferedImage.TYPE_INT_RGB);
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        ImageIO.write(image, "jpg", output);
+        return output.toByteArray();
     }
 
     private void completeDirectPurchaseFlowAndVerifyItemHistory(Session buyer, Session seller) throws Exception {

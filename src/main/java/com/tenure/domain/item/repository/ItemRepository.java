@@ -41,6 +41,14 @@ public interface ItemRepository extends JpaRepository<Item, Long> {
     long countByOwner_Id(Long ownerUserId);
 
     @Query("""
+            select item.representativeImageObjectKey
+            from Item item
+            where item.owner.id = :ownerUserId
+              and item.representativeImageObjectKey is not null
+            """)
+    List<String> findRepresentativeImageObjectKeysByOwnerId(@Param("ownerUserId") Long ownerUserId);
+
+    @Query("""
             select item
             from Item item
             join fetch item.category category

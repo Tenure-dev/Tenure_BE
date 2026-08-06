@@ -43,7 +43,9 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.test.util.ReflectionTestUtils;
 import com.tenure.domain.tag.repository.OotdTagRepository;
+import com.tenure.global.storage.ImageDeletionService;
 import com.tenure.global.storage.ImageStorageService;
+import com.tenure.global.storage.validation.ImageValidator;
 
 import com.tenure.domain.wish.repository.WishRepository;
 
@@ -75,6 +77,12 @@ class ItemServiceTest {
     private ImageStorageService imageStorageService;
 
     @Mock
+    private ImageDeletionService imageDeletionService;
+
+    @Mock
+    private ImageValidator imageValidator;
+
+    @Mock
     private WishRepository wishRepository;
 
     private ItemService itemService;
@@ -84,7 +92,7 @@ class ItemServiceTest {
         itemService = new ItemService(
                  productRepository, itemRepository,
                 categoryRepository, userRepository, itemHistoryRepository,
-                ootdTagRepository,imageStorageService, wishRepository
+                ootdTagRepository, imageStorageService, imageDeletionService, imageValidator, wishRepository
         );
     }
 

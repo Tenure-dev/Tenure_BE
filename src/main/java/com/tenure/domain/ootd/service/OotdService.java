@@ -11,7 +11,10 @@ import com.tenure.domain.user.entity.User;
 import com.tenure.domain.user.repository.UserRepository;
 import com.tenure.global.exception.CommonErrorCode;
 import com.tenure.global.exception.CustomException;
+import com.tenure.global.storage.ImageDeletionService;
 import com.tenure.global.storage.ImageStorageService;
+import com.tenure.global.storage.StoredImage;
+import com.tenure.global.storage.validation.ImageValidator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -27,6 +30,8 @@ public class OotdService {
     private final OotdRepository ootdRepository;
     private final UserRepository userRepository;
     private final ImageStorageService imageStorageService;
+    private final ImageDeletionService imageDeletionService;
+    private final ImageValidator imageValidator;
     private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
@@ -59,16 +64,17 @@ public class OotdService {
 
     private Ootd createOotdEntity(Long currentUserId, MultipartFile image, String source, boolean archived) {
         validateImage(image);
+        imageValidator.validateGeneralImage(image);
         OotdSource ootdSource = validateSource(source);
 
         User owner = userRepository.findById(currentUserId)
                 .orElseThrow(() -> new CustomException(CommonErrorCode.UNAUTHORIZED));
 
-        String imageUrl = imageStorageService.store(image, OOTD_IMAGE_DIRECTORY);
+        StoredImage storedImage = imageStorageService.storeImage(image, OOTD_IMAGE_DIRECTORY);
 
         Ootd ootd = archived
-                ? Ootd.createArchived(owner, imageUrl, ootdSource)
-                : Ootd.create(owner, imageUrl, ootdSource);
+                ? Ootd.createArchived(owner, storedImage.url(), storedImage.objectKey(), ootdSource)
+                : Ootd.create(owner, storedImage.url(), storedImage.objectKey(), ootdSource);
         ootdRepository.save(ootd);
         return ootd;
     }
@@ -81,6 +87,7 @@ public class OotdService {
         validateOwner(ootd, currentUserId);
 
         ootd.delete();
+        imageDeletionService.deleteAfterCommit(ootd.getImageObjectKey());
     }
 
     private void validateOwner(Ootd ootd, Long currentUserId) {

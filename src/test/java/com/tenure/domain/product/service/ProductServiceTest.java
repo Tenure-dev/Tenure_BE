@@ -62,6 +62,7 @@ import com.tenure.domain.user.repository.UserRepository;
 import com.tenure.domain.wish.repository.WishRepository;
 import com.tenure.global.exception.CommonErrorCode;
 import com.tenure.global.exception.CustomException;
+import com.tenure.global.storage.ImageStorageService;
 import java.lang.reflect.Constructor;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -125,6 +126,9 @@ class ProductServiceTest {
     @Mock
     private ProductReportRepository productReportRepository;
 
+    @Mock
+    private ImageStorageService imageStorageService;
+
     private ProductService productService;
 
     @BeforeEach
@@ -145,7 +149,8 @@ class ProductServiceTest {
                 notificationService,
                 new ObjectMapper(),
                 userRepository,
-                productReportRepository
+                productReportRepository,
+                imageStorageService
         );
     }
 

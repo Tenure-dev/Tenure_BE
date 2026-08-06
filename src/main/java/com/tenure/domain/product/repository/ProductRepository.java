@@ -40,6 +40,14 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     List<Product> findByItemIdIn(Collection<Long> itemIds);
 
+    @Query("""
+            select product.mainImageObjectKey
+            from Product product
+            where product.seller.id = :sellerUserId
+              and product.mainImageObjectKey is not null
+            """)
+    List<String> findMainImageObjectKeysBySellerId(@Param("sellerUserId") Long sellerUserId);
+
 
     Optional<Product> findByItemId(Long id);
 }
