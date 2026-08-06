@@ -25,19 +25,24 @@ public class LocalImageStorageService implements ImageStorageService {
     @Override
     public StoredImage storeImage(MultipartFile file, String directory) {
         try {
-            Path targetDir = Path.of(storageProperties.baseDir(), directory);
-            Files.createDirectories(targetDir);
+            String objectKey = buildObjectKey(directory, file.getOriginalFilename());
+            Path target = Path.of(storageProperties.baseDir(), objectKey);
+            Files.createDirectories(target.getParent());
+            file.transferTo(target);
+            return storedImage(objectKey, file.getContentType(), file.getSize());
+        } catch (IOException e) {
+            throw new CustomException(CommonErrorCode.INTERNAL_SERVER_ERROR);
+        }
+    }
 
-            String fileName = UUID.randomUUID() + extractExtension(file.getOriginalFilename());
-            file.transferTo(targetDir.resolve(fileName));
-
-            String objectKey = normalizeKey(directory + "/" + fileName);
-            return new StoredImage(
-                    storageProperties.baseUrl() + "/" + objectKey,
-                    objectKey,
-                    file.getContentType(),
-                    file.getSize()
-            );
+    @Override
+    public StoredImage storeBytes(byte[] bytes, String directory, String contentType, String originalFilename) {
+        try {
+            String objectKey = buildObjectKey(directory, originalFilename);
+            Path target = Path.of(storageProperties.baseDir(), objectKey);
+            Files.createDirectories(target.getParent());
+            Files.write(target, bytes);
+            return storedImage(objectKey, contentType, bytes.length);
         } catch (IOException e) {
             throw new CustomException(CommonErrorCode.INTERNAL_SERVER_ERROR);
         }
@@ -77,6 +82,19 @@ public class LocalImageStorageService implements ImageStorageService {
             return "";
         }
         return originalFilename.substring(originalFilename.lastIndexOf("."));
+    }
+
+    private String buildObjectKey(String directory, String originalFilename) {
+        return normalizeKey(directory + "/" + UUID.randomUUID() + extractExtension(originalFilename));
+    }
+
+    private StoredImage storedImage(String objectKey, String contentType, long size) {
+        return new StoredImage(
+                stripTrailingSlash(storageProperties.baseUrl()) + "/" + objectKey,
+                objectKey,
+                contentType,
+                size
+        );
     }
 
     private String normalizeKey(String key) {

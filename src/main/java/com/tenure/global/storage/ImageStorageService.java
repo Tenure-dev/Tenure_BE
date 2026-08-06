@@ -12,6 +12,8 @@ public interface ImageStorageService {
 
     StoredImage storeImage(MultipartFile file, String directory);
 
+    StoredImage storeBytes(byte[] bytes, String directory, String contentType, String originalFilename);
+
     byte[] readBytes(String objectKey) throws IOException;
 
     void delete(String objectKey);

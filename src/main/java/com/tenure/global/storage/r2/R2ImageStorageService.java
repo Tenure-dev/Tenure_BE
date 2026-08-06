@@ -48,6 +48,23 @@ public class R2ImageStorageService implements ImageStorageService {
     }
 
     @Override
+    public StoredImage storeBytes(byte[] bytes, String directory, String contentType, String originalFilename) {
+        String objectKey = buildObjectKey(directory, originalFilename);
+        try {
+            PutObjectRequest request = PutObjectRequest.builder()
+                    .bucket(properties.bucket())
+                    .key(objectKey)
+                    .contentType(contentType)
+                    .contentLength((long) bytes.length)
+                    .build();
+            r2S3Client.putObject(request, RequestBody.fromBytes(bytes));
+            return new StoredImage(buildPublicUrl(objectKey), objectKey, contentType, bytes.length);
+        } catch (S3Exception e) {
+            throw new CustomException(CommonErrorCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @Override
     public byte[] readBytes(String objectKey) throws IOException {
         try {
             ResponseBytes<GetObjectResponse> bytes = r2S3Client.getObjectAsBytes(GetObjectRequest.builder()
