@@ -64,4 +64,19 @@ public class UserReport {
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
     }
+
+    public static UserReport create(
+            User reporter,
+            User reported,
+            UserReportReason reasonType,
+            String reasonDetail
+    ) {
+        UserReport report = new UserReport();
+        report.reporter = reporter;
+        report.reported = reported;
+        report.reasonType = reasonType;
+        report.reasonDetail = reasonDetail;
+        report.status = ReportStatus.RECEIVED;
+        return report;
+    }
 }

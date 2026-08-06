@@ -29,6 +29,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.tenure.domain.item.dto.ItemOotdCandidateResponse;
+import com.tenure.domain.ootd.entity.Ootd;
+import com.tenure.domain.ootd.enums.OotdPublicationStatus;
+import com.tenure.domain.tag.enums.TagStatus;
+import com.tenure.global.response.PageResponse;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -39,7 +47,6 @@ public class ItemService {
 
     private static final int LARGE_CATEGORY_DEPTH = 1; //상위 카테고리 depth
     private static final int SMALL_CATEGORY_DEPTH = 2; //상세 카테고리 depth
-    private final OotdTagRepository ootdTagRepository;
     private final ProductRepository productRepository;
 
     private final ItemRepository itemRepository; //새 Item 저장
@@ -50,6 +57,7 @@ public class ItemService {
     private static final String AI_PENDING_CATEGORY_NAME = "AI 분류 대기";
     private static final int DETAIL_CATEGORY_DEPTH = 2;
 
+    private final OotdTagRepository ootdTagRepository;
     private final ImageStorageService imageStorageService;
 
     @Transactional
@@ -304,7 +312,7 @@ public class ItemService {
                 null,
                 null,
                 request.firstOwnedAt(),
-                null
+                request.representativeImageUrl()
         );
 
         Item savedItem = itemRepository.save(item);
@@ -348,5 +356,25 @@ public class ItemService {
     @Transactional
     public String uploadItemImage(MultipartFile image) {
         return imageStorageService.store(image, "items");
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<ItemOotdCandidateResponse> getItemOotdCandidates(
+            Long currentUserId,
+            Long itemId,
+            Pageable pageable
+    ) {
+        Item item = findItem(itemId);
+        validateItemOwner(item, currentUserId);
+
+        Page<Ootd> ootds = ootdTagRepository.findItemOotdCandidates(
+                itemId,
+                currentUserId,
+                TagStatus.CONFIRMED,
+                OotdPublicationStatus.ACTIVE,
+                pageable
+        );
+
+        return PageResponse.from(ootds, ItemOotdCandidateResponse::from);
     }
 }

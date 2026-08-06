@@ -25,6 +25,8 @@ import java.math.RoundingMode;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
 import java.util.function.Function;
@@ -63,22 +65,66 @@ public class OotdTagService {
             return;
         }
 
+        List<Item> ownedItems = itemRepository.findByOwner_IdAndItemStatusOrderByCreatedAtDesc(
+                ootd.getOwner().getId(), ItemStatus.OWNED
+        );
+
         List<OotdTag> tags = results.stream()
                 .filter(this::meetsConfidenceThreshold)
                 .filter(this::hasValidBbox)
-                .map(result -> OotdTag.createAiTag(
-                        ootd,
-                        result.labelText(),
-                        result.bboxX(),
-                        result.bboxY(),
-                        result.bboxWidth(),
-                        result.bboxHeight(),
-                        result.confidence()
-                ))
+                .map(result -> findMatchingItem(ownedItems, result)
+                        .map(item -> OotdTag.createAiTag(
+                                ootd,
+                                item,
+                                result.labelText(),
+                                result.bboxX(),
+                                result.bboxY(),
+                                result.bboxWidth(),
+                                result.bboxHeight(),
+                                result.confidence()
+                        ))
+                        .orElse(null))
+                .filter(Objects::nonNull)
                 .toList();
 
         ootdTagRepository.saveAll(tags);
-        log.info("AI 태그 저장 완료 - ootdId={}, 저장된 태그 수={}/{}", ootdId, tags.size(), results.size());
+        ootd.markAutoTagsReady();
+        log.info("AI 태그 저장 완료 - ootdId={}, 저장된 태그 수={}/{} (보유 아이템 매칭 실패분 제외)", ootdId, tags.size(), results.size());
+    }
+
+    // 보유 아이템 중 카테고리가 일치하고, 라벨/브랜드명이 겹치는 것만 매칭으로 인정한다.
+    // 카테고리만 같고 텍스트가 전혀 안 겹치면 잘못된 아이템에 연결될 위험이 있어 매칭 실패로 처리한다.
+    private Optional<Item> findMatchingItem(List<Item> ownedItems, AiTagResult result) {
+        List<Item> categoryMatches = ownedItems.stream()
+                .filter(item -> matchesCategory(item, result))
+                .toList();
+        if (categoryMatches.isEmpty()) {
+            return Optional.empty();
+        }
+        return categoryMatches.stream()
+                .filter(item -> matchesLabel(item, result))
+                .findFirst();
+    }
+
+    private boolean matchesCategory(Item item, AiTagResult result) {
+        return result.categorySmall() != null
+                && item.getCategory() != null
+                && result.categorySmall().equalsIgnoreCase(item.getCategory().getName());
+    }
+
+    private boolean matchesLabel(Item item, AiTagResult result) {
+        String normalizedLabel = normalize(result.labelText());
+        if (normalizedLabel.isEmpty()) {
+            return false;
+        }
+        String itemName = normalize(item.getItemName());
+        String brandName = normalize(item.getBrandName());
+        return (!itemName.isEmpty() && (normalizedLabel.contains(itemName) || itemName.contains(normalizedLabel)))
+                || (!brandName.isEmpty() && normalizedLabel.contains(brandName));
+    }
+
+    private String normalize(String value) {
+        return value == null ? "" : value.replace(" ", "").toLowerCase();
     }
 
     @Transactional

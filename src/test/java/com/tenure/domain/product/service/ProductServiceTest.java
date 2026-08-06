@@ -46,6 +46,7 @@ import com.tenure.domain.product.enums.ProductViewerMode;
 import com.tenure.domain.product.exception.ProductErrorCode;
 import com.tenure.domain.product.repository.ProductAttachedOotdRepository;
 import com.tenure.domain.product.repository.ProductRepository;
+import com.tenure.domain.product.repository.ProductReportRepository;
 import com.tenure.domain.purchase.entity.PurchaseIntent;
 import com.tenure.domain.purchase.entity.PurchaseOffer;
 import com.tenure.domain.purchase.enums.PurchaseIntentStatus;
@@ -57,6 +58,7 @@ import com.tenure.domain.tag.repository.OotdTagRepository;
 import com.tenure.domain.user.entity.User;
 import com.tenure.domain.user.enums.AccountVisibility;
 import com.tenure.domain.user.enums.UserGrade;
+import com.tenure.domain.user.repository.UserRepository;
 import com.tenure.domain.wish.repository.WishRepository;
 import com.tenure.global.exception.CommonErrorCode;
 import com.tenure.global.exception.CustomException;
@@ -117,6 +119,12 @@ class ProductServiceTest {
     @Mock
     private NotificationService notificationService;
 
+    @Mock
+    private UserRepository userRepository;
+
+    @Mock
+    private ProductReportRepository productReportRepository;
+
     private ProductService productService;
 
     @BeforeEach
@@ -135,7 +143,9 @@ class ProductServiceTest {
                 wishRepository,
                 new NotificationFactory(),
                 notificationService,
-                new ObjectMapper()
+                new ObjectMapper(),
+                userRepository,
+                productReportRepository
         );
     }
 

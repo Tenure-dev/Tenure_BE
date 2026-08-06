@@ -21,7 +21,9 @@ public enum ProductErrorCode implements ErrorCode {
     PRODUCT_NOT_TRADING("PRODUCT_007", "거래 중인 상품이 아닙니다.", HttpStatus.CONFLICT),
     PRODUCT_NOT_ON_SALE("PRODUCT_008", "판매중인 상품이 아닙니다.", HttpStatus.CONFLICT),
     PRODUCT_MEASUREMENTS_INVALID("PRODUCT_009", "카테고리에 맞지 않는 실측 입력값입니다.", HttpStatus.BAD_REQUEST),
-    PRODUCT_DETAIL_DATA_INVALID("PRODUCT_500", "판매 상품 정보를 불러올 수 없습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+    PRODUCT_DETAIL_DATA_INVALID("PRODUCT_500", "판매 상품 정보를 불러올 수 없습니다.", HttpStatus.INTERNAL_SERVER_ERROR),
+    CANNOT_REPORT_OWN_PRODUCT("PRODUCT_010", "본인이 판매하는 상품은 신고할 수 없습니다.", HttpStatus.BAD_REQUEST),
+    PRODUCT_ALREADY_REPORTED("PRODUCT_011", "이미 접수된 신고입니다.", HttpStatus.CONFLICT);
 
     private final String code;
     private final String message;
