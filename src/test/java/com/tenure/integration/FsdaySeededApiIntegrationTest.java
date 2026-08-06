@@ -11,7 +11,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.tenure.domain.ootd.ai.AiTagResult;
 import com.tenure.domain.ootd.ai.AiTagService;
+import com.tenure.domain.ootd.ai.RegionAnalysisResult;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
@@ -350,7 +353,23 @@ class FsdaySeededApiIntegrationTest {
         @Bean
         @Primary
         AiTagService aiTagService() {
-            return imageUrl -> List.of();
+            return new AiTagService() {
+                @Override
+                public List<AiTagResult> analyze(String imageUrl) {
+                    return List.of();
+                }
+
+                @Override
+                public RegionAnalysisResult analyzeRegion(
+                        String imageUrl,
+                        BigDecimal bboxX,
+                        BigDecimal bboxY,
+                        BigDecimal bboxWidth,
+                        BigDecimal bboxHeight
+                ) {
+                    return RegionAnalysisResult.empty();
+                }
+            };
         }
     }
 }

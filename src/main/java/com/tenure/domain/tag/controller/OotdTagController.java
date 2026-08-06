@@ -1,7 +1,9 @@
 package com.tenure.domain.tag.controller;
 
+import com.tenure.domain.tag.dto.request.OotdTagAnalyzeRequest;
 import com.tenure.domain.tag.dto.request.OotdTagBatchRequest;
 import com.tenure.domain.tag.dto.request.OotdTagCreateRequest;
+import com.tenure.domain.tag.dto.response.OotdTagAnalyzeResponse;
 import com.tenure.domain.tag.dto.response.OotdTagBatchResponse;
 import com.tenure.domain.tag.dto.response.OotdTagResponse;
 import com.tenure.domain.tag.dto.request.OotdTagUpdateRequest;
@@ -90,6 +92,27 @@ public class OotdTagController {
         Long currentUserId = currentUserProvider.getCurrentUserId();
         OotdTagBatchResponse response = ootdTagService.createTagsBatch(ootdId, currentUserId, request);
         return BaseResponse.success(response, "태그가 일괄 등록되었습니다.");
+    }
+
+    @Operation(
+            summary = "OOTD 박스 영역 AI 분석",
+            description = "태그 작성 화면에서 사용자가 아이템 위치에 박스를 그리면, 그 영역만 분석해서 "
+                    + "라벨과 카테고리를 추론하고 보유 아이템 중 일치하는 것이 있으면 matchedItemIds에 "
+                    + "유사도가 높은 순으로 최대 5개까지 목록으로 알려줍니다. "
+                    + "분석만 수행하며 태그를 저장하지 않으므로, 매칭된 itemId(목록 중 하나 선택)로 실제 태그를 저장하려면 "
+                    + "이 응답을 이용해 POST /ootds/{ootdId}/tags를 별도로 호출해야 합니다."
+    )
+    @ApiResponse(responseCode = "200", description = "분석 성공")
+    @ApiResponse(responseCode = "403", description = "본인이 게시한 OOTD가 아님")
+    @ApiResponse(responseCode = "404", description = "존재하지 않는 OOTD")
+    @PostMapping("/{ootdId}/tags/analyze")
+    public BaseResponse<OotdTagAnalyzeResponse> analyzeTagArea(
+            @PathVariable Long ootdId,
+            @Valid @RequestBody OotdTagAnalyzeRequest request
+    ) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        OotdTagAnalyzeResponse response = ootdTagService.analyzeTagArea(ootdId, currentUserId, request);
+        return BaseResponse.success(response, "분석이 완료되었습니다.");
     }
 
     @Operation(
