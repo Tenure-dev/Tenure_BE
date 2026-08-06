@@ -25,6 +25,12 @@ public record ItemTagDraftCreateRequest(
         LocalDate firstOwnedAt,
 
         @Schema(description = "대표 이미지 URL", example = "/files/items/abc123.jpg")
-        String representativeImageUrl
+        String representativeImageUrl,
+
+        @Schema(description = "상위 카테고리. 값이 없으면 AI 분류 대기 카테고리로 저장", example = "상의")
+        String categoryLarge,
+
+        @Schema(description = "상세 카테고리. 값이 없으면 AI 분류 대기 카테고리로 저장", example = "반팔 티셔츠")
+        String categorySmall
 ) {
 }
