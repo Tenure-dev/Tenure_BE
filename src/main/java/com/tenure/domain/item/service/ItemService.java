@@ -298,7 +298,7 @@ public class ItemService {
         validateFirstOwnedAt(request.firstOwnedAt());
 
         User owner = findUser(currentUserId);
-        Category category = findAiPendingCategory();
+        Category category = resolveTagDraftCategory(request);
 
         Item item = Item.create(
                 owner,
@@ -373,5 +373,21 @@ public class ItemService {
         );
 
         return PageResponse.from(ootds, ItemOotdCandidateResponse::from);
+    }
+
+    private Category resolveTagDraftCategory(ItemTagDraftCreateRequest request) {
+        boolean hasLargeCategory = hasText(request.categoryLarge());
+        boolean hasSmallCategory = hasText(request.categorySmall());
+
+        if (!hasLargeCategory || !hasSmallCategory) {
+            return findAiPendingCategory();
+        }
+
+        Category largeCategory = findLargeCategory(request.categoryLarge());
+        return findSmallCategory(request.categorySmall(), largeCategory);
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 }
