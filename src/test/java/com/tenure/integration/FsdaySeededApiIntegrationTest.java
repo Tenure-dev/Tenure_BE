@@ -140,38 +140,35 @@ class FsdaySeededApiIntegrationTest {
     }
 
     private long postOotdWithTaggedItemAndVerifyFeedAndMyPage(Session buyer) throws Exception {
-        String tagsJson = json(Map.of(
-                "tags", List.of(Map.of(
-                        "itemId", BUYER_TAG_ITEM_ID,
-                        "bbox", Map.of(
-                                "x", 0.12,
-                                "y", 0.18,
-                                "width", 0.35,
-                                "height", 0.44
-                        ),
-                        "labelText", "FSDAY tagged tee"
-                ))
-        ));
-
         MockMultipartFile image = new MockMultipartFile(
                 "image",
                 "fsday-ootd.jpg",
                 MediaType.IMAGE_JPEG_VALUE,
                 new byte[] {1, 2, 3, 4, 5}
         );
-        MockMultipartFile tags = new MockMultipartFile(
-                "tags",
-                "",
-                MediaType.APPLICATION_JSON_VALUE,
-                tagsJson.getBytes(StandardCharsets.UTF_8)
-        );
 
-        JsonNode createResponse = performOk(multipart("/ootds")
+        JsonNode createResponse = performOk(multipart("/ootds/auto-tag")
                 .file(image)
-                .file(tags)
                 .param("source", "CAMERA")
                 .with(auth(buyer.token())));
         long ootdId = createResponse.path("data").path("ootdId").asLong();
+
+        String tagJson = json(Map.of(
+                "itemId", BUYER_TAG_ITEM_ID,
+                "bbox", Map.of(
+                        "x", 0.12,
+                        "y", 0.18,
+                        "width", 0.35,
+                        "height", 0.44
+                ),
+                "labelText", "FSDAY tagged tee",
+                "status", "CONFIRMED"
+        ));
+
+        expectOkActions(post("/ootds/{ootdId}/tags", ootdId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(tagJson)
+                .with(auth(buyer.token())));
 
         expectOkActions(post("/ootds/{ootdId}/tags/confirm", ootdId).with(auth(buyer.token())))
                 .andExpect(jsonPath("$.data.tagStatus").value("CONFIRMED"));

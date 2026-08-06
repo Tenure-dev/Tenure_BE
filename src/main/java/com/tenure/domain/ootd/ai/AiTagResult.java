@@ -4,6 +4,8 @@ import java.math.BigDecimal;
 
 public record AiTagResult(
         String labelText,
+        String categoryLarge,
+        String categorySmall,
         BigDecimal bboxX,
         BigDecimal bboxY,
         BigDecimal bboxWidth,

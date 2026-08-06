@@ -537,13 +537,17 @@ class OotdTagServiceTest {
     void saveAiTags_filtersOutResultsBelowConfidenceThreshold() {
         User owner = user(OWNER_ID);
         Ootd ootd = ootd(OOTD_ID, owner);
+        Item jacket = itemWithCategory(30L, "아우터", "Uniqlo", "블루종 자켓");
+        Item sneakers = itemWithCategory(31L, "신발", "Nike", "운동화");
 
         when(ootdRepository.findById(OOTD_ID)).thenReturn(Optional.of(ootd));
+        when(itemRepository.findByOwner_IdAndItemStatusOrderByCreatedAtDesc(OWNER_ID, ItemStatus.OWNED))
+                .thenReturn(List.of(jacket, sneakers));
 
         List<AiTagResult> results = List.of(
-                aiTagResult("블루종 자켓", BigDecimal.valueOf(0.92)),
-                aiTagResult("청바지", BigDecimal.valueOf(0.55)),
-                aiTagResult("운동화", BigDecimal.valueOf(0.60))
+                aiTagResult("블루종 자켓", "아우터", BigDecimal.valueOf(0.92)),
+                aiTagResult("청바지", "하의", BigDecimal.valueOf(0.55)),
+                aiTagResult("운동화", "신발", BigDecimal.valueOf(0.60))
         );
 
         ootdTagService.saveAiTags(OOTD_ID, results);
@@ -557,20 +561,27 @@ class OotdTagServiceTest {
         assertThat(savedTags).allSatisfy(tag -> {
             assertThat(tag.getSource()).isEqualTo(TagSource.AI);
             assertThat(tag.getStatus()).isEqualTo(TagStatus.AUTO_UNCONFIRMED);
+            assertThat(tag.getItem()).isNotNull();
         });
         assertThat(savedTags).extracting(OotdTag::getLabelText)
                 .containsExactlyInAnyOrder("블루종 자켓", "운동화");
+        assertThat(ootd.getTagStatus()).isEqualTo(OotdTagStatus.AUTO_UNCONFIRMED);
     }
 
     @Test
     void saveAiTags_filtersOutResultsWithOutOfRangeBbox() {
         User owner = user(OWNER_ID);
         Ootd ootd = ootd(OOTD_ID, owner);
+        Item jacket = itemWithCategory(30L, "아우터", "Uniqlo", "블루종 자켓");
 
         when(ootdRepository.findById(OOTD_ID)).thenReturn(Optional.of(ootd));
+        when(itemRepository.findByOwner_IdAndItemStatusOrderByCreatedAtDesc(OWNER_ID, ItemStatus.OWNED))
+                .thenReturn(List.of(jacket));
 
-        AiTagResult validResult = aiTagResult("블루종 자켓", BigDecimal.valueOf(0.92));
+        AiTagResult validResult = aiTagResult("블루종 자켓", "아우터", BigDecimal.valueOf(0.92));
         AiTagResult outOfRangeResult = new AiTagResult(
+                "청바지",
+                "하의",
                 "청바지",
                 BigDecimal.valueOf(120),
                 BigDecimal.valueOf(0.2),
@@ -591,10 +602,55 @@ class OotdTagServiceTest {
     }
 
     @Test
+    void saveAiTags_skipsResultWhenNoOwnedItemMatches() {
+        User owner = user(OWNER_ID);
+        Ootd ootd = ootd(OOTD_ID, owner);
+        Item unrelatedItem = itemWithCategory(30L, "신발", "Nike", "운동화");
+
+        when(ootdRepository.findById(OOTD_ID)).thenReturn(Optional.of(ootd));
+        when(itemRepository.findByOwner_IdAndItemStatusOrderByCreatedAtDesc(OWNER_ID, ItemStatus.OWNED))
+                .thenReturn(List.of(unrelatedItem));
+
+        ootdTagService.saveAiTags(
+                OOTD_ID,
+                List.of(aiTagResult("블루종 자켓", "아우터", BigDecimal.valueOf(0.92)))
+        );
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<OotdTag>> captor = ArgumentCaptor.forClass(List.class);
+        verify(ootdTagRepository).saveAll(captor.capture());
+
+        assertThat(captor.getValue()).isEmpty();
+        assertThat(ootd.getTagStatus()).isEqualTo(OotdTagStatus.AUTO_UNCONFIRMED);
+    }
+
+    @Test
+    void saveAiTags_skipsResultWhenCategoryMatchesButLabelDoesNot() {
+        User owner = user(OWNER_ID);
+        Ootd ootd = ootd(OOTD_ID, owner);
+        Item unrelatedJacket = itemWithCategory(30L, "아우터", "Adidas", "레인 코트");
+
+        when(ootdRepository.findById(OOTD_ID)).thenReturn(Optional.of(ootd));
+        when(itemRepository.findByOwner_IdAndItemStatusOrderByCreatedAtDesc(OWNER_ID, ItemStatus.OWNED))
+                .thenReturn(List.of(unrelatedJacket));
+
+        ootdTagService.saveAiTags(
+                OOTD_ID,
+                List.of(aiTagResult("블루종 자켓", "아우터", BigDecimal.valueOf(0.92)))
+        );
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<OotdTag>> captor = ArgumentCaptor.forClass(List.class);
+        verify(ootdTagRepository).saveAll(captor.capture());
+
+        assertThat(captor.getValue()).isEmpty();
+    }
+
+    @Test
     void saveAiTags_doesNothingWhenOotdNotFound() {
         when(ootdRepository.findById(OOTD_ID)).thenReturn(Optional.empty());
 
-        ootdTagService.saveAiTags(OOTD_ID, List.of(aiTagResult("블루종 자켓", BigDecimal.valueOf(0.9))));
+        ootdTagService.saveAiTags(OOTD_ID, List.of(aiTagResult("블루종 자켓", "아우터", BigDecimal.valueOf(0.9))));
 
         verify(ootdTagRepository, never()).saveAll(anyList());
     }
@@ -607,7 +663,7 @@ class OotdTagServiceTest {
 
         when(ootdRepository.findById(OOTD_ID)).thenReturn(Optional.of(ootd));
 
-        ootdTagService.saveAiTags(OOTD_ID, List.of(aiTagResult("블루종 자켓", BigDecimal.valueOf(0.9))));
+        ootdTagService.saveAiTags(OOTD_ID, List.of(aiTagResult("블루종 자켓", "아우터", BigDecimal.valueOf(0.9))));
 
         verify(ootdTagRepository, never()).saveAll(anyList());
     }
@@ -654,9 +710,11 @@ class OotdTagServiceTest {
         return tag;
     }
 
-    private AiTagResult aiTagResult(String labelText, BigDecimal confidence) {
+    private AiTagResult aiTagResult(String labelText, String categorySmall, BigDecimal confidence) {
         return new AiTagResult(
                 labelText,
+                "대분류",
+                categorySmall,
                 BigDecimal.valueOf(0.1),
                 BigDecimal.valueOf(0.2),
                 BigDecimal.valueOf(0.3),
@@ -688,6 +746,17 @@ class OotdTagServiceTest {
         Item item = item(id);
         ReflectionTestUtils.setField(item, "category", category(categoryId));
         ReflectionTestUtils.setField(item, "brandName", brandName);
+        return item;
+    }
+
+    private Item itemWithCategory(Long id, String categoryName, String brandName, String itemName) {
+        Item item = item(id);
+        Category namedCategory = instantiate(Category.class);
+        ReflectionTestUtils.setField(namedCategory, "id", id + 1000);
+        ReflectionTestUtils.setField(namedCategory, "name", categoryName);
+        ReflectionTestUtils.setField(item, "category", namedCategory);
+        ReflectionTestUtils.setField(item, "brandName", brandName);
+        ReflectionTestUtils.setField(item, "itemName", itemName);
         return item;
     }
 

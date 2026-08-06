@@ -13,7 +13,7 @@ import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 /**
- * OOTD 게시 트랜잭션 커밋 이후 비동기로 AI 태그 분석을 수행하고 결과를 저장한다.
+ * 자동 태그 게시(OOTD_CREATED) 트랜잭션 커밋 이후 비동기로 AI 태그 분석을 수행하고 결과를 저장한다.
  */
 @Slf4j
 @Component

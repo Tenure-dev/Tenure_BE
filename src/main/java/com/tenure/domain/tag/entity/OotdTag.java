@@ -89,6 +89,21 @@ public class OotdTag extends BaseTimeEntity {
         return tag;
     }
 
+    public static OotdTag createAiTag(
+            Ootd ootd,
+            Item item,
+            String labelText,
+            BigDecimal bboxX,
+            BigDecimal bboxY,
+            BigDecimal bboxWidth,
+            BigDecimal bboxHeight,
+            BigDecimal confidence
+    ) {
+        OotdTag tag = createAiTag(ootd, labelText, bboxX, bboxY, bboxWidth, bboxHeight, confidence);
+        tag.item = item;
+        return tag;
+    }
+
     public static OotdTag createManualTag(
             Ootd ootd,
             Item item,
