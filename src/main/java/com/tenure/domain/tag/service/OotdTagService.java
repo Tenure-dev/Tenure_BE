@@ -51,6 +51,7 @@ public class OotdTagService {
     );
     private static final Random MOCK_RANDOM = new Random();
     private static final int DEFAULT_SIMILAR_ITEM_LIMIT = 10;
+    private static final int MAX_MATCHED_ITEM_CANDIDATES = 5;
 
     private final OotdRepository ootdRepository;
     private final ItemRepository itemRepository;
@@ -112,34 +113,79 @@ public class OotdTagService {
         );
 
         if (result.labelText() == null || result.labelText().isBlank()) {
-            return OotdTagAnalyzeResponse.of(null, null, null, null);
+            return OotdTagAnalyzeResponse.of(null, null, null, List.of());
         }
 
-        Long matchedItemId = null;
+        List<Long> matchedItemIds = List.of();
         if (meetsConfidenceThreshold(result.confidence())) {
             List<Item> ownedItems = itemRepository.findByOwner_IdAndItemStatusOrderByCreatedAtDesc(
                     currentUserId, ItemStatus.OWNED
             );
-            matchedItemId = findMatchingItem(ownedItems, result.labelText(), result.categorySmall())
-                    .map(Item::getId)
-                    .orElse(null);
+            matchedItemIds = findMatchingItems(
+                    ownedItems, result.labelText(), result.categorySmall(), MAX_MATCHED_ITEM_CANDIDATES
+            ).stream().map(Item::getId).toList();
         }
 
-        return OotdTagAnalyzeResponse.of(result.labelText(), result.categoryLarge(), result.categorySmall(), matchedItemId);
+        return OotdTagAnalyzeResponse.of(result.labelText(), result.categoryLarge(), result.categorySmall(), matchedItemIds);
     }
 
-    // 보유 아이템 중 카테고리가 일치하고, 라벨/브랜드명이 겹치는 것만 매칭으로 인정한다.
-    // 카테고리만 같고 텍스트가 전혀 안 겹치면 잘못된 아이템에 연결될 위험이 있어 매칭 실패로 처리한다.
-    private Optional<Item> findMatchingItem(List<Item> ownedItems, String labelText, String categorySmall) {
+    // 보유 아이템 중 카테고리가 일치하고, 라벨/브랜드명이 겹치는 아이템을 유사도 점수(레벤슈타인 거리 기반)가
+    // 높은 순으로 정렬해 최대 limit개까지 반환한다. 카테고리만 같고 텍스트가 전혀 안 겹치면 잘못된 아이템에
+    // 연결될 위험이 있어 후보에서 제외한다.
+    private List<Item> findMatchingItems(List<Item> ownedItems, String labelText, String categorySmall, int limit) {
         List<Item> categoryMatches = ownedItems.stream()
                 .filter(item -> matchesCategory(item, categorySmall))
                 .toList();
         if (categoryMatches.isEmpty()) {
-            return Optional.empty();
+            return List.of();
         }
+
+        String normalizedLabel = normalize(labelText);
         return categoryMatches.stream()
                 .filter(item -> matchesLabel(item, labelText))
-                .findFirst();
+                .sorted(Comparator.comparingDouble((Item item) -> similarityScore(normalizedLabel, item)).reversed())
+                .limit(limit)
+                .toList();
+    }
+
+    private Optional<Item> findMatchingItem(List<Item> ownedItems, String labelText, String categorySmall) {
+        return findMatchingItems(ownedItems, labelText, categorySmall, 1).stream().findFirst();
+    }
+
+    // 정규화된 라벨과 아이템명/브랜드명 사이의 문자열 유사도(레벤슈타인 거리 기반, 0~1)를 계산한다.
+    // 값이 클수록 더 유사한 아이템이며, 후보가 여러 개일 때 순위를 매기는 데만 사용된다.
+    private double similarityScore(String normalizedLabel, Item item) {
+        double itemNameScore = levenshteinSimilarity(normalizedLabel, normalize(item.getItemName()));
+        double brandNameScore = levenshteinSimilarity(normalizedLabel, normalize(item.getBrandName()));
+        return Math.max(itemNameScore, brandNameScore);
+    }
+
+    private double levenshteinSimilarity(String a, String b) {
+        if (a.isEmpty() || b.isEmpty()) {
+            return 0.0;
+        }
+        int maxLength = Math.max(a.length(), b.length());
+        return 1.0 - ((double) levenshteinDistance(a, b) / maxLength);
+    }
+
+    private int levenshteinDistance(String a, String b) {
+        int[][] dp = new int[a.length() + 1][b.length() + 1];
+        for (int i = 0; i <= a.length(); i++) {
+            dp[i][0] = i;
+        }
+        for (int j = 0; j <= b.length(); j++) {
+            dp[0][j] = j;
+        }
+        for (int i = 1; i <= a.length(); i++) {
+            for (int j = 1; j <= b.length(); j++) {
+                int cost = a.charAt(i - 1) == b.charAt(j - 1) ? 0 : 1;
+                dp[i][j] = Math.min(
+                        Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1),
+                        dp[i - 1][j - 1] + cost
+                );
+            }
+        }
+        return dp[a.length()][b.length()];
     }
 
     private boolean matchesCategory(Item item, String categorySmall) {

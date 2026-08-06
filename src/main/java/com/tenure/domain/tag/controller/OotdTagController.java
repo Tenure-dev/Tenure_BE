@@ -97,8 +97,9 @@ public class OotdTagController {
     @Operation(
             summary = "OOTD 박스 영역 AI 분석",
             description = "태그 작성 화면에서 사용자가 아이템 위치에 박스를 그리면, 그 영역만 분석해서 "
-                    + "라벨과 카테고리를 추론하고 보유 아이템 중 일치하는 것이 있으면 itemId를 함께 알려줍니다. "
-                    + "분석만 수행하며 태그를 저장하지 않으므로, 매칭된 itemId로 실제 태그를 저장하려면 "
+                    + "라벨과 카테고리를 추론하고 보유 아이템 중 일치하는 것이 있으면 matchedItemIds에 "
+                    + "유사도가 높은 순으로 최대 5개까지 목록으로 알려줍니다. "
+                    + "분석만 수행하며 태그를 저장하지 않으므로, 매칭된 itemId(목록 중 하나 선택)로 실제 태그를 저장하려면 "
                     + "이 응답을 이용해 POST /ootds/{ootdId}/tags를 별도로 호출해야 합니다."
     )
     @ApiResponse(responseCode = "200", description = "분석 성공")

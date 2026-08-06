@@ -697,7 +697,33 @@ class OotdTagServiceTest {
 
         assertThat(response.labelText()).isEqualTo("블루종 자켓");
         assertThat(response.categoryLarge()).isEqualTo("아우터");
-        assertThat(response.matchedItemId()).isEqualTo(30L);
+        assertThat(response.matchedItemIds()).containsExactly(30L);
+    }
+
+    @Test
+    void analyzeTagArea_returnsMatchedItemsOrderedBySimilarityDescending() {
+        User owner = user(OWNER_ID);
+        Ootd ootd = ootd(OOTD_ID, owner);
+        // 셋 다 라벨("블루종 자켓")과 부분적으로 겹쳐 매칭 후보가 되지만, 문자열 편집 거리가 가까운 순서는
+        // 정확일치(exact) > 라벨에 몇 글자만 덧붙은 경우(close) > 라벨 일부만 남은 경우(loose) 순이다.
+        Item exactMatch = itemWithCategory(30L, "아우터", "Uniqlo", "블루종 자켓");
+        Item closeMatch = itemWithCategory(31L, "아우터", "Uniqlo", "블루종 자켓 새상품");
+        Item looseMatch = itemWithCategory(32L, "아우터", "Uniqlo", "자켓");
+
+        when(ootdRepository.findById(OOTD_ID)).thenReturn(Optional.of(ootd));
+        when(aiTagService.analyzeRegion(
+                eq(ootd.getImageUrl()),
+                any(BigDecimal.class),
+                any(BigDecimal.class),
+                any(BigDecimal.class),
+                any(BigDecimal.class)
+        )).thenReturn(new RegionAnalysisResult("블루종 자켓", "아우터", "아우터", BigDecimal.valueOf(0.9)));
+        when(itemRepository.findByOwner_IdAndItemStatusOrderByCreatedAtDesc(OWNER_ID, ItemStatus.OWNED))
+                .thenReturn(List.of(looseMatch, closeMatch, exactMatch));
+
+        OotdTagAnalyzeResponse response = ootdTagService.analyzeTagArea(OOTD_ID, OWNER_ID, analyzeRequest());
+
+        assertThat(response.matchedItemIds()).containsExactly(30L, 31L, 32L);
     }
 
     @Test
@@ -719,7 +745,7 @@ class OotdTagServiceTest {
         OotdTagAnalyzeResponse response = ootdTagService.analyzeTagArea(OOTD_ID, OWNER_ID, analyzeRequest());
 
         assertThat(response.labelText()).isEqualTo("블루종 자켓");
-        assertThat(response.matchedItemId()).isNull();
+        assertThat(response.matchedItemIds()).isEmpty();
     }
 
     @Test
@@ -740,7 +766,7 @@ class OotdTagServiceTest {
         OotdTagAnalyzeResponse response = ootdTagService.analyzeTagArea(OOTD_ID, OWNER_ID, analyzeRequest());
 
         assertThat(response.labelText()).isEqualTo("블루종 자켓");
-        assertThat(response.matchedItemId()).isNull();
+        assertThat(response.matchedItemIds()).isEmpty();
         verify(itemRepository, never()).findByOwner_IdAndItemStatusOrderByCreatedAtDesc(any(), any());
     }
 
@@ -763,7 +789,7 @@ class OotdTagServiceTest {
         assertThat(response.labelText()).isNull();
         assertThat(response.categoryLarge()).isNull();
         assertThat(response.categorySmall()).isNull();
-        assertThat(response.matchedItemId()).isNull();
+        assertThat(response.matchedItemIds()).isEmpty();
     }
 
     @Test
