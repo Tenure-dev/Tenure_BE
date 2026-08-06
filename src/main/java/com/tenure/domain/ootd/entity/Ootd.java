@@ -85,6 +85,15 @@ public class Ootd extends BaseTimeEntity {
         return ootd;
     }
 
+    // 수동 태그 작성 흐름 전용. 태그를 다 작성하기 전까지는 다른 사용자에게 노출되면 안 되므로
+    // 임시 비공개(ARCHIVED)로 생성한다. confirmTags()가 호출되어야 ACTIVE로 전환된다.
+    public static Ootd createArchived(User owner, String imageUrl, OotdSource source) {
+        Ootd ootd = create(owner, imageUrl, source);
+        ootd.publicationStatus = OotdPublicationStatus.ARCHIVED;
+        ootd.archivedAt = LocalDateTime.now();
+        return ootd;
+    }
+
     // AI 자동분석이 끝났을 때 호출한다. 이미 사용자가 확인완료(CONFIRMED)한 뒤라면 되돌리지 않는다.
     public void markAutoTagsReady() {
         if (this.tagStatus == OotdTagStatus.ANALYZING) {
