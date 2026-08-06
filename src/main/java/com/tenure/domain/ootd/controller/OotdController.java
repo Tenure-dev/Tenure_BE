@@ -131,6 +131,28 @@ public class OotdController {
     }
 
     @Operation(
+            summary = "OOTD 게시 (수동 태그 작성)",
+            description = "앱 전용 카메라로 촬영한 착장 사진을 OOTD로 게시합니다. "
+                    + "자동 AI 분석을 트리거하지 않으며, 태그 작성 화면에서 사용자가 아이템 박스를 직접 그려서 태그를 등록해야 합니다."
+    )
+    @ApiResponse(
+            responseCode = "200",
+            description = "OOTD 게시 성공",
+            content = @Content(schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = OotdCreateResponse.class))
+    )
+    @ApiResponse(responseCode = "400", description = "업로드 이미지 누락 또는 앱 카메라 촬영이 아닌 이미지")
+    @PostMapping(value = "/manual-tag", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public BaseResponse<OotdCreateResponse> createManualTagOotd(
+            @RequestParam("image") MultipartFile image,
+            @RequestParam(value = "source", required = false) String source
+    ) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        OotdCreateResponse response = ootdService.createManualTagOotd(currentUserId, image, source);
+
+        return BaseResponse.success(response, "OOTD가 게시되었습니다.");
+    }
+
+    @Operation(
             summary = "OOTD 삭제",
             description = "작성자 본인이 게시한 OOTD를 삭제합니다(soft delete). 삭제된 OOTD는 상세 조회, 피드, "
                     + "마이페이지, 검색, 하트/저장 목록 등 모든 목록에서 제외되며 복원 기능은 제공하지 않습니다."
