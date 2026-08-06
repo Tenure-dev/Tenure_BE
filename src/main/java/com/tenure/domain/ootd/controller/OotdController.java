@@ -132,8 +132,10 @@ public class OotdController {
 
     @Operation(
             summary = "OOTD 게시 (수동 태그 작성)",
-            description = "앱 전용 카메라로 촬영한 착장 사진을 OOTD로 게시합니다. "
-                    + "자동 AI 분석을 트리거하지 않으며, 태그 작성 화면에서 사용자가 아이템 박스를 직접 그려서 태그를 등록해야 합니다."
+            description = "앱 전용 카메라로 촬영한 착장 사진을 OOTD로 등록합니다. "
+                    + "자동 AI 분석을 트리거하지 않으며, 태그 작성 화면에서 사용자가 아이템 박스를 직접 그려서 태그를 등록해야 합니다. "
+                    + "태그 작성이 끝나기 전까지 다른 사용자에게 노출되면 안 되므로 임시 비공개(ARCHIVED)로 생성되며, "
+                    + "POST /ootds/{ootdId}/tags/confirm을 호출해야 비로소 공개(ACTIVE)로 전환됩니다."
     )
     @ApiResponse(
             responseCode = "200",

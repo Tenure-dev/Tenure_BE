@@ -35,7 +35,7 @@ public class OotdService {
             MultipartFile image,
             String source
     ) {
-        Ootd ootd = createOotdEntity(currentUserId, image, source);
+        Ootd ootd = createOotdEntity(currentUserId, image, source, false);
 
         eventPublisher.publishEvent(new OotdCreatedEvent(ootd.getId(), ootd.getOwner().getId(), ootd.getImageUrl()));
 
@@ -44,18 +44,20 @@ public class OotdService {
 
     // 태그 작성 화면에서 사용자가 박스를 그릴 때마다 별도 분석 API를 호출하는 흐름이라,
     // 게시 시점에는 자동 분석을 트리거하지 않는다.
+    // 태그를 다 작성하기 전까지는 다른 사용자에게 노출되면 안 되므로 임시 비공개(ARCHIVED)로 생성하고,
+    // 사용자가 POST /ootds/{ootdId}/tags/confirm을 호출해야 비로소 공개(ACTIVE)로 전환된다.
     @Transactional
     public OotdCreateResponse createManualTagOotd(
             Long currentUserId,
             MultipartFile image,
             String source
     ) {
-        Ootd ootd = createOotdEntity(currentUserId, image, source);
+        Ootd ootd = createOotdEntity(currentUserId, image, source, true);
 
         return OotdCreateResponse.of(ootd);
     }
 
-    private Ootd createOotdEntity(Long currentUserId, MultipartFile image, String source) {
+    private Ootd createOotdEntity(Long currentUserId, MultipartFile image, String source, boolean archived) {
         validateImage(image);
         OotdSource ootdSource = validateSource(source);
 
@@ -64,7 +66,9 @@ public class OotdService {
 
         String imageUrl = imageStorageService.store(image, OOTD_IMAGE_DIRECTORY);
 
-        Ootd ootd = Ootd.create(owner, imageUrl, ootdSource);
+        Ootd ootd = archived
+                ? Ootd.createArchived(owner, imageUrl, ootdSource)
+                : Ootd.create(owner, imageUrl, ootdSource);
         ootdRepository.save(ootd);
         return ootd;
     }

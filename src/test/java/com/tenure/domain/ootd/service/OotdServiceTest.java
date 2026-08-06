@@ -70,6 +70,7 @@ class OotdServiceTest {
 
         assertThat(response.imageUrl()).isEqualTo("/files/ootds/photo.jpg");
         assertThat(response.ownerId()).isEqualTo(CURRENT_USER_ID);
+        assertThat(response.publicationStatus()).isEqualTo(OotdPublicationStatus.ACTIVE);
 
         verify(ootdRepository).save(any(Ootd.class));
 
@@ -136,6 +137,25 @@ class OotdServiceTest {
 
         verify(ootdRepository).save(any(Ootd.class));
         verify(eventPublisher, never()).publishEvent(any());
+    }
+
+    @Test
+    void createManualTagOotd_createsAsArchivedUntilTagsAreConfirmed() {
+        // 태그 작성이 끝나기 전까지는 다른 사용자에게 노출되면 안 되므로 ARCHIVED로 생성되고,
+        // tags/confirm 호출(Ootd.confirmTags())이 있어야 ACTIVE로 전환된다.
+        User owner = user(CURRENT_USER_ID);
+        MultipartFile image = new MockMultipartFile("image", "photo.jpg", "image/jpeg", "content".getBytes());
+
+        when(userRepository.findById(CURRENT_USER_ID)).thenReturn(Optional.of(owner));
+        when(imageStorageService.store(eq(image), anyString())).thenReturn("/files/ootds/photo.jpg");
+
+        OotdCreateResponse response = ootdService.createManualTagOotd(CURRENT_USER_ID, image, "CAMERA");
+
+        assertThat(response.publicationStatus()).isEqualTo(OotdPublicationStatus.ARCHIVED);
+
+        ArgumentCaptor<Ootd> captor = ArgumentCaptor.forClass(Ootd.class);
+        verify(ootdRepository).save(captor.capture());
+        assertThat(captor.getValue().getArchivedAt()).isNotNull();
     }
 
     @Test
