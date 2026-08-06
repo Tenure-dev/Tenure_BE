@@ -145,15 +145,17 @@ public class ChatRoomService {
 
         Long tradeId = tradeRepository.findByItemId(itemId).map(Trade::getId).orElse(null);
 
-        boolean hasPurchaseIntent = purchaseIntentRepository
-                .existsByBuyerIdAndSellerIdAndProductIdAndStatus(buyerId, owner.getId(), product.getId(), PurchaseIntentStatus.SENT);
+        Long purchaseIntentId = purchaseIntentRepository
+                .findIdByBuyerIdAndSellerIdAndProductIdAndStatus(buyerId, owner.getId(), product.getId(), PurchaseIntentStatus.SENT)
+                .orElse(null);
 
-        boolean hasPurchaseOffer = purchaseOfferRepository
-                .existsByProposerIdAndOwnerIdAndItemIdAndStatus(buyerId, owner.getId(), itemId, PurchaseOfferStatus.SENT);
+        Long purchaseOfferId = purchaseOfferRepository
+                .findIdByProposerIdAndOwnerIdAndItemIdAndStatus(buyerId, owner.getId(), itemId, PurchaseOfferStatus.SENT)
+                .orElse(null);
 
         // 아이템 상세에서 바로 들어온 경우 처음엔 isOpponentExited false 고정
         return ChatRoomResponse
-                .from(chatRoom, item, product, buyerId, tradeId, hasPurchaseIntent, hasPurchaseOffer, ownerBlockedBuyer, false);
+                .from(chatRoom, item, product, buyerId, tradeId, purchaseIntentId, purchaseOfferId, ownerBlockedBuyer, false);
     }
 
     // 채팅방 목록 조회
@@ -224,12 +226,14 @@ public class ChatRoomService {
         Long opponentId = currentUserId.equals(buyerId) ? sellerId : buyerId;
 
         // 해당 상품에 대해 거래 의사를 보낸 적이 있는가
-        boolean hasPurchaseIntent = purchaseIntentRepository
-                .existsByBuyerIdAndSellerIdAndProductIdAndStatus(buyerId, sellerId, product.getId(), PurchaseIntentStatus.SENT);
+        Long purchaseIntentId = purchaseIntentRepository
+                .findIdByBuyerIdAndSellerIdAndProductIdAndStatus(buyerId, sellerId, product.getId(), PurchaseIntentStatus.SENT)
+                .orElse(null);
 
         // 해당 아이템에 대해 구매 제안을 보낸 적이 있는가
-        boolean hasPurchaseOffer = purchaseOfferRepository
-                .existsByProposerIdAndOwnerIdAndItemIdAndStatus(buyerId, sellerId, item.getId(), PurchaseOfferStatus.SENT);
+        Long purchaseOfferId = purchaseOfferRepository
+                .findIdByProposerIdAndOwnerIdAndItemIdAndStatus(buyerId, sellerId, item.getId(), PurchaseOfferStatus.SENT)
+                .orElse(null);
 
         // 상대방이 나를 차단했는지 여부
         boolean isBlocked = userBlockRepository.isBlocked(opponentId, currentUserId);
@@ -244,7 +248,7 @@ public class ChatRoomService {
                 .ifPresent(Notification::markRead);
 
         return ChatRoomResponse
-                .from(chatRoom, item, product, currentUserId, tradeId, hasPurchaseIntent, hasPurchaseOffer, isBlocked, isOpponentExited);
+                .from(chatRoom, item, product, currentUserId, tradeId, purchaseIntentId, purchaseOfferId, isBlocked, isOpponentExited);
     }
 
     //채팅방 접속 시 unreadCount 업데이트

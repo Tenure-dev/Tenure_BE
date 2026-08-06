@@ -241,7 +241,13 @@ public interface PurchaseIntentRepository extends JpaRepository<PurchaseIntent, 
     );
 
 
-    boolean existsByBuyerIdAndSellerIdAndProductIdAndStatus(
-            Long buyerId, Long sellerId, Long productId, PurchaseIntentStatus status);
+    @Query("select pi.id from PurchaseIntent pi " +
+            "where pi.buyer.id = :buyerId " +
+            "and pi.seller.id = :sellerId and pi.product.id = :productId and pi.status = :status")
+    Optional<Long> findIdByBuyerIdAndSellerIdAndProductIdAndStatus(
+            @Param("buyerId") Long buyerId,
+            @Param("sellerId") Long sellerId,
+            @Param("productId") Long productId,
+            @Param("status") PurchaseIntentStatus status);
 
 }
