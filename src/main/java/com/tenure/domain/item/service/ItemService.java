@@ -18,6 +18,7 @@ import com.tenure.domain.tag.enums.TagStatus;
 import com.tenure.domain.tag.repository.OotdTagRepository;
 import com.tenure.domain.user.entity.User;
 import com.tenure.domain.user.repository.UserRepository;
+import com.tenure.domain.wish.repository.WishRepository;
 import com.tenure.global.exception.CustomException;
 import com.tenure.global.response.PageResponse;
 import com.tenure.global.storage.ImageStorageService;
@@ -28,14 +29,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
-
-import com.tenure.domain.item.dto.ItemOotdCandidateResponse;
-import com.tenure.domain.ootd.entity.Ootd;
-import com.tenure.domain.ootd.enums.OotdPublicationStatus;
-import com.tenure.domain.tag.enums.TagStatus;
-import com.tenure.global.response.PageResponse;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -59,6 +52,8 @@ public class ItemService {
 
     private final OotdTagRepository ootdTagRepository;
     private final ImageStorageService imageStorageService;
+
+    private final WishRepository wishRepository;
 
     @Transactional
     public ItemCreateResponse createItem(Long currentUserId, ItemCreateRequest request) {
@@ -154,7 +149,9 @@ public class ItemService {
                 List.of(ProductStatus.ON_SALE, ProductStatus.TRADING, ProductStatus.SOLD)
         ).orElse(null);
 
-        return ItemDetailResponse.from(item, product);
+        boolean wished = wishRepository.existsByUserIdAndItemId(currentUserId, itemId);
+
+        return ItemDetailResponse.from(item, product, wished);
     }
 
     private Item findItem(Long itemId) {

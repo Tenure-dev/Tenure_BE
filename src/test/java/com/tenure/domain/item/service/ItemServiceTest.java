@@ -45,6 +45,8 @@ import org.springframework.test.util.ReflectionTestUtils;
 import com.tenure.domain.tag.repository.OotdTagRepository;
 import com.tenure.global.storage.ImageStorageService;
 
+import com.tenure.domain.wish.repository.WishRepository;
+
 @ExtendWith(MockitoExtension.class)
 class ItemServiceTest {
 
@@ -72,6 +74,9 @@ class ItemServiceTest {
     @Mock
     private ImageStorageService imageStorageService;
 
+    @Mock
+    private WishRepository wishRepository;
+
     private ItemService itemService;
 
     @BeforeEach
@@ -79,7 +84,7 @@ class ItemServiceTest {
         itemService = new ItemService(
                  productRepository, itemRepository,
                 categoryRepository, userRepository, itemHistoryRepository,
-                ootdTagRepository,imageStorageService
+                ootdTagRepository,imageStorageService, wishRepository
         );
     }
 

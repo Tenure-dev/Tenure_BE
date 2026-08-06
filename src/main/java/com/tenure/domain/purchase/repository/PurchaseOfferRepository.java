@@ -234,6 +234,11 @@ public interface PurchaseOfferRepository extends JpaRepository<PurchaseOffer, Lo
     );
 
 
-    boolean existsByProposerIdAndOwnerIdAndItemIdAndStatus(
-            Long proposerId, Long ownerId, Long itemId, PurchaseOfferStatus status);
+
+    @Query("select po.id from PurchaseOffer po where po.proposer.id = :proposerId and po.owner.id = :ownerId and po.item.id = :itemId and po.status = :status")
+    Optional<Long> findIdByProposerIdAndOwnerIdAndItemIdAndStatus(
+            @Param("proposerId") Long proposerId,
+            @Param("ownerId") Long ownerId,
+            @Param("itemId") Long itemId,
+            @Param("status") PurchaseOfferStatus status);
 }
