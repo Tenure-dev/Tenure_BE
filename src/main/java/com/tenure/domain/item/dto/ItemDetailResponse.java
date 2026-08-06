@@ -56,6 +56,9 @@ public record ItemDetailResponse(
         @Schema(description = "위시 수", example = "10")
         Integer wishCount,
 
+        @Schema(description = "현재 로그인 사용자의 위시 여부", example = "true")
+        Boolean wished,
+
         @Schema(description = "구매 제안 허용 여부", example = "true")
         Boolean purchaseOfferEnabled,
 
@@ -69,7 +72,7 @@ public record ItemDetailResponse(
         ProductStatus saleStatus
 ) {
 
-    public static ItemDetailResponse from(Item item, Product product) {
+    public static ItemDetailResponse from(Item item, Product product, boolean wished) {
         return new ItemDetailResponse(
                 item.getId(),
                 item.getOwner().getId(),
@@ -86,6 +89,7 @@ public record ItemDetailResponse(
                 item.getLastWornAt(),
                 item.getFirstOwnedAt(),
                 item.getWishCount(),
+                wished,
                 item.getPurchaseOfferEnabled(),
                 product == null ? null : product.getId(),
                 product == null ? null : product.getPrice(),
