@@ -50,6 +50,10 @@ public class User extends BaseTimeEntity {
 
     @Column(name = "profile_image_url", length = 500)
     private String profileImageUrl;
+
+    @Column(name = "profile_image_object_key", length = 700)
+    private String profileImageObjectKey;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private UserGender gender;
@@ -145,6 +149,11 @@ public class User extends BaseTimeEntity {
     }
 
     // 계정 설정 부분 수정
+    public void updateProfileImageMetadata(String profileImageUrl, String profileImageObjectKey) {
+        this.profileImageUrl = profileImageUrl;
+        this.profileImageObjectKey = profileImageObjectKey;
+    }
+
     public void updateAccountSettings(
             Integer defaultShippingFee,
             String settlementAccountJson
@@ -169,6 +178,7 @@ public class User extends BaseTimeEntity {
      * username은 unique 제약이 있으므로 id를 붙여 유일성을 보장한다.
      */
     public void withdraw() {
+        this.profileImageObjectKey = null;
         this.email = null;                          // 이메일 비움 (재가입 가능하게)
         this.passwordHash = null;                   // 비밀번호 제거
         this.username = "탈퇴한 사용자" + this.id;    // 익명화 + 유일성 (예: 탈퇴한 사용자3)

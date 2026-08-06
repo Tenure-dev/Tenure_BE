@@ -21,7 +21,9 @@ import com.tenure.domain.user.repository.UserRepository;
 import com.tenure.domain.wish.repository.WishRepository;
 import com.tenure.global.exception.CustomException;
 import com.tenure.global.response.PageResponse;
+import com.tenure.global.storage.ImageDeletionService;
 import com.tenure.global.storage.ImageStorageService;
+import com.tenure.global.storage.validation.ImageValidator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -52,6 +54,8 @@ public class ItemService {
 
     private final OotdTagRepository ootdTagRepository;
     private final ImageStorageService imageStorageService;
+    private final ImageDeletionService imageDeletionService;
+    private final ImageValidator imageValidator;
 
     private final WishRepository wishRepository;
 
@@ -75,6 +79,10 @@ public class ItemService {
                 request.representativeImageUrl()
         );
 
+        item.updateRepresentativeImageMetadata(
+                request.representativeImageUrl(),
+                resolveObjectKey(request.representativeImageUrl())
+        );
         Item savedItem = itemRepository.save(item);
         itemHistoryRepository.save(
                 ItemHistory.ofFirstRegistration(savedItem, owner, resolveFirstRegisteredStartedAt(savedItem))
@@ -218,6 +226,7 @@ public class ItemService {
     ) {
         Item item = findItem(itemId);
         validateItemOwner(item, currentUserId);
+        String previousRepresentativeImageObjectKey = item.getRepresentativeImageObjectKey();
 
         Category largeCategory = findLargeCategory(request.categoryLarge());
         Category smallCategory = findSmallCategory(request.categorySmall(), largeCategory);
@@ -232,6 +241,9 @@ public class ItemService {
                 request.firstOwnedAt(),
                 request.representativeImageUrl()
         );
+        String newRepresentativeImageObjectKey = resolveObjectKey(request.representativeImageUrl());
+        item.updateRepresentativeImageMetadata(request.representativeImageUrl(), newRepresentativeImageObjectKey);
+        deleteIfChanged(previousRepresentativeImageObjectKey, newRepresentativeImageObjectKey);
 
         return ItemUpdateResponse.from(item);
     }
@@ -312,6 +324,10 @@ public class ItemService {
                 request.representativeImageUrl()
         );
 
+        item.updateRepresentativeImageMetadata(
+                request.representativeImageUrl(),
+                resolveObjectKey(request.representativeImageUrl())
+        );
         Item savedItem = itemRepository.save(item);
         itemHistoryRepository.save(
                 ItemHistory.ofFirstRegistration(savedItem, owner, resolveFirstRegisteredStartedAt(savedItem))
@@ -352,6 +368,7 @@ public class ItemService {
 
     @Transactional
     public String uploadItemImage(MultipartFile image) {
+        imageValidator.validateItemRepresentativeImage(image);
         return imageStorageService.store(image, "items");
     }
 
@@ -389,5 +406,15 @@ public class ItemService {
 
     private boolean hasText(String value) {
         return value != null && !value.isBlank();
+    }
+
+    private void deleteIfChanged(String previousObjectKey, String nextObjectKey) {
+        if (previousObjectKey != null && !previousObjectKey.equals(nextObjectKey)) {
+            imageDeletionService.deleteAfterCommit(previousObjectKey);
+        }
+    }
+
+    private String resolveObjectKey(String imageUrl) {
+        return imageStorageService.objectKeyFromUrl(imageUrl).orElse(null);
     }
 }

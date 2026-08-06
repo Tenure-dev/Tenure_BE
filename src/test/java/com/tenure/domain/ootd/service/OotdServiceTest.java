@@ -19,7 +19,10 @@ import com.tenure.domain.user.entity.User;
 import com.tenure.domain.user.repository.UserRepository;
 import com.tenure.global.exception.CommonErrorCode;
 import com.tenure.global.exception.CustomException;
+import com.tenure.global.storage.ImageDeletionService;
 import com.tenure.global.storage.ImageStorageService;
+import com.tenure.global.storage.StoredImage;
+import com.tenure.global.storage.validation.ImageValidator;
 import java.lang.reflect.Constructor;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -49,13 +52,26 @@ class OotdServiceTest {
     private ImageStorageService imageStorageService;
 
     @Mock
+    private ImageDeletionService imageDeletionService;
+
+    @Mock
+    private ImageValidator imageValidator;
+
+    @Mock
     private ApplicationEventPublisher eventPublisher;
 
     private OotdService ootdService;
 
     @BeforeEach
     void setUp() {
-        ootdService = new OotdService(ootdRepository, userRepository, imageStorageService, eventPublisher);
+        ootdService = new OotdService(
+                ootdRepository,
+                userRepository,
+                imageStorageService,
+                imageDeletionService,
+                imageValidator,
+                eventPublisher
+        );
     }
 
     @Test
@@ -64,7 +80,8 @@ class OotdServiceTest {
         MultipartFile image = new MockMultipartFile("image", "photo.jpg", "image/jpeg", "content".getBytes());
 
         when(userRepository.findById(CURRENT_USER_ID)).thenReturn(Optional.of(owner));
-        when(imageStorageService.store(eq(image), anyString())).thenReturn("/files/ootds/photo.jpg");
+        when(imageStorageService.storeImage(eq(image), anyString()))
+                .thenReturn(new StoredImage("/files/ootds/photo.jpg", "ootds/photo.jpg", "image/jpeg", image.getSize()));
 
         OotdCreateResponse response = ootdService.createAutoTagOotd(CURRENT_USER_ID, image, "CAMERA");
 
@@ -128,7 +145,8 @@ class OotdServiceTest {
         MultipartFile image = new MockMultipartFile("image", "photo.jpg", "image/jpeg", "content".getBytes());
 
         when(userRepository.findById(CURRENT_USER_ID)).thenReturn(Optional.of(owner));
-        when(imageStorageService.store(eq(image), anyString())).thenReturn("/files/ootds/photo.jpg");
+        when(imageStorageService.storeImage(eq(image), anyString()))
+                .thenReturn(new StoredImage("/files/ootds/photo.jpg", "ootds/photo.jpg", "image/jpeg", image.getSize()));
 
         OotdCreateResponse response = ootdService.createManualTagOotd(CURRENT_USER_ID, image, "CAMERA");
 
@@ -147,7 +165,8 @@ class OotdServiceTest {
         MultipartFile image = new MockMultipartFile("image", "photo.jpg", "image/jpeg", "content".getBytes());
 
         when(userRepository.findById(CURRENT_USER_ID)).thenReturn(Optional.of(owner));
-        when(imageStorageService.store(eq(image), anyString())).thenReturn("/files/ootds/photo.jpg");
+        when(imageStorageService.storeImage(eq(image), anyString()))
+                .thenReturn(new StoredImage("/files/ootds/photo.jpg", "ootds/photo.jpg", "image/jpeg", image.getSize()));
 
         OotdCreateResponse response = ootdService.createManualTagOotd(CURRENT_USER_ID, image, "CAMERA");
 

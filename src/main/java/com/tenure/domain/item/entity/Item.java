@@ -59,6 +59,9 @@ public class Item extends BaseTimeEntity {
     @Column(name = "representative_image_url", length = 500)
     private String representativeImageUrl;
 
+    @Column(name = "representative_image_object_key", length = 700)
+    private String representativeImageObjectKey;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "item_status", nullable = false, length = 30)
     private ItemStatus itemStatus = ItemStatus.OWNED;
@@ -104,6 +107,11 @@ public class Item extends BaseTimeEntity {
         item.wishCount = 0;
         item.purchaseOfferEnabled = true;
         return item;
+    }
+
+    public void updateRepresentativeImageMetadata(String representativeImageUrl, String representativeImageObjectKey) {
+        this.representativeImageUrl = representativeImageUrl;
+        this.representativeImageObjectKey = representativeImageObjectKey;
     }
 
     public void markOnSale() {

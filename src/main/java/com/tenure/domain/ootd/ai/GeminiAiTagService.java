@@ -6,14 +6,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tenure.domain.item.entity.Category;
 import com.tenure.domain.item.repository.CategoryRepository;
 import com.tenure.global.config.GeminiProperties;
-import com.tenure.global.config.StorageProperties;
+import com.tenure.global.storage.ImageStorageService;
 import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -72,20 +71,20 @@ public class GeminiAiTagService implements AiTagService {
 
     private final RestClient restClient;
     private final GeminiProperties geminiProperties;
-    private final StorageProperties storageProperties;
+    private final ImageStorageService imageStorageService;
     private final ObjectMapper objectMapper;
     private final CategoryRepository categoryRepository;
 
     public GeminiAiTagService(
             RestClient.Builder restClientBuilder,
             GeminiProperties geminiProperties,
-            StorageProperties storageProperties,
+            ImageStorageService imageStorageService,
             ObjectMapper objectMapper,
             CategoryRepository categoryRepository
     ) {
         this.restClient = restClientBuilder.baseUrl(geminiProperties.endpoint()).build();
         this.geminiProperties = geminiProperties;
-        this.storageProperties = storageProperties;
+        this.imageStorageService = imageStorageService;
         this.objectMapper = objectMapper;
         this.categoryRepository = categoryRepository;
     }
@@ -93,8 +92,9 @@ public class GeminiAiTagService implements AiTagService {
     @Override
     public List<AiTagResult> analyze(String imageUrl) {
         try {
-            String base64Image = readImageAsBase64(imageUrl);
-            String responseBody = requestGemini(base64Image);
+            byte[] imageBytes = readImageBytes(imageUrl);
+            String base64Image = Base64.getEncoder().encodeToString(imageBytes);
+            String responseBody = requestGemini(base64Image, detectContentType(imageBytes));
             return parseTagResults(responseBody);
         } catch (Exception e) {
             log.error("Gemini AI 태그 분석 실패 - imageUrl={}", imageUrl, e);
@@ -168,7 +168,7 @@ public class GeminiAiTagService implements AiTagService {
             BigDecimal bboxWidth,
             BigDecimal bboxHeight
     ) throws IOException {
-        BufferedImage original = ImageIO.read(resolveImagePath(imageUrl).toFile());
+        BufferedImage original = ImageIO.read(new ByteArrayInputStream(readImageBytes(imageUrl)));
         if (original == null) {
             throw new IOException("이미지를 읽을 수 없습니다: " + imageUrl);
         }
@@ -196,13 +196,13 @@ public class GeminiAiTagService implements AiTagService {
         return Math.max(min, Math.min(value, max));
     }
 
-    private String requestGemini(String base64Image) {
+    private String requestGemini(String base64Image, String contentType) {
         Map<String, Object> requestBody = Map.of(
                 "contents", List.of(Map.of(
                         "parts", List.of(
                                 Map.of("text", buildPrompt()),
                                 Map.of("inline_data", Map.of(
-                                        "mime_type", "image/jpeg",
+                                        "mime_type", contentType,
                                         "data", base64Image
                                 ))
                         )
@@ -217,14 +217,42 @@ public class GeminiAiTagService implements AiTagService {
                 .body(String.class);
     }
 
-    private String readImageAsBase64(String imageUrl) throws IOException {
-        return Base64.getEncoder().encodeToString(Files.readAllBytes(resolveImagePath(imageUrl)));
+    private byte[] readImageBytes(String imageUrl) throws IOException {
+        String objectKey = imageStorageService.objectKeyFromUrl(imageUrl)
+                .orElseThrow(() -> new IOException("Image object key not found: " + imageUrl));
+        return imageStorageService.readBytes(objectKey);
     }
 
-    private Path resolveImagePath(String imageUrl) {
-        String baseUrl = storageProperties.baseUrl();
-        String relativePath = imageUrl.startsWith(baseUrl) ? imageUrl.substring(baseUrl.length()) : imageUrl;
-        return Path.of(storageProperties.baseDir(), relativePath);
+    private String detectContentType(byte[] imageBytes) {
+        if (imageBytes.length >= 3
+                && unsigned(imageBytes[0]) == 0xFF
+                && unsigned(imageBytes[1]) == 0xD8
+                && unsigned(imageBytes[2]) == 0xFF) {
+            return "image/jpeg";
+        }
+        if (imageBytes.length >= 8
+                && unsigned(imageBytes[0]) == 0x89
+                && imageBytes[1] == 'P'
+                && imageBytes[2] == 'N'
+                && imageBytes[3] == 'G') {
+            return "image/png";
+        }
+        if (imageBytes.length >= 12
+                && imageBytes[0] == 'R'
+                && imageBytes[1] == 'I'
+                && imageBytes[2] == 'F'
+                && imageBytes[3] == 'F'
+                && imageBytes[8] == 'W'
+                && imageBytes[9] == 'E'
+                && imageBytes[10] == 'B'
+                && imageBytes[11] == 'P') {
+            return "image/webp";
+        }
+        return "image/jpeg";
+    }
+
+    private int unsigned(byte value) {
+        return value & 0xFF;
     }
 
     private List<AiTagResult> parseTagResults(String responseBody) throws IOException {

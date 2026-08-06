@@ -41,6 +41,9 @@ public class Ootd extends BaseTimeEntity {
     @Column(name = "image_url", nullable = false, length = 500)
     private String imageUrl;
 
+    @Column(name = "image_object_key", length = 700)
+    private String imageObjectKey;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private OotdSource source = OotdSource.CAMERA;
@@ -78,9 +81,14 @@ public class Ootd extends BaseTimeEntity {
     private Double hotScore = 0.0;
 
     public static Ootd create(User owner, String imageUrl, OotdSource source) {
+        return create(owner, imageUrl, null, source);
+    }
+
+    public static Ootd create(User owner, String imageUrl, String imageObjectKey, OotdSource source) {
         Ootd ootd = new Ootd();
         ootd.owner = owner;
         ootd.imageUrl = imageUrl;
+        ootd.imageObjectKey = imageObjectKey;
         ootd.source = source;
         return ootd;
     }
@@ -88,7 +96,11 @@ public class Ootd extends BaseTimeEntity {
     // 수동 태그 작성 흐름 전용. 태그를 다 작성하기 전까지는 다른 사용자에게 노출되면 안 되므로
     // 임시 비공개(ARCHIVED)로 생성한다. confirmTags()가 호출되어야 ACTIVE로 전환된다.
     public static Ootd createArchived(User owner, String imageUrl, OotdSource source) {
-        Ootd ootd = create(owner, imageUrl, source);
+        return createArchived(owner, imageUrl, null, source);
+    }
+
+    public static Ootd createArchived(User owner, String imageUrl, String imageObjectKey, OotdSource source) {
+        Ootd ootd = create(owner, imageUrl, imageObjectKey, source);
         ootd.publicationStatus = OotdPublicationStatus.ARCHIVED;
         ootd.archivedAt = LocalDateTime.now();
         return ootd;
