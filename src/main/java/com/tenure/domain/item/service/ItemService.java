@@ -379,11 +379,10 @@ public class ItemService {
             Pageable pageable
     ) {
         Item item = findItem(itemId);
-        validateItemOwner(item, currentUserId);
 
         Page<Ootd> ootds = ootdTagRepository.findItemOotdCandidates(
                 itemId,
-                currentUserId,
+                item.getOwner().getId(),
                 TagStatus.CONFIRMED,
                 OotdPublicationStatus.ACTIVE,
                 pageable
