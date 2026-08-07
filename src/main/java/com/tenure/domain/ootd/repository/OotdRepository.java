@@ -603,4 +603,6 @@ public interface OotdRepository extends JpaRepository<Ootd, Long> {
             @Param("cursorId") Long cursorId,
             @Param("size") int size
     );
+
+
 }
