@@ -603,4 +603,36 @@ public interface OotdRepository extends JpaRepository<Ootd, Long> {
             @Param("cursorId") Long cursorId,
             @Param("size") int size
     );
+
+    // 타 사용자 프로필 OOTD 피드 첫 페이지 조회
+    @Query("""
+        select o
+        from Ootd o
+        where o.owner.id = :userId
+          and o.publicationStatus = :publicationStatus
+        order by o.createdAt desc, o.id desc
+        """)
+    List<Ootd> findUserPostsFirstPage(
+            @Param("userId") Long userId,
+            @Param("publicationStatus") OotdPublicationStatus publicationStatus,
+            Pageable pageable
+    );
+
+    // 타 사용자 프로필 OOTD 피드 커서 조회
+    @Query("""
+        select o
+        from Ootd o
+        where o.owner.id = :userId
+          and o.publicationStatus = :publicationStatus
+          and (o.createdAt < :cursorCreatedAt
+               or (o.createdAt = :cursorCreatedAt and o.id < :cursorId))
+        order by o.createdAt desc, o.id desc
+        """)
+    List<Ootd> findUserPosts(
+            @Param("userId") Long userId,
+            @Param("publicationStatus") OotdPublicationStatus publicationStatus,
+            @Param("cursorCreatedAt") LocalDateTime cursorCreatedAt,
+            @Param("cursorId") Long cursorId,
+            Pageable pageable
+    );
 }
