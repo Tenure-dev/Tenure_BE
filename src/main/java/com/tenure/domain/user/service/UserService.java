@@ -53,6 +53,11 @@ import com.tenure.domain.user.repository.UserBlockRepository;
 import com.tenure.domain.auth.service.EmailVerificationStore;
 import com.tenure.domain.address.entity.DeliveryAddress;
 import com.tenure.domain.address.repository.DeliveryAddressRepository;
+import com.tenure.domain.follow.repository.FollowRelationshipRepository;
+import com.tenure.domain.follow.enums.FollowStatus;
+import com.tenure.domain.ootd.repository.OotdRepository;
+import com.tenure.domain.ootd.enums.OotdPublicationStatus;
+import com.tenure.domain.item.repository.ItemRepository;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -82,6 +87,7 @@ public class UserService {
     private final ProductRepository productRepository;
     private final ImageDeletionService imageDeletionService;
     private final ImageValidator imageValidator;
+
 
     // 회원가입
     @Transactional
@@ -254,25 +260,31 @@ public class UserService {
     // 내가 상대를 차단했거나, 상대가 나를 차단한 경우 조회를 막는다.
     @Transactional(readOnly = true)
     public PublicUserProfileResponse getUserProfile(Long currentUserId, Long targetUserId) {
-
-        // 대상 사용자 조회
         User target = userRepository.findById(targetUserId)
                 .orElseThrow(() -> new CustomException(UserErrorCode.USER_NOT_FOUND));
 
-        // 탈퇴한 회원은 프로필 조회 불가 (없는 것처럼 처리)
+        // 탈퇴 회원 조회 차단
         if (target.isWithdrawn()) {
             throw new CustomException(UserErrorCode.USER_NOT_FOUND);
         }
 
-        // 차단 관계 확인
-        // 내가 상대를 차단했거나, 상대가 나를 차단한 경우 -> 차단 에러
+        // 차단 관계 검증 (양방향)
         boolean blockedByMe = userBlockRepository.isBlocked(currentUserId, targetUserId);
         boolean blockedByTarget = userBlockRepository.isBlocked(targetUserId, currentUserId);
         if (blockedByMe || blockedByTarget) {
             throw new CustomException(UserErrorCode.USER_BLOCKED);
         }
 
-        return PublicUserProfileResponse.from(target);
+        // 프로필 헤더 카운트 조회
+        long feedCount = ootdRepository.countByOwner_IdAndPublicationStatus(
+                targetUserId, OotdPublicationStatus.ACTIVE);
+        long itemCount = itemRepository.countByOwner_Id(targetUserId);
+        long followerCount = followRepository.countByFollowing_IdAndStatus(
+                targetUserId, FollowStatus.ACCEPTED);
+        boolean isFollowing = followRepository.existsByFollower_IdAndFollowing_IdAndStatus(
+                currentUserId, targetUserId, FollowStatus.ACCEPTED);
+
+        return PublicUserProfileResponse.of(target, feedCount, itemCount, followerCount, isFollowing);
     }
 
     // 회원 탈퇴
