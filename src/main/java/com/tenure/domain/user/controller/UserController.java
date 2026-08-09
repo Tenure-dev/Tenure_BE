@@ -1,5 +1,7 @@
 package com.tenure.domain.user.controller;
 
+import com.tenure.domain.ootd.dto.OotdMyPostsResponse;
+import com.tenure.domain.ootd.service.OotdMyPostService;
 import com.tenure.domain.user.dto.request.SignupRequest;
 import com.tenure.domain.user.dto.request.UserReportCreateRequest;
 import com.tenure.domain.user.dto.response.BlockResponse;
@@ -15,6 +17,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -36,6 +39,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.LocalDateTime;
+
 
 // 사용자, 인증 관련 API
 @Tag(name = "User", description = "사용자/인증 API")
@@ -46,6 +51,7 @@ public class UserController {
 
     private final UserService userService;
     private final CurrentUserProvider currentUserProvider;
+    private final OotdMyPostService ootdMyPostService;
 
     @Operation(summary = "회원가입", description = "이메일 기반 회원가입을 진행합니다.")
     @PostMapping("/auth/signup")
@@ -155,5 +161,32 @@ public class UserController {
         Long currentUserId = currentUserProvider.getCurrentUserId();
         UserReportCreateResponse response = userService.reportUser(currentUserId, userId, request);
         return BaseResponse.success(response, "신고가 접수되었습니다.");
+    }
+
+    // 타 사용자 OOTD 피드 조회
+    @Operation(
+            summary = "타 사용자 OOTD 피드 조회",
+            description = "특정 사용자의 공개 OOTD 게시물 목록을 커서 기반으로 조회합니다."
+    )
+    @GetMapping("/users/{userId}/ootds")
+    public BaseResponse<OotdMyPostsResponse> getUserPosts(
+            @PathVariable Long userId,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+            LocalDateTime cursorCreatedAt,
+            @RequestParam(required = false) Long cursorId,
+            @RequestParam(defaultValue = "20") Integer size
+    ) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+
+        OotdMyPostsResponse response = ootdMyPostService.getUserPosts(
+                currentUserId,
+                userId,
+                cursorCreatedAt,
+                cursorId,
+                size
+        );
+
+        return BaseResponse.success(response, "사용자 게시물 목록을 조회했습니다.");
     }
 }

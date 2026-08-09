@@ -45,6 +45,7 @@ public class OotdController {
     private final OotdReactionListService ootdReactionListService;
     private final CurrentUserProvider currentUserProvider;
 
+
     @Operation(
             summary = "My OOTD posts",
             description = "Returns my OOTD posts as a flat latest list for my page monthly gallery. Includes active and archived posts."
@@ -276,4 +277,7 @@ public class OotdController {
         );
         return BaseResponse.success(response, "저장한 OOTD 목록을 조회했습니다.");
     }
+
+
+
 }
