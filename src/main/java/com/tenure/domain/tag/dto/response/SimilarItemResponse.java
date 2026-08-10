@@ -2,6 +2,7 @@ package com.tenure.domain.tag.dto.response;
 
 import com.tenure.domain.item.entity.Item;
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.time.LocalDate;
 
 @Schema(description = "태그 작성용 유사 아이템 추천 응답")
 public record SimilarItemResponse(
@@ -22,7 +23,13 @@ public record SimilarItemResponse(
         Long categoryId,
 
         @Schema(description = "카테고리명", example = "반팔 티셔츠")
-        String categoryName
+        String categoryName,
+
+        @Schema(description = "마지막 착용일 (착용 이력 없으면 null)", example = "2026-07-30")
+        LocalDate lastWornAt,
+
+        @Schema(description = "OOTD 인증 착용 횟수", example = "3")
+        Integer ootdVerifiedWearCount
 ) {
 
     public static SimilarItemResponse of(Item item) {
@@ -32,7 +39,9 @@ public record SimilarItemResponse(
                 item.getItemName(),
                 item.getRepresentativeImageUrl(),
                 item.getCategory().getId(),
-                item.getCategory().getName()
+                item.getCategory().getName(),
+                item.getLastWornAt(),
+                item.getOotdVerifiedWearCount()
         );
     }
 }
