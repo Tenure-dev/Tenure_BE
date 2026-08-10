@@ -102,6 +102,9 @@ public class GeminiAiTagService implements AiTagService {
         }
     }
 
+    // 크롭/API 호출/파싱 단계를 분리해서 실패 시 어느 단계에서 문제가 났는지 로그로 구분한다.
+    // 세 단계 모두 정상인데 Gemini가 정말 아이템을 못 찾은 경우(labelText=null)는 예외가 아니라
+    // 정상 응답이라 별도로 info 로그를 남겨, "로그가 없다 = 정상 미인식"으로 구분할 수 있게 한다.
     @Override
     public RegionAnalysisResult analyzeRegion(
             String imageUrl,
@@ -110,14 +113,35 @@ public class GeminiAiTagService implements AiTagService {
             BigDecimal bboxWidth,
             BigDecimal bboxHeight
     ) {
+        String base64Crop;
         try {
-            String base64Crop = readCroppedImageAsBase64(imageUrl, bboxX, bboxY, bboxWidth, bboxHeight);
-            String responseBody = requestGeminiForRegion(base64Crop);
-            return parseRegionResult(responseBody);
+            base64Crop = readCroppedImageAsBase64(imageUrl, bboxX, bboxY, bboxWidth, bboxHeight);
         } catch (Exception e) {
-            log.error("Gemini 영역 분석 실패 - imageUrl={}", imageUrl, e);
+            log.error("Gemini 영역 분석 실패(크롭 단계) - imageUrl={}, bbox=({}, {}, {}, {})",
+                    imageUrl, bboxX, bboxY, bboxWidth, bboxHeight, e);
             return RegionAnalysisResult.empty();
         }
+
+        String responseBody;
+        try {
+            responseBody = requestGeminiForRegion(base64Crop);
+        } catch (Exception e) {
+            log.error("Gemini 영역 분석 실패(API 호출 단계) - imageUrl={}", imageUrl, e);
+            return RegionAnalysisResult.empty();
+        }
+
+        RegionAnalysisResult result;
+        try {
+            result = parseRegionResult(responseBody);
+        } catch (Exception e) {
+            log.error("Gemini 영역 분석 실패(응답 파싱 단계) - imageUrl={}, responseBody={}", imageUrl, responseBody, e);
+            return RegionAnalysisResult.empty();
+        }
+
+        if (result.labelText() == null || result.labelText().isBlank()) {
+            log.info("Gemini 영역 분석 결과 없음(정상 응답, 아이템 미인식) - imageUrl={}", imageUrl);
+        }
+        return result;
     }
 
     private String requestGeminiForRegion(String base64Image) {
