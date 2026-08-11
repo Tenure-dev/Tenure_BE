@@ -6,3 +6,9 @@ spring:
 logging:
   level:
     com.tenure: INFO
+
+jwt:
+  secret: tenure-test-jwt-secret-key-for-tests-32bytes
+
+encryption:
+  secret: tenure-test-aes-secret-key-32b!!
