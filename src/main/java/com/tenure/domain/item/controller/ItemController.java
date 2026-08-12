@@ -229,4 +229,20 @@ public class ItemController {
 
         return BaseResponse.success(response, "판매 전환 대표 OOTD 후보 조회에 성공했습니다.");
     }
+
+    // 보유 아이템 삭제
+    @Operation(
+            summary = "보유 아이템 삭제",
+            description = "로그인 사용자가 본인 소유 아이템을 삭제 처리합니다."
+    )
+    @DeleteMapping("/items/{itemId}")
+    public BaseResponse<ItemDeleteResponse> deleteItem(
+            @PathVariable Long itemId
+    ) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+
+        ItemDeleteResponse response = itemService.deleteItem(currentUserId, itemId);
+
+        return BaseResponse.success(response, "아이템 삭제에 성공했습니다.");
+    }
 }

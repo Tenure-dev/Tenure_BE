@@ -248,6 +248,16 @@ public class ItemService {
         return ItemUpdateResponse.from(item);
     }
 
+    @Transactional
+    public ItemDeleteResponse deleteItem(Long currentUserId, Long itemId) {
+        Item item = findItem(itemId);
+        validateItemAccess(item, currentUserId);
+
+        item.archive();
+
+        return ItemDeleteResponse.of(item);
+    }
+
     @Transactional(readOnly = true)
     public PageResponse<ItemHistoryResponse> getItemHistories(
             Long currentUserId,
