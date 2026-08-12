@@ -128,6 +128,17 @@ class FsdaySeededApiIntegrationTest {
                 .isEqualTo(59L);
         assertThat(count("SELECT COUNT(*) FROM items WHERE item_status = 'OWNED' AND purchase_offer_enabled = FALSE"))
                 .isEqualTo(59L);
+        assertThat(count("""
+                SELECT COUNT(*)
+                FROM items
+                WHERE item_status = 'OWNED'
+                  AND representative_image_url LIKE '/files/seed/ian/ootds/ootd_%'
+                  AND representative_image_object_key LIKE 'seed/ian/ootds/ootd_%'
+                """)).isEqualTo(118L);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT representative_image_url FROM items WHERE id = 920002",
+                String.class
+        )).isEqualTo("/files/seed/ian/ootds/ootd_001.jpg");
     }
 
     private void assertSeedStaticResourceIsServed() throws Exception {
