@@ -766,6 +766,7 @@ class OotdTagServiceTest {
         OotdTagAnalyzeResponse response = ootdTagService.analyzeTagArea(OOTD_ID, OWNER_ID, analyzeRequest());
 
         assertThat(response.labelText()).isEqualTo("블루종 자켓");
+        assertThat(response.confidence()).isEqualByComparingTo(BigDecimal.valueOf(0.2));
         assertThat(response.matchedItemIds()).isEmpty();
         verify(itemRepository, never()).findByOwner_IdAndItemStatusOrderByCreatedAtDesc(any(), any());
     }
@@ -789,6 +790,7 @@ class OotdTagServiceTest {
         assertThat(response.labelText()).isNull();
         assertThat(response.categoryLarge()).isNull();
         assertThat(response.categorySmall()).isNull();
+        assertThat(response.confidence()).isNull();
         assertThat(response.matchedItemIds()).isEmpty();
     }
 

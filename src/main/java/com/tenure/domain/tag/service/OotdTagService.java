@@ -113,7 +113,7 @@ public class OotdTagService {
         );
 
         if (result.labelText() == null || result.labelText().isBlank()) {
-            return OotdTagAnalyzeResponse.of(null, null, null, List.of());
+            return OotdTagAnalyzeResponse.of(null, null, null, result.confidence(), List.of());
         }
 
         List<Long> matchedItemIds = List.of();
@@ -126,7 +126,9 @@ public class OotdTagService {
             ).stream().map(Item::getId).toList();
         }
 
-        return OotdTagAnalyzeResponse.of(result.labelText(), result.categoryLarge(), result.categorySmall(), matchedItemIds);
+        return OotdTagAnalyzeResponse.of(
+                result.labelText(), result.categoryLarge(), result.categorySmall(), result.confidence(), matchedItemIds
+        );
     }
 
     // 보유 아이템 중 카테고리가 일치하고, 라벨/브랜드명이 겹치는 아이템을 유사도 점수(레벤슈타인 거리 기반)가
