@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -40,6 +41,7 @@ import com.tenure.global.config.AiTagProperties;
 import com.tenure.global.exception.CustomException;
 import java.lang.reflect.Constructor;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -86,6 +88,8 @@ class OotdTagServiceTest {
 
         when(ootdRepository.findById(OOTD_ID)).thenReturn(Optional.of(ootd));
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+        when(ootdTagRepository.findWearStatsByItemId(anyLong(), eq(TagStatus.CONFIRMED), eq(OotdPublicationStatus.ACTIVE)))
+                .thenReturn(wearStats(1, LocalDateTime.now()));
 
         OotdTagCreateRequest request = request(ITEM_ID, "CONFIRMED");
 
@@ -96,6 +100,24 @@ class OotdTagServiceTest {
         assertThat(response.source()).isEqualTo(TagSource.MANUAL);
 
         verify(ootdTagRepository).save(any(OotdTag.class));
+    }
+
+    @Test
+    void createManualTag_recalculatesItemWearStats() {
+        User owner = user(OWNER_ID);
+        Ootd ootd = ootd(OOTD_ID, owner);
+        Item item = item(ITEM_ID);
+        LocalDateTime wornAt = LocalDateTime.of(2026, 8, 10, 12, 0);
+
+        when(ootdRepository.findById(OOTD_ID)).thenReturn(Optional.of(ootd));
+        when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+        when(ootdTagRepository.findWearStatsByItemId(ITEM_ID, TagStatus.CONFIRMED, OotdPublicationStatus.ACTIVE))
+                .thenReturn(wearStats(3, wornAt));
+
+        ootdTagService.createManualTag(OOTD_ID, OWNER_ID, request(ITEM_ID, "CONFIRMED"));
+
+        assertThat(item.getOotdVerifiedWearCount()).isEqualTo(3);
+        assertThat(item.getLastWornAt()).isEqualTo(wornAt.toLocalDate());
     }
 
     @Test
@@ -154,6 +176,8 @@ class OotdTagServiceTest {
         when(ootdRepository.findById(OOTD_ID)).thenReturn(Optional.of(ootd));
         when(itemRepository.findAllById(List.of(ITEM_ID, ITEM_ID + 1)))
                 .thenReturn(List.of(firstItem, secondItem));
+        when(ootdTagRepository.findWearStatsByItemId(anyLong(), eq(TagStatus.CONFIRMED), eq(OotdPublicationStatus.ACTIVE)))
+                .thenReturn(wearStats(1, LocalDateTime.now()));
 
         OotdTagBatchResponse response = ootdTagService.createTagsBatch(
                 OOTD_ID, OWNER_ID, batchRequest(List.of(ITEM_ID, ITEM_ID + 1)));
@@ -167,6 +191,35 @@ class OotdTagServiceTest {
 
         verify(ootdTagRepository).deleteAllByOotdId(OOTD_ID);
         verify(ootdTagRepository).saveAll(anyList());
+    }
+
+    @Test
+    void createTagsBatch_recalculatesWearStatsForRemovedAndNewItems() {
+        User owner = user(OWNER_ID);
+        Ootd ootd = ootd(OOTD_ID, owner);
+        Item newItem = item(ITEM_ID);
+        Item removedItem = item(ITEM_ID + 2);
+        LocalDateTime wornAt = LocalDateTime.of(2026, 8, 12, 9, 0);
+        OotdTag previousTag = OotdTag.createManualTag(
+                ootd, removedItem, "청바지",
+                BigDecimal.valueOf(0.1), BigDecimal.valueOf(0.2), BigDecimal.valueOf(0.3), BigDecimal.valueOf(0.4)
+        );
+
+        when(ootdRepository.findById(OOTD_ID)).thenReturn(Optional.of(ootd));
+        when(itemRepository.findAllById(List.of(ITEM_ID))).thenReturn(List.of(newItem));
+        when(ootdTagRepository.findAllByOotdId(OOTD_ID)).thenReturn(List.of(previousTag));
+        // 배치 재등록으로 빠진 아이템은 카운트가 0으로 줄고, 새로 태그된 아이템은 반영된다.
+        when(ootdTagRepository.findWearStatsByItemId(ITEM_ID + 2, TagStatus.CONFIRMED, OotdPublicationStatus.ACTIVE))
+                .thenReturn(wearStats(0, null));
+        when(ootdTagRepository.findWearStatsByItemId(ITEM_ID, TagStatus.CONFIRMED, OotdPublicationStatus.ACTIVE))
+                .thenReturn(wearStats(1, wornAt));
+
+        ootdTagService.createTagsBatch(OOTD_ID, OWNER_ID, batchRequest(List.of(ITEM_ID)));
+
+        assertThat(removedItem.getOotdVerifiedWearCount()).isEqualTo(0);
+        assertThat(removedItem.getLastWornAt()).isNull();
+        assertThat(newItem.getOotdVerifiedWearCount()).isEqualTo(1);
+        assertThat(newItem.getLastWornAt()).isEqualTo(wornAt.toLocalDate());
     }
 
     @Test
@@ -379,6 +432,8 @@ class OotdTagServiceTest {
 
         when(ootdTagRepository.findById(TAG_ID)).thenReturn(Optional.of(aiTag));
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+        when(ootdTagRepository.findWearStatsByItemId(anyLong(), eq(TagStatus.CONFIRMED), eq(OotdPublicationStatus.ACTIVE)))
+                .thenReturn(wearStats(1, LocalDateTime.now()));
 
         OotdTagResponse response = ootdTagService.updateTag(TAG_ID, OWNER_ID, updateRequest(ITEM_ID));
 
@@ -403,12 +458,42 @@ class OotdTagServiceTest {
 
         when(ootdTagRepository.findById(TAG_ID)).thenReturn(Optional.of(manualTag));
         when(itemRepository.findById(ITEM_ID + 1)).thenReturn(Optional.of(newItem));
+        when(ootdTagRepository.findWearStatsByItemId(anyLong(), eq(TagStatus.CONFIRMED), eq(OotdPublicationStatus.ACTIVE)))
+                .thenReturn(wearStats(1, LocalDateTime.now()));
 
         OotdTagResponse response = ootdTagService.updateTag(TAG_ID, OWNER_ID, updateRequest(ITEM_ID + 1));
 
         assertThat(response.status()).isEqualTo(TagStatus.CONFIRMED);
         assertThat(manualTag.getStatus()).isEqualTo(TagStatus.CONFIRMED);
         assertThat(manualTag.getItem()).isEqualTo(newItem);
+    }
+
+    @Test
+    void updateTag_recalculatesWearStatsForBothPreviousAndNewItem() {
+        User owner = user(OWNER_ID);
+        Ootd ootd = ootd(OOTD_ID, owner);
+        Item originalItem = item(ITEM_ID);
+        Item newItem = item(ITEM_ID + 1);
+        LocalDateTime wornAt = LocalDateTime.of(2026, 8, 12, 9, 0);
+        OotdTag manualTag = OotdTag.createManualTag(
+                ootd, originalItem, "청바지",
+                BigDecimal.valueOf(0.1), BigDecimal.valueOf(0.2), BigDecimal.valueOf(0.3), BigDecimal.valueOf(0.4)
+        );
+
+        when(ootdTagRepository.findById(TAG_ID)).thenReturn(Optional.of(manualTag));
+        when(itemRepository.findById(ITEM_ID + 1)).thenReturn(Optional.of(newItem));
+        // item이 교체되면서 태그가 빠져나간 이전 아이템은 카운트가 0으로 줄고, 새로 태그된 아이템은 반영된다.
+        when(ootdTagRepository.findWearStatsByItemId(ITEM_ID, TagStatus.CONFIRMED, OotdPublicationStatus.ACTIVE))
+                .thenReturn(wearStats(0, null));
+        when(ootdTagRepository.findWearStatsByItemId(ITEM_ID + 1, TagStatus.CONFIRMED, OotdPublicationStatus.ACTIVE))
+                .thenReturn(wearStats(2, wornAt));
+
+        ootdTagService.updateTag(TAG_ID, OWNER_ID, updateRequest(ITEM_ID + 1));
+
+        assertThat(originalItem.getOotdVerifiedWearCount()).isEqualTo(0);
+        assertThat(originalItem.getLastWornAt()).isNull();
+        assertThat(newItem.getOotdVerifiedWearCount()).isEqualTo(2);
+        assertThat(newItem.getLastWornAt()).isEqualTo(wornAt.toLocalDate());
     }
 
     @Test
@@ -469,6 +554,30 @@ class OotdTagServiceTest {
         assertThat(response.reviewRequired()).isFalse();
         assertThat(response.publicationStatus()).isEqualTo(OotdPublicationStatus.ACTIVE);
         assertThat(aiTag.getStatus()).isEqualTo(TagStatus.CONFIRMED);
+    }
+
+    @Test
+    void confirmTags_recalculatesWearStatsForConfirmedItems() {
+        User owner = user(OWNER_ID);
+        Ootd ootd = ootd(OOTD_ID, owner);
+        Item item = item(ITEM_ID);
+        OotdTag aiTag = OotdTag.createAiTag(
+                ootd, item, "블루종 자켓",
+                BigDecimal.valueOf(0.1), BigDecimal.valueOf(0.2), BigDecimal.valueOf(0.3), BigDecimal.valueOf(0.4),
+                BigDecimal.valueOf(0.9)
+        );
+        ReflectionTestUtils.setField(aiTag, "id", TAG_ID);
+        LocalDateTime wornAt = LocalDateTime.of(2026, 8, 12, 9, 0);
+
+        when(ootdRepository.findById(OOTD_ID)).thenReturn(Optional.of(ootd));
+        when(ootdTagRepository.findAllByOotdId(OOTD_ID)).thenReturn(List.of(aiTag));
+        when(ootdTagRepository.findWearStatsByItemId(ITEM_ID, TagStatus.CONFIRMED, OotdPublicationStatus.ACTIVE))
+                .thenReturn(wearStats(1, wornAt));
+
+        ootdTagService.confirmTags(OOTD_ID, OWNER_ID);
+
+        assertThat(item.getOotdVerifiedWearCount()).isEqualTo(1);
+        assertThat(item.getLastWornAt()).isEqualTo(wornAt.toLocalDate());
     }
 
     @Test
@@ -890,6 +999,20 @@ class OotdTagServiceTest {
         ReflectionTestUtils.setField(ootd, "id", id);
         ReflectionTestUtils.setField(ootd, "owner", owner);
         return ootd;
+    }
+
+    private OotdTagRepository.ItemWearStatsProjection wearStats(long wornOotdCount, LocalDateTime lastWornAt) {
+        return new OotdTagRepository.ItemWearStatsProjection() {
+            @Override
+            public Long getWornOotdCount() {
+                return wornOotdCount;
+            }
+
+            @Override
+            public LocalDateTime getLastWornAt() {
+                return lastWornAt;
+            }
+        };
     }
 
     private Item item(Long id) {
