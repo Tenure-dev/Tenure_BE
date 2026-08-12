@@ -152,6 +152,9 @@ public class Item extends BaseTimeEntity {
         this.representativeImageUrl = representativeImageUrl;
     }
 
+    public void archive() {
+        this.itemStatus = ItemStatus.ARCHIVED;
+    }
 
     public void markSold() {
         this.itemStatus = ItemStatus.SOLD;
@@ -168,4 +171,5 @@ public class Item extends BaseTimeEntity {
         this.itemStatus = ItemStatus.OWNED;
         this.purchaseOfferEnabled = false;
     }
+
 }

@@ -26,6 +26,7 @@ public interface ItemRepository extends JpaRepository<Item, Long> {
             select item
             from Item item
             where item.owner.id = :ownerUserId 
+              and item.itemStatus <> com.tenure.domain.item.enums.ItemStatus.ARCHIVED
               and (:query = '' or lower(item.brandName) like lower(concat('%', :query, '%'))
                    or lower(item.itemName) like lower(concat('%', :query, '%')))
               and (:itemStatus is null or item.itemStatus = :itemStatus)
