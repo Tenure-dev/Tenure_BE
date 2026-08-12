@@ -122,6 +122,13 @@ public class Item extends BaseTimeEntity {
         this.purchaseOfferEnabled = purchaseOfferEnabled;
     }
 
+    // 현재 CONFIRMED로 태그된 서로 다른 OOTD 개수/최근 게시일 기준으로 매번 재계산한 값을 덮어쓴다.
+    // 누적(+1) 방식이 아니므로 같은 게시물 내 태그 추가/삭제를 반복해도 부풀지 않고, 태그가 빠지면 자동 감소한다.
+    public void updateWearStats(int ootdVerifiedWearCount, LocalDate lastWornAt) {
+        this.ootdVerifiedWearCount = ootdVerifiedWearCount;
+        this.lastWornAt = lastWornAt;
+    }
+
     public void increaseWishCount() {
         this.wishCount++;
     }

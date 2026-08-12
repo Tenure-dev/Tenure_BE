@@ -29,6 +29,26 @@ public interface OotdTagRepository extends JpaRepository<OotdTag, Long> {
         Long getTogetherCount();
     }
 
+    interface ItemWearStatsProjection {
+        Long getWornOotdCount();
+        LocalDateTime getLastWornAt();
+    }
+
+    // 아이템 착용 정보(ootdVerifiedWearCount/lastWornAt) 재계산용 —
+    // 현재 CONFIRMED 상태로, 게시(ACTIVE)된 서로 다른 OOTD 개수와 그중 가장 최근 OOTD 게시일을 조회한다.
+    @Query("""
+            select count(distinct tag.ootd.id) as wornOotdCount, max(tag.ootd.createdAt) as lastWornAt
+            from OotdTag tag
+            where tag.item.id = :itemId
+              and tag.status = :tagStatus
+              and tag.ootd.publicationStatus = :publicationStatus
+            """)
+    ItemWearStatsProjection findWearStatsByItemId(
+            @Param("itemId") Long itemId,
+            @Param("tagStatus") TagStatus tagStatus,
+            @Param("publicationStatus") OotdPublicationStatus publicationStatus
+    );
+
     @Query("""
             select count(distinct ootd.id)
             from OotdTag tag

@@ -26,7 +26,9 @@ import com.tenure.global.config.AiTagProperties;
 import com.tenure.global.exception.CustomException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -232,6 +234,7 @@ public class OotdTagService {
                 request.bbox().height()
         );
         ootdTagRepository.save(tag);
+        recalculateWearStats(item);
 
         return OotdTagResponse.of(tag);
     }
@@ -244,6 +247,7 @@ public class OotdTagService {
 
         Item item = itemRepository.findById(request.itemId())
                 .orElseThrow(() -> new CustomException(TagErrorCode.ITEM_NOT_FOUND));
+        Item previousItem = tag.getItem();
 
         tag.updateContent(
                 item,
@@ -253,6 +257,13 @@ public class OotdTagService {
                 request.bbox().width(),
                 request.bbox().height()
         );
+
+        // item이 교체된 경우, 새로 태그된 아이템뿐 아니라 태그가 빠져나간 이전 아이템의 착용 정보도
+        // 다시 계산해야 카운트가 남아있지 않는다.
+        recalculateWearStats(item);
+        if (previousItem != null && !previousItem.getId().equals(item.getId())) {
+            recalculateWearStats(previousItem);
+        }
 
         return OotdTagResponse.of(tag);
     }
@@ -278,6 +289,15 @@ public class OotdTagService {
             throw new CustomException(TagErrorCode.BATCH_ITEM_NOT_FOUND);
         }
 
+        // 기존 태그가 삭제되면서 빠지는 아이템도 착용 정보 재계산 대상이므로, 삭제 전에 대상 아이템을 모아둔다.
+        Map<Long, Item> affectedItemsById = new LinkedHashMap<>();
+        ootdTagRepository.findAllByOotdId(ootdId).forEach(previousTag -> {
+            Item previousItem = previousTag.getItem();
+            if (previousItem != null) {
+                affectedItemsById.put(previousItem.getId(), previousItem);
+            }
+        });
+
         ootdTagRepository.deleteAllByOotdId(ootdId);
 
         List<OotdTag> tags = request.tags().stream()
@@ -292,6 +312,9 @@ public class OotdTagService {
                 ))
                 .toList();
         ootdTagRepository.saveAll(tags);
+
+        tags.forEach(tag -> affectedItemsById.put(tag.getItem().getId(), tag.getItem()));
+        affectedItemsById.values().forEach(this::recalculateWearStats);
 
         return OotdTagBatchResponse.of(ootd.getId(), tags);
     }
@@ -310,7 +333,30 @@ public class OotdTagService {
         tags.forEach(OotdTag::confirm);
         ootd.confirmTags();
 
+        // AUTO_UNCONFIRMED -> CONFIRMED로 상태가 바뀐 태그들의 아이템 착용 정보를 재계산한다.
+        // 이미 CONFIRMED였던 태그(수동 등록분)는 재계산해도 값이 그대로라 안전하다.
+        Map<Long, Item> itemsById = new LinkedHashMap<>();
+        tags.forEach(tag -> {
+            Item item = tag.getItem();
+            if (item != null) {
+                itemsById.put(item.getId(), item);
+            }
+        });
+        itemsById.values().forEach(this::recalculateWearStats);
+
         return OotdTagConfirmResponse.of(ootd);
+    }
+
+    // 해당 아이템이 현재 CONFIRMED로 태그된, 게시(ACTIVE) 상태인 서로 다른 OOTD 개수와
+    // 그중 가장 최근 OOTD 날짜로 착용 정보를 매번 재계산해서 덮어쓴다. 누적(+1) 방식이 아니므로
+    // 같은 게시물 내 태그 추가/삭제를 반복해도 카운트가 부풀지 않고, 태그가 빠지면 자동으로 줄어든다.
+    private void recalculateWearStats(Item item) {
+        OotdTagRepository.ItemWearStatsProjection stats = ootdTagRepository.findWearStatsByItemId(
+                item.getId(), TagStatus.CONFIRMED, OotdPublicationStatus.ACTIVE
+        );
+        int wornOotdCount = stats.getWornOotdCount() == null ? 0 : stats.getWornOotdCount().intValue();
+        LocalDate lastWornAt = stats.getLastWornAt() == null ? null : stats.getLastWornAt().toLocalDate();
+        item.updateWearStats(wornOotdCount, lastWornAt);
     }
 
     @Transactional(readOnly = true)
