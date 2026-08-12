@@ -109,6 +109,19 @@ class FsdaySeededApiIntegrationTest {
         assertThat(count("SELECT COUNT(*) FROM items")).isEqualTo(250L);
         assertThat(count("SELECT COUNT(*) FROM products")).isEqualTo(132L);
         assertThat(count("SELECT COUNT(*) FROM ootd_tags")).isEqualTo(250L);
+        assertThat(count("""
+                SELECT COUNT(*)
+                FROM (
+                    SELECT ootd_id
+                    FROM ootd_tags
+                    WHERE id BETWEEN 926001 AND 926250
+                    GROUP BY ootd_id
+                    HAVING COUNT(*) = 5
+                       AND COUNT(DISTINCT bbox_y) = 5
+                       AND MAX(bbox_height) = 0.10000
+                       AND MAX(bbox_width) <= 0.26000
+                ) positioned_ootds
+                """)).isEqualTo(50L);
         assertThat(count("SELECT COUNT(*) FROM chat_rooms")).isZero();
         assertThat(count("SELECT COUNT(*) FROM trades")).isZero();
         assertThat(count("SELECT COUNT(*) FROM items WHERE item_status = 'OWNED' AND purchase_offer_enabled = TRUE"))
