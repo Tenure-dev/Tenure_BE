@@ -80,5 +80,5 @@ encryption:
   secret: ${ENCRYPTION_SECRET:tenure-local-aes-secret-key-32b!}
 
 resend:
-  api-key: ${RESEND_API_KEY}
+  api-key: ${RESEND_API_KEY:}
   from: ${RESEND_FROM:noreply@tenure.co.kr}
