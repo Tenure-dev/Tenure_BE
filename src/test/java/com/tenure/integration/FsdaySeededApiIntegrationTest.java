@@ -32,6 +32,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -55,13 +56,11 @@ class FsdaySeededApiIntegrationTest {
     private static final long BUYER_ID = 900001L;
     private static final long SELLER_ID = 900101L;
     private static final long BUYER_ADDRESS_ID = 901001L;
-    private static final long BUYER_TAG_ITEM_ID = 903001L;
-    private static final long SELLER_OOTD_ID = 905001L;
-    private static final long SALE_ITEM_ID = 902011L;
-    private static final long SALE_PRODUCT_ID = 904011L;
-    private static final long OFFER_ITEM_ID = 902013L;
-    private static final long CHAT_ROOM_ID = 911001L;
-    private static final long BUYER_NOTIFICATION_ID = 912012L;
+    private static final long BUYER_TAG_ITEM_ID = 920051L;
+    private static final long SELLER_OOTD_ID = 925001L;
+    private static final long SALE_ITEM_ID = 920001L;
+    private static final long SALE_PRODUCT_ID = 924001L;
+    private static final long OFFER_ITEM_ID = 920002L;
 
     @Container
     @ServiceConnection
@@ -75,6 +74,9 @@ class FsdaySeededApiIntegrationTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     @DynamicPropertySource
     static void testProperties(DynamicPropertyRegistry registry) {
@@ -92,6 +94,7 @@ class FsdaySeededApiIntegrationTest {
         assertThat(buyer.userId()).isEqualTo(BUYER_ID);
         assertThat(seller.userId()).isEqualTo(SELLER_ID);
 
+        assertIanSeedDataReplacedOldRelationshipData();
         assertSeedStaticResourceIsServed();
         assertBaseApiSurfaceIsUsable(buyer, seller);
         long createdOotdId = postOotdWithTaggedItemAndVerifyFeedAndMyPage(buyer);
@@ -101,8 +104,21 @@ class FsdaySeededApiIntegrationTest {
         createAndCancelPurchaseOfferForExploration(buyer);
     }
 
+    private void assertIanSeedDataReplacedOldRelationshipData() {
+        assertThat(count("SELECT COUNT(*) FROM ootds")).isEqualTo(50L);
+        assertThat(count("SELECT COUNT(*) FROM items")).isEqualTo(250L);
+        assertThat(count("SELECT COUNT(*) FROM products")).isEqualTo(132L);
+        assertThat(count("SELECT COUNT(*) FROM ootd_tags")).isEqualTo(250L);
+        assertThat(count("SELECT COUNT(*) FROM chat_rooms")).isZero();
+        assertThat(count("SELECT COUNT(*) FROM trades")).isZero();
+        assertThat(count("SELECT COUNT(*) FROM items WHERE item_status = 'OWNED' AND purchase_offer_enabled = TRUE"))
+                .isEqualTo(59L);
+        assertThat(count("SELECT COUNT(*) FROM items WHERE item_status = 'OWNED' AND purchase_offer_enabled = FALSE"))
+                .isEqualTo(59L);
+    }
+
     private void assertSeedStaticResourceIsServed() throws Exception {
-        mockMvc.perform(get("/files/seed/ootd-seller-08.jpg"))
+        mockMvc.perform(get("/files/seed/ian/ootds/ootd_001.jpg"))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.IMAGE_JPEG));
     }
@@ -132,17 +148,14 @@ class FsdaySeededApiIntegrationTest {
         expectOkActions(post("/search/recent-users/{userId}", SELLER_ID).with(auth(buyer.token())));
 
         expectOkActions(get("/wishes").with(auth(buyer.token())));
+        expectOkActions(post("/items/{itemId}/wish", SALE_ITEM_ID).with(auth(buyer.token())));
         expectOkActions(patch("/items/{itemId}/wish/notification", SALE_ITEM_ID)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(json(Map.of("notificationEnabled", false)))
                 .with(auth(buyer.token())));
         expectOkActions(get("/notifications").with(auth(buyer.token())));
-        expectOkActions(post("/notifications/{notificationId}/read", BUYER_NOTIFICATION_ID).with(auth(buyer.token())));
 
         expectOkActions(get("/chats").with(auth(buyer.token())));
-        expectOkActions(get("/chats/{chatRoomId}", CHAT_ROOM_ID).with(auth(buyer.token())));
-        expectOkActions(get("/chats/{chatRoomId}/messages", CHAT_ROOM_ID).with(auth(buyer.token())));
-        expectOkActions(post("/chats/{chatRoomId}/read", CHAT_ROOM_ID).with(auth(seller.token())));
     }
 
     private long postOotdWithTaggedItemAndVerifyFeedAndMyPage(Session buyer) throws Exception {
@@ -305,6 +318,12 @@ class FsdaySeededApiIntegrationTest {
 
     private String json(Object value) throws Exception {
         return objectMapper.writeValueAsString(value);
+    }
+
+    private long count(String sql) {
+        Long value = jdbcTemplate.queryForObject(sql, Long.class);
+        assertThat(value).isNotNull();
+        return value;
     }
 
     private RequestPostProcessor auth(String token) {
