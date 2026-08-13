@@ -55,9 +55,13 @@ public class ChatRoomResponse {
                 ? chatRoom.getSeller().getProfileImageUrl()
                 : chatRoom.getBuyer().getProfileImageUrl();
 
+        ProductStatus productStatus = product != null ? product.getProductStatus() : null;
+        Integer price = product != null ? product.getPrice() : null;
+        Long productId = product != null ? product.getId() : null;
+
         return new ChatRoomResponse(chatRoom.getId(), opponentUserId, opponentUsername, opponentProfileImage, item.getId(),
-                item.getRepresentativeImageUrl(), item.getBrandName(), item.getItemName(), product.getProductStatus(), product.getPrice(),
-                item.getLastWornAt(), isBuyer, tradeId, product.getId(), purchaseIntentId, purchaseOfferId, isBlocked, isOpponentExited
+                item.getRepresentativeImageUrl(), item.getBrandName(), item.getItemName(), productStatus, price,
+                item.getLastWornAt(), isBuyer, tradeId, productId, purchaseIntentId, purchaseOfferId, isBlocked, isOpponentExited
         );
     }
 

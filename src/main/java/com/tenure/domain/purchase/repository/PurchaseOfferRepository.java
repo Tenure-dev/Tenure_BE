@@ -241,4 +241,11 @@ public interface PurchaseOfferRepository extends JpaRepository<PurchaseOffer, Lo
             @Param("ownerId") Long ownerId,
             @Param("itemId") Long itemId,
             @Param("status") PurchaseOfferStatus status);
+
+    @Query("select count(po) > 0 from PurchaseOffer po where po.proposer.id = :proposerId and po.owner.id = :ownerId and po.item.id = :itemId and po.status in :statuses")
+    boolean existsByProposerIdAndOwnerIdAndItemIdAndStatusIn(
+            @Param("proposerId") Long proposerId,
+            @Param("ownerId") Long ownerId,
+            @Param("itemId") Long itemId,
+            @Param("statuses") List<PurchaseOfferStatus> statuses);
 }
