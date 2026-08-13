@@ -126,21 +126,20 @@ public class ChatRoomService {
                     // 미판매 or 판매완료 상품인 경우
                     // 미판매 상품 + 구매제안 = 채팅방 생성 가능
                     boolean hasSentOffer = purchaseOfferRepository
-                            .findIdByProposerIdAndOwnerIdAndItemIdAndStatus(buyerId, owner.getId(), itemId, SENT)
-                            .isPresent();
+                            .existsByProposerIdAndOwnerIdAndItemIdAndStatusIn(
+                                    buyerId, owner.getId(), itemId, List.of(SENT, ACCEPTED));
 
                     if(!hasSentOffer) {
                         log.warn("[채팅방 생성/조회] 해당 상품은 미판매 상품입니다. itemId = {}", itemId);
                         throw new CustomException(ProductErrorCode.PRODUCT_NOT_ON_SALE);
                     }
+
+                    // 판매 등록을 안했을 경우 null
                     Product offerSentProduct = productRepository.findByItemId(itemId)
-                            .orElseThrow(() -> {
-                                log.warn("[채팅방 생성/조회] 상품을 찾을 수 없습니다. itemId = {}", itemId);
-                                return new CustomException(ProductErrorCode.PRODUCT_NOT_FOUND);
-                            });
+                            .orElse(null);
 
                     // 상품이 판매 완료 된 경우
-                    if(offerSentProduct.getProductStatus() == SOLD) {
+                    if(offerSentProduct != null && offerSentProduct.getProductStatus() == SOLD) {
                         log.warn("[채팅방 생성/조회] 해당 상품은 판매 완료된 상품입니다. itemId = {}", itemId);
                         throw new CustomException(ProductErrorCode.PRODUCT_NOT_ON_SALE);
                     }
@@ -168,7 +167,8 @@ public class ChatRoomService {
 
         Long tradeId = tradeRepository.findByItemId(itemId).map(Trade::getId).orElse(null);
 
-        Long purchaseIntentId = purchaseIntentRepository
+        // 판매등록을 안했을경우 product 생성 x
+        Long purchaseIntentId = (product == null) ? null : purchaseIntentRepository
                 .findIdByBuyerIdAndSellerIdAndProductIdAndStatus(buyerId, owner.getId(), product.getId(), PurchaseIntentStatus.SENT)
                 .orElse(null);
 
@@ -234,11 +234,7 @@ public class ChatRoomService {
         Item item = chatRoom.getItem();
 
         //해당 아이템의 product 조회
-        Product product = productRepository.findByItemId(item.getId())
-                .orElseThrow(() -> {
-                    log.warn("[채팅방 조회] 상품을 찾을 수 없습니다. itemId = {}", item.getId());
-                    return new CustomException(ProductErrorCode.PRODUCT_NOT_FOUND);
-                });
+        Product product = productRepository.findByItemId(item.getId()).orElse(null);
 
         //아이템에 대한 거래가 성사됐는지 판단
         Long tradeId = tradeRepository
@@ -248,8 +244,8 @@ public class ChatRoomService {
         Long sellerId = chatRoom.getSeller().getId();
         Long opponentId = currentUserId.equals(buyerId) ? sellerId : buyerId;
 
-        // 해당 상품에 대해 거래 의사를 보낸 적이 있는가
-        Long purchaseIntentId = purchaseIntentRepository
+        // 해당 상품에 대해 거래 의사를 보낸 적이 있는가 (product 없는 제안 기반 거래는 null)
+        Long purchaseIntentId = (product == null) ? null : purchaseIntentRepository
                 .findIdByBuyerIdAndSellerIdAndProductIdAndStatus(buyerId, sellerId, product.getId(), PurchaseIntentStatus.SENT)
                 .orElse(null);
 
