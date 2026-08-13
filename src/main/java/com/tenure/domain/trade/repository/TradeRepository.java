@@ -190,4 +190,14 @@ public interface TradeRepository extends JpaRepository<Trade, Long> {
     boolean existsByItemIdAndStatusNotIn(Long itemId, Collection<TradeStatus> statuses);
 
     Optional<Trade> findByItemId(Long itemId);
+
+    @Query("""
+            select trade
+            from Trade trade
+            join fetch trade.buyer
+            join fetch trade.seller
+            join fetch trade.item
+            where trade.id = :tradeId
+            """)
+    Optional<Trade> findByIdWithParticipants(@Param("tradeId") Long tradeId);
 }

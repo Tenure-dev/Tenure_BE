@@ -77,6 +77,17 @@ public class ChatController {
     }
 
     @Operation(
+            summary = "거래 기반 채팅방 생성 또는 조회",
+            description = "거래 상세 화면에서 채팅하기 버튼 클릭 시 호출합니다. 구매자/판매자 모두 사용 가능합니다."
+    )
+    @PostMapping("/trades/{tradeId}")
+    public BaseResponse<ChatRoomResponse> findOrCreateChatRoomByTrade(@PathVariable Long tradeId) {
+        ChatRoomResponse chatRoomResponse = chatRoomService
+                .findOrCreateChatRoomByTrade(currentUserProvider.getCurrentUserId(), tradeId);
+        return BaseResponse.success(chatRoomResponse);
+    }
+
+    @Operation(
             summary = "채팅방 읽음 처리",
             description = "채팅방 접속 시 호출합니다. 읽지 않은 메시지 수를 0으로 초기화합니다."
     )
