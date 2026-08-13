@@ -105,7 +105,7 @@ public class ChatRoomService {
                 log.warn("[채팅방 생성/조회] 판매자가 채팅방 생성 시 purchaseOfferId 필요. currentUserId = {}", currentUserId);
                 throw new CustomException(ChatErrorCode.CHAT_CREATION_NOT_ALLOWED);
             }
-            PurchaseOffer offer = purchaseOfferRepository.findById(purchaseOfferId)
+            PurchaseOffer offer = purchaseOfferRepository.findByIdWithUsers(purchaseOfferId)
                     .orElseThrow(() -> {
                         log.warn("[채팅방 생성/조회] 구매 제안을 찾을 수 없습니다. purchaseOfferId = {}", purchaseOfferId);
                         return new CustomException(PurchaseOfferErrorCode.PURCHASE_OFFER_NOT_FOUND);
@@ -204,9 +204,13 @@ public class ChatRoomService {
                 .findIdByProposerIdAndOwnerIdAndItemIdAndStatus(buyerId, owner.getId(), itemId, SENT)
                 .orElse(null);
 
+        Integer offerPrice = purchaseOfferRepository
+                .findOfferPriceByProposerIdAndOwnerIdAndItemIdAndStatusIn(buyerId, owner.getId(), itemId, List.of(SENT, ACCEPTED))
+                .orElse(null);
+
         // 아이템 상세에서 바로 들어온 경우 처음엔 isOpponentExited false 고정
         return ChatRoomResponse
-                .from(chatRoom, item, product, currentUserId, tradeId, purchaseIntentId, sentPurchaseOfferId, ownerBlockedBuyer, false);
+                .from(chatRoom, item, product, currentUserId, tradeId, purchaseIntentId, sentPurchaseOfferId, ownerBlockedBuyer, false, offerPrice);
     }
 
     // 채팅방 목록 조회
@@ -282,6 +286,10 @@ public class ChatRoomService {
                 .findIdByProposerIdAndOwnerIdAndItemIdAndStatus(buyerId, sellerId, item.getId(), SENT)
                 .orElse(null);
 
+        Integer offerPrice = purchaseOfferRepository
+                .findOfferPriceByProposerIdAndOwnerIdAndItemIdAndStatusIn(buyerId, sellerId, item.getId(), List.of(SENT, ACCEPTED))
+                .orElse(null);
+
         // 상대방이 나를 차단했는지 여부
         boolean isBlocked = userBlockRepository.isBlocked(opponentId, currentUserId);
 
@@ -295,7 +303,7 @@ public class ChatRoomService {
                 .ifPresent(Notification::markRead);
 
         return ChatRoomResponse
-                .from(chatRoom, item, product, currentUserId, tradeId, purchaseIntentId, purchaseOfferId, isBlocked, isOpponentExited);
+                .from(chatRoom, item, product, currentUserId, tradeId, purchaseIntentId, purchaseOfferId, isBlocked, isOpponentExited, offerPrice);
     }
 
     //채팅방 접속 시 unreadCount 업데이트

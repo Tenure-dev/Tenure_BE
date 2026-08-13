@@ -36,6 +36,9 @@ public interface PurchaseOfferRepository extends JpaRepository<PurchaseOffer, Lo
     @Query("select offer from PurchaseOffer offer where offer.id = :offerId")
     Optional<PurchaseOffer> findByIdForUpdate(@Param("offerId") Long offerId);
 
+    @Query("select offer from PurchaseOffer offer join fetch offer.item join fetch offer.owner join fetch offer.proposer where offer.id = :offerId")
+    Optional<PurchaseOffer> findByIdWithUsers(@Param("offerId") Long offerId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             select offer
@@ -241,6 +244,13 @@ public interface PurchaseOfferRepository extends JpaRepository<PurchaseOffer, Lo
             @Param("ownerId") Long ownerId,
             @Param("itemId") Long itemId,
             @Param("status") PurchaseOfferStatus status);
+
+    @Query("select po.offerPrice from PurchaseOffer po where po.proposer.id = :proposerId and po.owner.id = :ownerId and po.item.id = :itemId and po.status in :statuses")
+    Optional<Integer> findOfferPriceByProposerIdAndOwnerIdAndItemIdAndStatusIn(
+            @Param("proposerId") Long proposerId,
+            @Param("ownerId") Long ownerId,
+            @Param("itemId") Long itemId,
+            @Param("statuses") List<PurchaseOfferStatus> statuses);
 
     @Query("select count(po) > 0 from PurchaseOffer po where po.proposer.id = :proposerId and po.owner.id = :ownerId and po.item.id = :itemId and po.status in :statuses")
     boolean existsByProposerIdAndOwnerIdAndItemIdAndStatusIn(
