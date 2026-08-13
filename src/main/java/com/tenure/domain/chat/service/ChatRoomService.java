@@ -51,6 +51,7 @@ import java.util.List;
 import java.util.Objects;
 
 import static com.tenure.domain.product.enums.ProductStatus.*;
+import static com.tenure.domain.purchase.enums.PurchaseOfferStatus.*;
 
 @Service
 @Slf4j
@@ -120,11 +121,33 @@ public class ChatRoomService {
 
         //product 중에서 해당 아이템이 판매중이거나 거래중인 항목을 찾음
         Product product = productRepository.findByItemIdAndProductStatusIn(itemId, List.of(ON_SALE, TRADING))
-                .orElseThrow(() -> {
-                    log.warn("[채팅방 생성/조회] 해당 상품은 판매중이거나 거래중이 아닙니다. itemId = {}", itemId);
-                    return new CustomException(ProductErrorCode.PRODUCT_NOT_ON_SALE);
-                });
+                .orElseGet(() -> {
 
+                    // 미판매 or 판매완료 상품인 경우
+                    // 미판매 상품 + 구매제안 = 채팅방 생성 가능
+                    boolean hasSentOffer = purchaseOfferRepository
+                            .findIdByProposerIdAndOwnerIdAndItemIdAndStatus(buyerId, owner.getId(), itemId, SENT)
+                            .isPresent();
+
+                    if(!hasSentOffer) {
+                        log.warn("[채팅방 생성/조회] 해당 상품은 미판매 상품입니다. itemId = {}", itemId);
+                        throw new CustomException(ProductErrorCode.PRODUCT_NOT_ON_SALE);
+                    }
+                    Product offerSentProduct = productRepository.findByItemId(itemId)
+                            .orElseThrow(() -> {
+                                log.warn("[채팅방 생성/조회] 상품을 찾을 수 없습니다. itemId = {}", itemId);
+                                return new CustomException(ProductErrorCode.PRODUCT_NOT_FOUND);
+                            });
+
+                    // 상품이 판매 완료 된 경우
+                    if(offerSentProduct.getProductStatus() == SOLD) {
+                        log.warn("[채팅방 생성/조회] 해당 상품은 판매 완료된 상품입니다. itemId = {}", itemId);
+                        throw new CustomException(ProductErrorCode.PRODUCT_NOT_ON_SALE);
+                    }
+
+                    // 미판매 + 구매제안
+                    return offerSentProduct;
+                });
 
         ChatRoom  chatRoom;
 
@@ -150,7 +173,7 @@ public class ChatRoomService {
                 .orElse(null);
 
         Long purchaseOfferId = purchaseOfferRepository
-                .findIdByProposerIdAndOwnerIdAndItemIdAndStatus(buyerId, owner.getId(), itemId, PurchaseOfferStatus.SENT)
+                .findIdByProposerIdAndOwnerIdAndItemIdAndStatus(buyerId, owner.getId(), itemId, SENT)
                 .orElse(null);
 
         // 아이템 상세에서 바로 들어온 경우 처음엔 isOpponentExited false 고정
@@ -232,7 +255,7 @@ public class ChatRoomService {
 
         // 해당 아이템에 대해 구매 제안을 보낸 적이 있는가
         Long purchaseOfferId = purchaseOfferRepository
-                .findIdByProposerIdAndOwnerIdAndItemIdAndStatus(buyerId, sellerId, item.getId(), PurchaseOfferStatus.SENT)
+                .findIdByProposerIdAndOwnerIdAndItemIdAndStatus(buyerId, sellerId, item.getId(), SENT)
                 .orElse(null);
 
         // 상대방이 나를 차단했는지 여부
