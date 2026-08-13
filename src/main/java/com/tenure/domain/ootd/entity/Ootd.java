@@ -106,10 +106,13 @@ public class Ootd extends BaseTimeEntity {
         return ootd;
     }
 
-    // AI 자동분석이 끝났을 때 호출한다. 이미 사용자가 확인완료(CONFIRMED)한 뒤라면 되돌리지 않는다.
+    // AI 자동분석이 끝났을 때 호출한다. auto-tag 플로우는 사용자가 별도로 확인하는 화면이 없으므로
+    // 분석이 끝나면 바로 확정(CONFIRMED) 처리해서, OOTD 상세/관련/검색 등 CONFIRMED 태그만 노출하는
+    // 화면에서도 자동 태그가 바로 보이게 한다. 이미 ANALYZING을 벗어난 상태라면 되돌리지 않는다.
     public void markAutoTagsReady() {
         if (this.tagStatus == OotdTagStatus.ANALYZING) {
-            this.tagStatus = OotdTagStatus.AUTO_UNCONFIRMED;
+            this.tagStatus = OotdTagStatus.CONFIRMED;
+            this.tagConfirmedAt = LocalDateTime.now();
         }
     }
 

@@ -660,6 +660,8 @@ class OotdTagServiceTest {
         when(ootdRepository.findById(OOTD_ID)).thenReturn(Optional.of(ootd));
         when(itemRepository.findByOwner_IdAndItemStatusOrderByCreatedAtDesc(OWNER_ID, ItemStatus.OWNED))
                 .thenReturn(List.of(jacket, sneakers));
+        when(ootdTagRepository.findWearStatsByItemId(anyLong(), eq(TagStatus.CONFIRMED), eq(OotdPublicationStatus.ACTIVE)))
+                .thenReturn(wearStats(1, LocalDateTime.now()));
 
         List<AiTagResult> results = List.of(
                 aiTagResult("블루종 자켓", "아우터", BigDecimal.valueOf(0.92)),
@@ -677,12 +679,12 @@ class OotdTagServiceTest {
         assertThat(savedTags).hasSize(2);
         assertThat(savedTags).allSatisfy(tag -> {
             assertThat(tag.getSource()).isEqualTo(TagSource.AI);
-            assertThat(tag.getStatus()).isEqualTo(TagStatus.AUTO_UNCONFIRMED);
+            assertThat(tag.getStatus()).isEqualTo(TagStatus.CONFIRMED);
             assertThat(tag.getItem()).isNotNull();
         });
         assertThat(savedTags).extracting(OotdTag::getLabelText)
                 .containsExactlyInAnyOrder("블루종 자켓", "운동화");
-        assertThat(ootd.getTagStatus()).isEqualTo(OotdTagStatus.AUTO_UNCONFIRMED);
+        assertThat(ootd.getTagStatus()).isEqualTo(OotdTagStatus.CONFIRMED);
     }
 
     @Test
@@ -694,6 +696,8 @@ class OotdTagServiceTest {
         when(ootdRepository.findById(OOTD_ID)).thenReturn(Optional.of(ootd));
         when(itemRepository.findByOwner_IdAndItemStatusOrderByCreatedAtDesc(OWNER_ID, ItemStatus.OWNED))
                 .thenReturn(List.of(jacket));
+        when(ootdTagRepository.findWearStatsByItemId(anyLong(), eq(TagStatus.CONFIRMED), eq(OotdPublicationStatus.ACTIVE)))
+                .thenReturn(wearStats(1, LocalDateTime.now()));
 
         AiTagResult validResult = aiTagResult("블루종 자켓", "아우터", BigDecimal.valueOf(0.92));
         AiTagResult outOfRangeResult = new AiTagResult(
@@ -738,7 +742,7 @@ class OotdTagServiceTest {
         verify(ootdTagRepository).saveAll(captor.capture());
 
         assertThat(captor.getValue()).isEmpty();
-        assertThat(ootd.getTagStatus()).isEqualTo(OotdTagStatus.AUTO_UNCONFIRMED);
+        assertThat(ootd.getTagStatus()).isEqualTo(OotdTagStatus.CONFIRMED);
     }
 
     @Test
