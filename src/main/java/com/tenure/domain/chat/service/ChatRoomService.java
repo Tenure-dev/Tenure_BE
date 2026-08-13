@@ -21,8 +21,10 @@ import com.tenure.domain.notification.repository.NotificationRepository;
 import com.tenure.domain.product.entity.Product;
 import com.tenure.domain.product.exception.ProductErrorCode;
 import com.tenure.domain.product.repository.ProductRepository;
+import com.tenure.domain.purchase.entity.PurchaseOffer;
 import com.tenure.domain.purchase.enums.PurchaseIntentStatus;
 import com.tenure.domain.purchase.enums.PurchaseOfferStatus;
+import com.tenure.domain.purchase.exception.PurchaseOfferErrorCode;
 import com.tenure.domain.purchase.repository.PurchaseIntentRepository;
 import com.tenure.domain.purchase.repository.PurchaseOfferRepository;
 import com.tenure.domain.trade.entity.Trade;
@@ -80,9 +82,9 @@ public class ChatRoomService {
 
     // 채팅방 조회 / 생성
     @Transactional
-    public ChatRoomResponse findOrCreateChatRoom(Long buyerId, Long itemId) {
+    public ChatRoomResponse findOrCreateChatRoom(Long currentUserId, Long itemId, Long purchaseOfferId) {
 
-        log.info("[채팅방 생성/조회] buyerId = {}, itemId = {}", buyerId, itemId);
+        log.info("[채팅방 생성/조회] currentUserId = {}, itemId = {}", currentUserId, itemId);
 
         //아이템 + 주인 한 번에 조회
         Item item = itemRepository.findByIdWithOwner(itemId)
@@ -93,16 +95,42 @@ public class ChatRoomService {
 
         User owner = item.getOwner();
 
-        //구매자(사용자) 조회
-        User buyer = userRepository.findById(buyerId)
-                .orElseThrow(() -> {
-                    log.warn("[채팅방 생성/조회] 해당 구매자는 존재하지 않습니다. buyerId = {}", buyerId);
-                    return new CustomException(UserErrorCode.USER_NOT_FOUND);
-                });
+        Long buyerId;
+        User buyer;
 
-        if(buyerId.equals(owner.getId())) {
-            log.warn("[채팅방 생성 / 조회] 본인의 아이템에는 채팅방을 생성 할 수없습니다. buyerId = {}, ownerId = {}", buyerId, owner.getId());
-            throw new CustomException(ChatErrorCode.CHAT_CREATION_NOT_ALLOWED);
+        // 판매자라면
+        if (currentUserId.equals(owner.getId())) {
+            // 판매자가 채팅 시작 — purchaseOfferId로 구매자 특정
+            if (purchaseOfferId == null) {
+                log.warn("[채팅방 생성/조회] 판매자가 채팅방 생성 시 purchaseOfferId 필요. currentUserId = {}", currentUserId);
+                throw new CustomException(ChatErrorCode.CHAT_CREATION_NOT_ALLOWED);
+            }
+            PurchaseOffer offer = purchaseOfferRepository.findById(purchaseOfferId)
+                    .orElseThrow(() -> {
+                        log.warn("[채팅방 생성/조회] 구매 제안을 찾을 수 없습니다. purchaseOfferId = {}", purchaseOfferId);
+                        return new CustomException(PurchaseOfferErrorCode.PURCHASE_OFFER_NOT_FOUND);
+                    });
+
+            // 검증
+            boolean valid = offer.getItem().getId().equals(itemId)
+                    && offer.getOwner().getId().equals(currentUserId)
+                    && (offer.getStatus() == SENT || offer.getStatus() == ACCEPTED);
+
+            if (!valid) {
+                log.warn("[채팅방 생성/조회] 유효하지 않은 구매 제안. purchaseOfferId = {}", purchaseOfferId);
+                throw new CustomException(ChatErrorCode.CHAT_CREATION_NOT_ALLOWED);
+            }
+
+            buyer = offer.getProposer();
+            buyerId = buyer.getId();
+        } else {
+            // 구매자가 채팅 시작
+            buyerId = currentUserId;
+            buyer = userRepository.findById(buyerId)
+                    .orElseThrow(() -> {
+                        log.warn("[채팅방 생성/조회] 해당 구매자는 존재하지 않습니다. buyerId = {}", buyerId);
+                        return new CustomException(UserErrorCode.USER_NOT_FOUND);
+                    });
         }
 
         // 양방향 차단 한 번에 조회
@@ -172,13 +200,13 @@ public class ChatRoomService {
                 .findIdByBuyerIdAndSellerIdAndProductIdAndStatus(buyerId, owner.getId(), product.getId(), PurchaseIntentStatus.SENT)
                 .orElse(null);
 
-        Long purchaseOfferId = purchaseOfferRepository
+        Long sentPurchaseOfferId = purchaseOfferRepository
                 .findIdByProposerIdAndOwnerIdAndItemIdAndStatus(buyerId, owner.getId(), itemId, SENT)
                 .orElse(null);
 
         // 아이템 상세에서 바로 들어온 경우 처음엔 isOpponentExited false 고정
         return ChatRoomResponse
-                .from(chatRoom, item, product, buyerId, tradeId, purchaseIntentId, purchaseOfferId, ownerBlockedBuyer, false);
+                .from(chatRoom, item, product, currentUserId, tradeId, purchaseIntentId, sentPurchaseOfferId, ownerBlockedBuyer, false);
     }
 
     // 채팅방 목록 조회
