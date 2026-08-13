@@ -112,7 +112,7 @@ public class OotdController {
             description = "앱 전용 카메라로 촬영한 착장 사진을 OOTD로 게시합니다. "
                     + "게시 응답은 AI 태그 분석을 기다리지 않고 즉시 반환하며, "
                     + "게시 직후 백그라운드에서 비동기로 사진 전체에 대한 AI 태그 분석이 자동으로 진행됩니다. "
-                    + "분석이 끝나면 tagStatus가 ANALYZING에서 AUTO_UNCONFIRMED로 바뀝니다."
+                    + "자동 태그는 별도 확인 단계 없이 즉시 확정되며, 분석이 끝나면 tagStatus가 ANALYZING에서 CONFIRMED로 바뀝니다."
     )
     @ApiResponse(
             responseCode = "200",

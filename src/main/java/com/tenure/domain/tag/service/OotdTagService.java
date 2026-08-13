@@ -95,8 +95,17 @@ public class OotdTagService {
                 .filter(Objects::nonNull)
                 .toList();
 
+        // auto-tag 플로우는 사용자가 태그를 따로 확인/확정하는 화면이 없으므로, 저장과 동시에 확정(CONFIRMED)
+        // 처리한다. 그래야 OOTD 상세/관련/검색 등 CONFIRMED 태그만 노출하는 화면과 착용 정보 집계에 바로 반영된다.
+        tags.forEach(OotdTag::confirm);
         ootdTagRepository.saveAll(tags);
         ootd.markAutoTagsReady();
+
+        tags.stream()
+                .map(OotdTag::getItem)
+                .distinct()
+                .forEach(this::recalculateWearStats);
+
         log.info("AI 태그 저장 완료 - ootdId={}, 저장된 태그 수={}/{} (보유 아이템 매칭 실패분 제외)", ootdId, tags.size(), results.size());
     }
 
