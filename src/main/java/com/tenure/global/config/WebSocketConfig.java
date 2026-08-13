@@ -2,6 +2,7 @@ package com.tenure.global.config;
 
 import com.tenure.global.handler.StompHandler;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.simp.config.ChannelRegistration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
@@ -15,6 +16,8 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     private final StompHandler stompHandler;
+    @Value("${app.cors.allowed-origins}")
+    private String[] allowedOrigins;
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry registry) {
@@ -26,7 +29,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         registry.addEndpoint("/ws") //클라이언트가 웹소켓 연결을 맺기 위해 접속하는 엔드포인트
-                .setAllowedOriginPatterns("*") // CORS 허용 TODO: 배포 전 프론트 도메인으로 교체 예정
+                .setAllowedOriginPatterns(allowedOrigins) // CORS 허용
                 .withSockJS(); // SockJS 지원 (웹소켓 미지원 브라우저 대응)
     }
 
