@@ -11,15 +11,19 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.net.URI;
 import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import javax.imageio.ImageIO;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
@@ -91,8 +95,13 @@ public class GeminiAiTagService implements AiTagService {
 
     @Override
     public List<AiTagResult> analyze(String imageUrl) {
+        return analyze(imageUrl, null);
+    }
+
+    @Override
+    public List<AiTagResult> analyze(String imageUrl, String imageObjectKey) {
         try {
-            byte[] imageBytes = readImageBytes(imageUrl);
+            byte[] imageBytes = readImageBytes(imageUrl, imageObjectKey);
             String base64Image = Base64.getEncoder().encodeToString(imageBytes);
             String responseBody = requestGemini(base64Image, detectContentType(imageBytes));
             return parseTagResults(responseBody);
@@ -113,9 +122,21 @@ public class GeminiAiTagService implements AiTagService {
             BigDecimal bboxWidth,
             BigDecimal bboxHeight
     ) {
+        return analyzeRegion(imageUrl, null, bboxX, bboxY, bboxWidth, bboxHeight);
+    }
+
+    @Override
+    public RegionAnalysisResult analyzeRegion(
+            String imageUrl,
+            String imageObjectKey,
+            BigDecimal bboxX,
+            BigDecimal bboxY,
+            BigDecimal bboxWidth,
+            BigDecimal bboxHeight
+    ) {
         String base64Crop;
         try {
-            base64Crop = readCroppedImageAsBase64(imageUrl, bboxX, bboxY, bboxWidth, bboxHeight);
+            base64Crop = readCroppedImageAsBase64(imageUrl, imageObjectKey, bboxX, bboxY, bboxWidth, bboxHeight);
         } catch (Exception e) {
             log.error("Gemini 영역 분석 실패(크롭 단계) - imageUrl={}, bbox=({}, {}, {}, {})",
                     imageUrl, bboxX, bboxY, bboxWidth, bboxHeight, e);
@@ -187,12 +208,13 @@ public class GeminiAiTagService implements AiTagService {
 
     private String readCroppedImageAsBase64(
             String imageUrl,
+            String imageObjectKey,
             BigDecimal bboxX,
             BigDecimal bboxY,
             BigDecimal bboxWidth,
             BigDecimal bboxHeight
     ) throws IOException {
-        BufferedImage original = ImageIO.read(new ByteArrayInputStream(readImageBytes(imageUrl)));
+        BufferedImage original = ImageIO.read(new ByteArrayInputStream(readImageBytes(imageUrl, imageObjectKey)));
         if (original == null) {
             throw new IOException("이미지를 읽을 수 없습니다: " + imageUrl);
         }
@@ -241,10 +263,72 @@ public class GeminiAiTagService implements AiTagService {
                 .body(String.class);
     }
 
-    private byte[] readImageBytes(String imageUrl) throws IOException {
-        String objectKey = imageStorageService.objectKeyFromUrl(imageUrl)
-                .orElseThrow(() -> new IOException("Image object key not found: " + imageUrl));
-        return imageStorageService.readBytes(objectKey);
+    private byte[] readImageBytes(String imageUrl, String imageObjectKey) throws IOException {
+        Optional<String> objectKey = hasText(imageObjectKey)
+                ? Optional.of(imageObjectKey)
+                : imageStorageService.objectKeyFromUrl(imageUrl).or(() -> objectKeyFromStaticFilesUrl(imageUrl));
+
+        return readImageBytesByObjectKey(objectKey
+                .orElseThrow(() -> new IOException("Image object key not found: " + imageUrl)));
+    }
+
+    private byte[] readImageBytesByObjectKey(String objectKey) throws IOException {
+        try {
+            return imageStorageService.readBytes(objectKey);
+        } catch (IOException storageException) {
+            return readClasspathFileBytes(objectKey)
+                    .orElseThrow(() -> storageException);
+        }
+    }
+
+    private Optional<byte[]> readClasspathFileBytes(String objectKey) throws IOException {
+        String normalizedKey = trimLeadingSlash(objectKey);
+        if (normalizedKey.isBlank() || normalizedKey.contains("..")) {
+            return Optional.empty();
+        }
+
+        ClassPathResource resource = new ClassPathResource("static/files/" + normalizedKey);
+        if (!resource.exists()) {
+            return Optional.empty();
+        }
+
+        try (InputStream inputStream = resource.getInputStream()) {
+            return Optional.of(inputStream.readAllBytes());
+        }
+    }
+
+    private Optional<String> objectKeyFromStaticFilesUrl(String imageUrl) {
+        if (!hasText(imageUrl)) {
+            return Optional.empty();
+        }
+
+        String path = imageUrl;
+        try {
+            URI uri = URI.create(imageUrl);
+            if (uri.getPath() != null) {
+                path = uri.getPath();
+            }
+        } catch (IllegalArgumentException ignored) {
+            // Keep the original value when imageUrl is a relative path.
+        }
+
+        String staticPrefix = "/files/";
+        if (!path.startsWith(staticPrefix)) {
+            return Optional.empty();
+        }
+        return Optional.of(path.substring(staticPrefix.length()));
+    }
+
+    private String trimLeadingSlash(String value) {
+        String result = value.replace('\\', '/');
+        while (result.startsWith("/")) {
+            result = result.substring(1);
+        }
+        return result;
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 
     private String detectContentType(byte[] imageBytes) {
