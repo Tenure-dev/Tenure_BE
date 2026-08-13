@@ -42,7 +42,12 @@ public class OotdService {
     ) {
         Ootd ootd = createOotdEntity(currentUserId, image, source, false);
 
-        eventPublisher.publishEvent(new OotdCreatedEvent(ootd.getId(), ootd.getOwner().getId(), ootd.getImageUrl()));
+        eventPublisher.publishEvent(new OotdCreatedEvent(
+                ootd.getId(),
+                ootd.getOwner().getId(),
+                ootd.getImageUrl(),
+                ootd.getImageObjectKey()
+        ));
 
         return OotdCreateResponse.of(ootd);
     }
