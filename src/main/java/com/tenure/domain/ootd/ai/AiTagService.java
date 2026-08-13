@@ -11,6 +11,10 @@ public interface AiTagService {
 
     List<AiTagResult> analyze(String imageUrl);
 
+    default List<AiTagResult> analyze(String imageUrl, String imageObjectKey) {
+        return analyze(imageUrl);
+    }
+
     RegionAnalysisResult analyzeRegion(
             String imageUrl,
             BigDecimal bboxX,
@@ -18,4 +22,15 @@ public interface AiTagService {
             BigDecimal bboxWidth,
             BigDecimal bboxHeight
     );
+
+    default RegionAnalysisResult analyzeRegion(
+            String imageUrl,
+            String imageObjectKey,
+            BigDecimal bboxX,
+            BigDecimal bboxY,
+            BigDecimal bboxWidth,
+            BigDecimal bboxHeight
+    ) {
+        return analyzeRegion(imageUrl, bboxX, bboxY, bboxWidth, bboxHeight);
+    }
 }
