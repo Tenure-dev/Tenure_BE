@@ -240,6 +240,16 @@ public class NotificationFactory {
         );
     }
 
+    // 거래 시작 (관심 유저에게)
+    public Notification productTradingStarted(User receiver, Item item) {
+        return Notification.of(
+                receiver, NotificationType.PRODUCT_TRADING_STARTED,
+                "관심 아이템이 거래를 시작했어요.", item.getId(),
+                null, item.getBrandName(), item.getItemName(),
+                item.getRepresentativeImageUrl()
+        );
+    }
+
     // 미판매 전환 (관심 유저에게)
     public Notification productReturnedToUnsold(User receiver, Item item) {
         return Notification.of(
