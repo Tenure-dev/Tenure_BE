@@ -798,6 +798,7 @@ class OotdTagServiceTest {
         when(ootdRepository.findById(OOTD_ID)).thenReturn(Optional.of(ootd));
         when(aiTagService.analyzeRegion(
                 eq(ootd.getImageUrl()),
+                eq(ootd.getImageObjectKey()),
                 any(BigDecimal.class),
                 any(BigDecimal.class),
                 any(BigDecimal.class),
@@ -826,6 +827,7 @@ class OotdTagServiceTest {
         when(ootdRepository.findById(OOTD_ID)).thenReturn(Optional.of(ootd));
         when(aiTagService.analyzeRegion(
                 eq(ootd.getImageUrl()),
+                eq(ootd.getImageObjectKey()),
                 any(BigDecimal.class),
                 any(BigDecimal.class),
                 any(BigDecimal.class),
@@ -847,6 +849,7 @@ class OotdTagServiceTest {
         when(ootdRepository.findById(OOTD_ID)).thenReturn(Optional.of(ootd));
         when(aiTagService.analyzeRegion(
                 eq(ootd.getImageUrl()),
+                eq(ootd.getImageObjectKey()),
                 any(BigDecimal.class),
                 any(BigDecimal.class),
                 any(BigDecimal.class),
@@ -870,6 +873,7 @@ class OotdTagServiceTest {
         when(ootdRepository.findById(OOTD_ID)).thenReturn(Optional.of(ootd));
         when(aiTagService.analyzeRegion(
                 eq(ootd.getImageUrl()),
+                eq(ootd.getImageObjectKey()),
                 any(BigDecimal.class),
                 any(BigDecimal.class),
                 any(BigDecimal.class),
@@ -892,6 +896,7 @@ class OotdTagServiceTest {
         when(ootdRepository.findById(OOTD_ID)).thenReturn(Optional.of(ootd));
         when(aiTagService.analyzeRegion(
                 eq(ootd.getImageUrl()),
+                eq(ootd.getImageObjectKey()),
                 any(BigDecimal.class),
                 any(BigDecimal.class),
                 any(BigDecimal.class),

@@ -21,8 +21,10 @@ import com.tenure.domain.notification.repository.NotificationRepository;
 import com.tenure.domain.product.entity.Product;
 import com.tenure.domain.product.exception.ProductErrorCode;
 import com.tenure.domain.product.repository.ProductRepository;
+import com.tenure.domain.purchase.entity.PurchaseOffer;
 import com.tenure.domain.purchase.enums.PurchaseIntentStatus;
 import com.tenure.domain.purchase.enums.PurchaseOfferStatus;
+import com.tenure.domain.purchase.exception.PurchaseOfferErrorCode;
 import com.tenure.domain.purchase.repository.PurchaseIntentRepository;
 import com.tenure.domain.purchase.repository.PurchaseOfferRepository;
 import com.tenure.domain.trade.entity.Trade;
@@ -51,6 +53,7 @@ import java.util.List;
 import java.util.Objects;
 
 import static com.tenure.domain.product.enums.ProductStatus.*;
+import static com.tenure.domain.purchase.enums.PurchaseOfferStatus.*;
 
 @Service
 @Slf4j
@@ -79,9 +82,9 @@ public class ChatRoomService {
 
     // 채팅방 조회 / 생성
     @Transactional
-    public ChatRoomResponse findOrCreateChatRoom(Long buyerId, Long itemId) {
+    public ChatRoomResponse findOrCreateChatRoom(Long currentUserId, Long itemId, Long purchaseOfferId) {
 
-        log.info("[채팅방 생성/조회] buyerId = {}, itemId = {}", buyerId, itemId);
+        log.info("[채팅방 생성/조회] currentUserId = {}, itemId = {}", currentUserId, itemId);
 
         //아이템 + 주인 한 번에 조회
         Item item = itemRepository.findByIdWithOwner(itemId)
@@ -92,16 +95,42 @@ public class ChatRoomService {
 
         User owner = item.getOwner();
 
-        //구매자(사용자) 조회
-        User buyer = userRepository.findById(buyerId)
-                .orElseThrow(() -> {
-                    log.warn("[채팅방 생성/조회] 해당 구매자는 존재하지 않습니다. buyerId = {}", buyerId);
-                    return new CustomException(UserErrorCode.USER_NOT_FOUND);
-                });
+        Long buyerId;
+        User buyer;
 
-        if(buyerId.equals(owner.getId())) {
-            log.warn("[채팅방 생성 / 조회] 본인의 아이템에는 채팅방을 생성 할 수없습니다. buyerId = {}, ownerId = {}", buyerId, owner.getId());
-            throw new CustomException(ChatErrorCode.CHAT_CREATION_NOT_ALLOWED);
+        // 판매자라면
+        if (currentUserId.equals(owner.getId())) {
+            // 판매자가 채팅 시작 — purchaseOfferId로 구매자 특정
+            if (purchaseOfferId == null) {
+                log.warn("[채팅방 생성/조회] 판매자가 채팅방 생성 시 purchaseOfferId 필요. currentUserId = {}", currentUserId);
+                throw new CustomException(ChatErrorCode.CHAT_CREATION_NOT_ALLOWED);
+            }
+            PurchaseOffer offer = purchaseOfferRepository.findByIdWithUsers(purchaseOfferId)
+                    .orElseThrow(() -> {
+                        log.warn("[채팅방 생성/조회] 구매 제안을 찾을 수 없습니다. purchaseOfferId = {}", purchaseOfferId);
+                        return new CustomException(PurchaseOfferErrorCode.PURCHASE_OFFER_NOT_FOUND);
+                    });
+
+            // 검증
+            boolean valid = offer.getItem().getId().equals(itemId)
+                    && offer.getOwner().getId().equals(currentUserId)
+                    && (offer.getStatus() == SENT || offer.getStatus() == ACCEPTED);
+
+            if (!valid) {
+                log.warn("[채팅방 생성/조회] 유효하지 않은 구매 제안. purchaseOfferId = {}", purchaseOfferId);
+                throw new CustomException(ChatErrorCode.CHAT_CREATION_NOT_ALLOWED);
+            }
+
+            buyer = offer.getProposer();
+            buyerId = buyer.getId();
+        } else {
+            // 구매자가 채팅 시작
+            buyerId = currentUserId;
+            buyer = userRepository.findById(buyerId)
+                    .orElseThrow(() -> {
+                        log.warn("[채팅방 생성/조회] 해당 구매자는 존재하지 않습니다. buyerId = {}", buyerId);
+                        return new CustomException(UserErrorCode.USER_NOT_FOUND);
+                    });
         }
 
         // 양방향 차단 한 번에 조회
@@ -120,11 +149,32 @@ public class ChatRoomService {
 
         //product 중에서 해당 아이템이 판매중이거나 거래중인 항목을 찾음
         Product product = productRepository.findByItemIdAndProductStatusIn(itemId, List.of(ON_SALE, TRADING))
-                .orElseThrow(() -> {
-                    log.warn("[채팅방 생성/조회] 해당 상품은 판매중이거나 거래중이 아닙니다. itemId = {}", itemId);
-                    return new CustomException(ProductErrorCode.PRODUCT_NOT_ON_SALE);
-                });
+                .orElseGet(() -> {
 
+                    // 미판매 or 판매완료 상품인 경우
+                    // 미판매 상품 + 구매제안 = 채팅방 생성 가능
+                    boolean hasSentOffer = purchaseOfferRepository
+                            .existsByProposerIdAndOwnerIdAndItemIdAndStatusIn(
+                                    buyerId, owner.getId(), itemId, List.of(SENT, ACCEPTED));
+
+                    if(!hasSentOffer) {
+                        log.warn("[채팅방 생성/조회] 해당 상품은 미판매 상품입니다. itemId = {}", itemId);
+                        throw new CustomException(ProductErrorCode.PRODUCT_NOT_ON_SALE);
+                    }
+
+                    // 판매 등록을 안했을 경우 null
+                    Product offerSentProduct = productRepository.findByItemId(itemId)
+                            .orElse(null);
+
+                    // 상품이 판매 완료 된 경우
+                    if(offerSentProduct != null && offerSentProduct.getProductStatus() == SOLD) {
+                        log.warn("[채팅방 생성/조회] 해당 상품은 판매 완료된 상품입니다. itemId = {}", itemId);
+                        throw new CustomException(ProductErrorCode.PRODUCT_NOT_ON_SALE);
+                    }
+
+                    // 미판매 + 구매제안
+                    return offerSentProduct;
+                });
 
         ChatRoom  chatRoom;
 
@@ -145,17 +195,22 @@ public class ChatRoomService {
 
         Long tradeId = tradeRepository.findByItemId(itemId).map(Trade::getId).orElse(null);
 
-        Long purchaseIntentId = purchaseIntentRepository
+        // 판매등록을 안했을경우 product 생성 x
+        Long purchaseIntentId = (product == null) ? null : purchaseIntentRepository
                 .findIdByBuyerIdAndSellerIdAndProductIdAndStatus(buyerId, owner.getId(), product.getId(), PurchaseIntentStatus.SENT)
                 .orElse(null);
 
-        Long purchaseOfferId = purchaseOfferRepository
-                .findIdByProposerIdAndOwnerIdAndItemIdAndStatus(buyerId, owner.getId(), itemId, PurchaseOfferStatus.SENT)
+        Long sentPurchaseOfferId = purchaseOfferRepository
+                .findIdByProposerIdAndOwnerIdAndItemIdAndStatus(buyerId, owner.getId(), itemId, SENT)
+                .orElse(null);
+
+        Integer offerPrice = purchaseOfferRepository
+                .findOfferPriceByProposerIdAndOwnerIdAndItemIdAndStatusIn(buyerId, owner.getId(), itemId, List.of(SENT, ACCEPTED))
                 .orElse(null);
 
         // 아이템 상세에서 바로 들어온 경우 처음엔 isOpponentExited false 고정
         return ChatRoomResponse
-                .from(chatRoom, item, product, buyerId, tradeId, purchaseIntentId, purchaseOfferId, ownerBlockedBuyer, false);
+                .from(chatRoom, item, product, currentUserId, tradeId, purchaseIntentId, sentPurchaseOfferId, ownerBlockedBuyer, false, offerPrice);
     }
 
     // 채팅방 목록 조회
@@ -211,11 +266,7 @@ public class ChatRoomService {
         Item item = chatRoom.getItem();
 
         //해당 아이템의 product 조회
-        Product product = productRepository.findByItemId(item.getId())
-                .orElseThrow(() -> {
-                    log.warn("[채팅방 조회] 상품을 찾을 수 없습니다. itemId = {}", item.getId());
-                    return new CustomException(ProductErrorCode.PRODUCT_NOT_FOUND);
-                });
+        Product product = productRepository.findByItemId(item.getId()).orElse(null);
 
         //아이템에 대한 거래가 성사됐는지 판단
         Long tradeId = tradeRepository
@@ -225,14 +276,18 @@ public class ChatRoomService {
         Long sellerId = chatRoom.getSeller().getId();
         Long opponentId = currentUserId.equals(buyerId) ? sellerId : buyerId;
 
-        // 해당 상품에 대해 거래 의사를 보낸 적이 있는가
-        Long purchaseIntentId = purchaseIntentRepository
+        // 해당 상품에 대해 거래 의사를 보낸 적이 있는가 (product 없는 제안 기반 거래는 null)
+        Long purchaseIntentId = (product == null) ? null : purchaseIntentRepository
                 .findIdByBuyerIdAndSellerIdAndProductIdAndStatus(buyerId, sellerId, product.getId(), PurchaseIntentStatus.SENT)
                 .orElse(null);
 
         // 해당 아이템에 대해 구매 제안을 보낸 적이 있는가
         Long purchaseOfferId = purchaseOfferRepository
-                .findIdByProposerIdAndOwnerIdAndItemIdAndStatus(buyerId, sellerId, item.getId(), PurchaseOfferStatus.SENT)
+                .findIdByProposerIdAndOwnerIdAndItemIdAndStatus(buyerId, sellerId, item.getId(), SENT)
+                .orElse(null);
+
+        Integer offerPrice = purchaseOfferRepository
+                .findOfferPriceByProposerIdAndOwnerIdAndItemIdAndStatusIn(buyerId, sellerId, item.getId(), List.of(SENT, ACCEPTED))
                 .orElse(null);
 
         // 상대방이 나를 차단했는지 여부
@@ -248,7 +303,7 @@ public class ChatRoomService {
                 .ifPresent(Notification::markRead);
 
         return ChatRoomResponse
-                .from(chatRoom, item, product, currentUserId, tradeId, purchaseIntentId, purchaseOfferId, isBlocked, isOpponentExited);
+                .from(chatRoom, item, product, currentUserId, tradeId, purchaseIntentId, purchaseOfferId, isBlocked, isOpponentExited, offerPrice);
     }
 
     //채팅방 접속 시 unreadCount 업데이트

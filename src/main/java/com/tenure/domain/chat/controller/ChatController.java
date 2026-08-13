@@ -39,7 +39,7 @@ public class ChatController {
     public BaseResponse<ChatRoomResponse> findOrCreateChatRoom(@RequestBody @Valid ChatRoomRequest chatRoomRequest) {
 
         ChatRoomResponse chatRoomResponse = chatRoomService
-                .findOrCreateChatRoom(currentUserProvider.getCurrentUserId(), chatRoomRequest.getItemId());
+                .findOrCreateChatRoom(currentUserProvider.getCurrentUserId(), chatRoomRequest.getItemId(), chatRoomRequest.getPurchaseOfferId());
 
         return BaseResponse.success(chatRoomResponse);
 

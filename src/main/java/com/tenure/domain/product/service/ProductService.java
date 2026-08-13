@@ -302,14 +302,28 @@ public class ProductService {
         return ProductDeleteResponse.of(product, item);
     }
 
+    @Transactional
+    public void notifyWishersTradingStarted(Item item, Long excludeUserId) {
+        notifyWishedUsers(item, excludeUserId, receiver -> notificationFactory.productTradingStarted(receiver, item));
+    }
+
     private void notifyWishedUsers(Item item, Function<User, Notification> notificationCreator) {
+        notifyWishedUsers(item, null, notificationCreator);
+    }
+
+    private void notifyWishedUsers(Item item, Long excludeUserId, Function<User, Notification> notificationCreator) {
         List<User> receivers = wishRepository.findNotificationReceiversByItemId(item.getId());
         if (receivers == null || receivers.isEmpty()) {
             return;
         }
-        notificationService.saveAll(receivers.stream()
+        List<Notification> notifications = receivers.stream()
+                .filter(receiver -> excludeUserId == null || !receiver.getId().equals(excludeUserId))
                 .map(notificationCreator)
-                .toList());
+                .toList();
+        if (notifications.isEmpty()) {
+            return;
+        }
+        notificationService.saveAll(notifications);
     }
 
     private void validateOwner(Item item, Long currentUserId) {

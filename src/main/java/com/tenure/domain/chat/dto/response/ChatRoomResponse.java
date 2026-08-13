@@ -4,6 +4,9 @@ import com.tenure.domain.chat.entity.ChatRoom;
 import com.tenure.domain.item.entity.Item;
 import com.tenure.domain.product.entity.Product;
 import com.tenure.domain.product.enums.ProductStatus;
+
+import static com.tenure.domain.product.enums.ProductStatus.ON_SALE;
+import static com.tenure.domain.product.enums.ProductStatus.TRADING;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -39,7 +42,8 @@ public class ChatRoomResponse {
     public static ChatRoomResponse from(
             ChatRoom chatRoom, Item item, Product product,
             Long currentUserId, Long tradeId, Long purchaseIntentId,
-            Long purchaseOfferId, boolean isBlocked, boolean isOpponentExited)
+            Long purchaseOfferId, boolean isBlocked, boolean isOpponentExited,
+            Integer offerPrice)
     {
         boolean isBuyer = currentUserId.equals(chatRoom.getBuyer().getId());
 
@@ -55,9 +59,18 @@ public class ChatRoomResponse {
                 ? chatRoom.getSeller().getProfileImageUrl()
                 : chatRoom.getBuyer().getProfileImageUrl();
 
+        ProductStatus productStatus = product != null ? product.getProductStatus() : null;
+
+
+        // 판매중/거래중이면 상품 가격, 그 외(미판매 + product없음)는 제안 금액(없으면 null)
+        Integer price = (product != null && (product.getProductStatus() == ON_SALE || product.getProductStatus() == TRADING))
+                ? product.getPrice()
+                : offerPrice;
+        Long productId = product != null ? product.getId() : null;
+
         return new ChatRoomResponse(chatRoom.getId(), opponentUserId, opponentUsername, opponentProfileImage, item.getId(),
-                item.getRepresentativeImageUrl(), item.getBrandName(), item.getItemName(), product.getProductStatus(), product.getPrice(),
-                item.getLastWornAt(), isBuyer, tradeId, product.getId(), purchaseIntentId, purchaseOfferId, isBlocked, isOpponentExited
+                item.getRepresentativeImageUrl(), item.getBrandName(), item.getItemName(), productStatus, price,
+                item.getLastWornAt(), isBuyer, tradeId, productId, purchaseIntentId, purchaseOfferId, isBlocked, isOpponentExited
         );
     }
 

@@ -28,7 +28,7 @@ public class OotdCreatedEventListener {
     public void handleOotdCreated(OotdCreatedEvent event) {
         log.info("OOTD_CREATED 이벤트 수신 - ootdId={}. AI 태그 분석을 시작합니다.", event.ootdId());
 
-        List<AiTagResult> results = aiTagService.analyze(event.imageUrl());
+        List<AiTagResult> results = aiTagService.analyze(event.imageUrl(), event.imageObjectKey());
         ootdTagService.saveAiTags(event.ootdId(), results);
     }
 }

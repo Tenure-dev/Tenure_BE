@@ -3,6 +3,7 @@ package com.tenure.domain.trade.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -19,6 +20,7 @@ import com.tenure.domain.product.entity.Product;
 import com.tenure.domain.product.enums.ProductStatus;
 import com.tenure.domain.product.exception.ProductErrorCode;
 import com.tenure.domain.product.repository.ProductRepository;
+import com.tenure.domain.product.service.ProductService;
 import com.tenure.domain.purchase.entity.PurchaseIntent;
 import com.tenure.domain.purchase.enums.PurchaseIntentStatus;
 import com.tenure.domain.purchase.exception.PurchaseIntentErrorCode;
@@ -63,6 +65,9 @@ class PurchaseIntentAcceptServiceTest {
     private ItemRepository itemRepository;
 
     @Mock
+    private ProductService productService;
+
+    @Mock
     private PurchaseIntentRepository purchaseIntentRepository;
 
     @Mock
@@ -81,6 +86,7 @@ class PurchaseIntentAcceptServiceTest {
         purchaseIntentAcceptService = new PurchaseIntentAcceptService(
                 productRepository,
                 itemRepository,
+                productService,
                 purchaseIntentRepository,
                 tradeRepository,
                 new PurchaseIntentExpirationService(new NotificationFactory(), notificationService),
@@ -145,6 +151,29 @@ class PurchaseIntentAcceptServiceTest {
 
         assertThat(response.tradeId()).isEqualTo(900L);
         assertThat(intent.getStatus()).isEqualTo(PurchaseIntentStatus.ACCEPTED);
+    }
+
+    @Test
+    void acceptPurchaseIntent_notifiesWishersTradingStartedExcludingBuyer() {
+        setUpService();
+        User seller = user(SELLER_ID);
+        User buyer = user(BUYER_ID);
+        Item item = item(ITEM_ID, seller);
+        Product product = product(PRODUCT_ID, item, seller);
+        PurchaseIntent intent = existingIntent(INTENT_ID, product, buyer, seller, LocalDateTime.now().plusHours(2));
+
+        givenIntentDetail(product, item, intent);
+        when(purchaseIntentRepository.findSentByProductIdForUpdate(PRODUCT_ID, PurchaseIntentStatus.SENT))
+                .thenReturn(List.of());
+        when(tradeRepository.save(any(Trade.class))).thenAnswer(invocation -> {
+            Trade trade = invocation.getArgument(0);
+            ReflectionTestUtils.setField(trade, "id", 900L);
+            return trade;
+        });
+
+        purchaseIntentAcceptService.acceptPurchaseIntent(INTENT_ID, SELLER_ID);
+
+        verify(productService).notifyWishersTradingStarted(item, BUYER_ID);
     }
 
     @Test
@@ -250,6 +279,7 @@ class PurchaseIntentAcceptServiceTest {
                 .isEqualTo(ProductErrorCode.PRODUCT_NOT_ON_SALE);
 
         assertThat(intent.getStatus()).isEqualTo(PurchaseIntentStatus.SENT);
+        verify(productService, never()).notifyWishersTradingStarted(any(), any());
     }
 
     private void givenIntentDetail(Product product, Item item, PurchaseIntent intent) {

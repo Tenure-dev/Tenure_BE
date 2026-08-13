@@ -26,17 +26,6 @@ spring:
       max-file-size: 10MB
       max-request-size: 10MB
 
-  mail:
-    host: smtp.gmail.com
-    port: 587
-    username: ${MAIL_USERNAME}
-    password: ${MAIL_PASSWORD}
-    properties:
-      mail:
-        smtp:
-          auth: true
-          starttls:
-            enable: true
 
 logging:
   level:
@@ -88,4 +77,8 @@ jwt:
   access-token-validity-in-seconds: 3600
 
 encryption:
-  secret: ${ENCRYPTION_SECRET}
+  secret: ${ENCRYPTION_SECRET:tenure-local-aes-secret-key-32b!}
+
+resend:
+  api-key: ${RESEND_API_KEY:}
+  from: ${RESEND_FROM:noreply@tenure.co.kr}

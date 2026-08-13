@@ -24,6 +24,8 @@ import com.tenure.domain.item.enums.WearingTarget;
 import com.tenure.domain.item.repository.CategoryRepository;
 import com.tenure.domain.item.repository.ItemHistoryRepository;
 import com.tenure.domain.item.repository.ItemRepository;
+import com.tenure.domain.notification.entity.Notification;
+import com.tenure.domain.notification.enums.NotificationType;
 import com.tenure.domain.notification.service.NotificationFactory;
 import com.tenure.domain.notification.service.NotificationService;
 import com.tenure.domain.ootd.entity.Ootd;
@@ -617,6 +619,47 @@ class ProductServiceTest {
                 .isInstanceOf(CustomException.class)
                 .extracting("errorCode")
                 .isEqualTo(ProductErrorCode.PRODUCT_ITEM_STATUS_INVALID);
+    }
+
+    @Test
+    void notifyWishersTradingStarted_savesTradingStartedNotificationsExcludingBuyer() {
+        User seller = user(CURRENT_USER_ID, UserGrade.BASIC);
+        Item item = item(ITEM_ID, seller, ItemStatus.ON_SALE);
+        User wisher1 = user(50L, UserGrade.BASIC);
+        User wisher2 = user(60L, UserGrade.BASIC);
+        User buyer = user(70L, UserGrade.BASIC);
+
+        when(wishRepository.findNotificationReceiversByItemId(ITEM_ID))
+                .thenReturn(List.of(wisher1, wisher2, buyer));
+
+        productService.notifyWishersTradingStarted(item, 70L);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<Notification>> captor = ArgumentCaptor.forClass(List.class);
+        verify(notificationService).saveAll(captor.capture());
+        List<Notification> notifications = captor.getValue();
+        assertThat(notifications).hasSize(2);
+        assertThat(notifications)
+                .extracting(notification -> notification.getReceiver().getId())
+                .containsExactlyInAnyOrder(50L, 60L);
+        assertThat(notifications)
+                .extracting(Notification::getType)
+                .containsOnly(NotificationType.PRODUCT_TRADING_STARTED);
+        assertThat(notifications)
+                .extracting(Notification::getTargetId)
+                .containsOnly(ITEM_ID);
+    }
+
+    @Test
+    void notifyWishersTradingStarted_doesNothingWhenNoWishers() {
+        User seller = user(CURRENT_USER_ID, UserGrade.BASIC);
+        Item item = item(ITEM_ID, seller, ItemStatus.ON_SALE);
+
+        when(wishRepository.findNotificationReceiversByItemId(ITEM_ID)).thenReturn(List.of());
+
+        productService.notifyWishersTradingStarted(item, 70L);
+
+        verify(notificationService, never()).saveAll(any());
     }
 
     private ProductCreateRequest request(FeePolicy feePolicy, int shippingFee, List<Long> attachedOotdIds) {

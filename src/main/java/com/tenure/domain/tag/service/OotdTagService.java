@@ -117,6 +117,7 @@ public class OotdTagService {
 
         RegionAnalysisResult result = aiTagService.analyzeRegion(
                 ootd.getImageUrl(),
+                ootd.getImageObjectKey(),
                 request.bbox().x(),
                 request.bbox().y(),
                 request.bbox().width(),
